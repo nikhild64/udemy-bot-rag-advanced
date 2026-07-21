@@ -40,3 +40,15 @@ export interface Chunk {
   readonly characterCount?: number;
   readonly cueCount?: number;
 }
+
+/**
+ * Represents a semantic chunk enriched with an embedding vector and provider metadata.
+ */
+export interface EmbeddedChunk extends Chunk {
+  readonly embedding: readonly number[];
+  readonly embeddingModel: string;
+  readonly embeddingDimension: number;
+  readonly providerName: string;
+  readonly provider?: string;
+}
+

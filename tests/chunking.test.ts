@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   Chunk,
-  ChunkMetadata,
   Transcript,
   TranscriptCue,
 } from '../src/core/models';
@@ -9,13 +8,11 @@ import { TranscriptFormat } from '../src/types';
 import {
   ChunkingService,
   ChunkValidator,
-  ChunkingStrategyFactory,
   SemanticChunkingStrategy,
   ChunkingError,
 } from '../src/ingestion/chunking';
 import { ParsingResult, LessonParsingResult } from '../src/ingestion/parsing';
 import { IngestionOrchestrator } from '../src/ingestion/orchestrator';
-import { ValidationError } from '../src/shared/errors';
 
 describe('Phase 7 — Semantic Chunking Module', () => {
   describe('SemanticChunkingStrategy', () => {

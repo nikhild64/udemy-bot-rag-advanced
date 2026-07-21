@@ -8,5 +8,7 @@ export * from './extraction';
 export * from './manifest';
 export * from './parsing';
 export * from './chunking';
+export * from './embeddings';
 export * from './orchestrator';
+
 

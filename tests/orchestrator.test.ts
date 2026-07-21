@@ -6,12 +6,15 @@ import {
 } from '../src/ingestion/orchestrator';
 import { IInputDiscoveryService, FileMetadata } from '../src/ingestion/discovery';
 import { IExtractionService } from '../src/ingestion/extraction';
+import { IEmbeddingService } from '../src/ingestion/embeddings';
+import { ICourseManifestDiscoveryService } from '../src/ingestion/manifest';
 import { IngestionError, NotFoundError } from '../src/shared/errors';
 import { logger } from '../src/shared/logger';
 
 describe('IngestionOrchestrator', () => {
   let mockDiscoveryService: IInputDiscoveryService;
   let mockExtractionService: IExtractionService;
+  let mockManifestDiscoveryService: ICourseManifestDiscoveryService;
   let orchestrator: IngestionOrchestrator;
   let logInfoSpy: ReturnType<typeof vi.spyOn>;
   let logErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -49,7 +52,16 @@ describe('IngestionOrchestrator', () => {
       extractAll: vi.fn(),
     };
 
-    orchestrator = new IngestionOrchestrator(mockDiscoveryService, mockExtractionService);
+    mockManifestDiscoveryService = {
+      discover: vi.fn().mockRejectedValue(new NotFoundError('Mock course not found')),
+      discoverAll: vi.fn().mockResolvedValue([]),
+    };
+
+    orchestrator = new IngestionOrchestrator(
+      mockDiscoveryService,
+      mockExtractionService,
+      mockManifestDiscoveryService,
+    );
 
     logInfoSpy = vi.spyOn(logger, 'info').mockImplementation(() => logger);
     logErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => logger);
@@ -210,4 +222,59 @@ describe('IngestionOrchestrator', () => {
       expect(result.success).toBe(true);
     });
   });
+
+  describe('embed() stage', () => {
+    it('should run embedding service on chunking results and return embedding results', async () => {
+      const mockEmbeddingService: IEmbeddingService = {
+        embedChunks: vi.fn(),
+        embedChunkingResult: vi.fn().mockResolvedValue({
+          courseId: 'course-1',
+          courseName: 'Test Course',
+          providerName: 'Mistral',
+          embeddingModel: 'mistral-embed',
+          chunksCount: 5,
+          embeddingsGeneratedCount: 5,
+          failedChunksCount: 0,
+          durationMs: 10,
+          success: true,
+          embeddedChunks: [],
+          errors: [],
+        }),
+      };
+
+      const customOrchestrator = new IngestionOrchestrator(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        mockEmbeddingService,
+      );
+
+      const chunkingResults = [
+        {
+          courseId: 'course-1',
+          courseName: 'Test Course',
+          lessonsCount: 1,
+          transcriptsChunkedCount: 1,
+          failedTranscriptsCount: 0,
+          totalChunksCount: 5,
+          averageChunkSize: 100,
+          durationMs: 5,
+          success: true,
+          chunks: [{ id: 'chk-1', text: 'hello', metadata: { courseId: 'course-1', moduleId: 'm1', lessonId: 'l1', transcriptId: 't1' } }],
+          transcriptResults: [],
+          errors: [],
+        },
+      ];
+
+      const res = await customOrchestrator.embed(chunkingResults);
+      expect(res).toHaveLength(1);
+      expect(res[0]?.embeddingsGeneratedCount).toBe(5);
+      expect(mockEmbeddingService.embedChunkingResult).toHaveBeenCalledTimes(1);
+    });
+  });
 });
+

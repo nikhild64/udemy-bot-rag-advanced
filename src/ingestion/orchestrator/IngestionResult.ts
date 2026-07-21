@@ -1,6 +1,7 @@
 import { ManifestResult } from '@/ingestion/manifest';
 import { ParsingResult } from '@/ingestion/parsing';
 import { ChunkingResult } from '@/ingestion/chunking';
+import { EmbeddingResult } from '@/ingestion/embeddings';
 
 /**
  * Represents the failure details of an archive during the extraction stage.
@@ -92,9 +93,23 @@ export interface IngestionResult {
   readonly chunkingResults?: readonly ChunkingResult[];
 
   /**
+   * Total number of embedding vectors generated across all chunks.
+   */
+  readonly totalEmbeddingsGenerated?: number;
+
+  /**
+   * Number of courses/manifests that failed during embedding generation stage.
+   */
+  readonly failedEmbeddings?: number;
+
+  /**
+   * List of generated embedding results across courses.
+   */
+  readonly embeddingResults?: readonly EmbeddingResult[];
+
+  /**
    * Overall duration of the ingestion workflow in milliseconds.
    */
-
   readonly durationMs: number;
 
   /**

@@ -25,6 +25,11 @@ import {
   ChunkingService,
   ChunkingResult,
 } from '../chunking';
+import {
+  IEmbeddingService,
+  EmbeddingService,
+  EmbeddingResult,
+} from '../embeddings';
 import { IngestionContext, IngestionContextOptions } from './IngestionContext';
 import { IngestionResult, ArchiveExtractionFailure } from './IngestionResult';
 
@@ -50,6 +55,11 @@ export interface IIngestionOrchestrator {
   chunk(optionsOrParsingResults?: IngestionContextOptions | readonly ParsingResult[]): Promise<ChunkingResult[]>;
 
   /**
+   * Run only the embedding generation stage of the ingestion pipeline.
+   */
+  embed(optionsOrChunkingResults?: IngestionContextOptions | readonly ChunkingResult[]): Promise<EmbeddingResult[]>;
+
+  /**
    * Execute the full ingestion workflow.
    */
   execute(options?: IngestionContextOptions): Promise<IngestionResult>;
@@ -68,6 +78,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
   private readonly manifestValidator: IManifestValidator;
   private readonly parsingService: ITranscriptParsingService;
   private readonly chunkingService: IChunkingService;
+  private readonly embeddingService: IEmbeddingService;
 
   constructor(
     discoveryService?: IInputDiscoveryService,
@@ -77,6 +88,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     manifestValidator?: IManifestValidator,
     parsingService?: ITranscriptParsingService,
     chunkingService?: IChunkingService,
+    embeddingService?: IEmbeddingService,
   ) {
     this.discoveryService = discoveryService ?? new InputDiscoveryService();
     this.extractionService = extractionService ?? new ExtractionService();
@@ -86,6 +98,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     this.manifestValidator = manifestValidator ?? new ManifestValidator();
     this.parsingService = parsingService ?? new TranscriptParsingService();
     this.chunkingService = chunkingService ?? new ChunkingService();
+    this.embeddingService = embeddingService ?? new EmbeddingService();
   }
 
   async discover(options?: IngestionContextOptions): Promise<FileMetadata[]> {
@@ -345,6 +358,53 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     return results;
   }
 
+  async embed(
+    optionsOrChunkingResults?: IngestionContextOptions | readonly ChunkingResult[],
+  ): Promise<EmbeddingResult[]> {
+    const chunkingResults: readonly ChunkingResult[] = Array.isArray(optionsOrChunkingResults)
+      ? optionsOrChunkingResults
+      : await this.chunk(optionsOrChunkingResults as IngestionContextOptions | undefined);
+
+    logger.info(
+      { totalCoursesToEmbed: chunkingResults.length },
+      'Ingestion embedding generation stage started',
+    );
+
+    const results: EmbeddingResult[] = [];
+    for (const cRes of chunkingResults) {
+      if (!cRes.success || !cRes.chunks || cRes.chunks.length === 0) {
+        logger.warn(
+          { courseId: cRes.courseId },
+          'Skipping embedding generation for course with chunking errors or 0 chunks',
+        );
+        results.push({
+          courseId: cRes.courseId,
+          courseName: cRes.courseName,
+          providerName: 'unknown',
+          embeddingModel: config.embeddings?.mistralEmbeddingModel ?? 'mistral-embed',
+          chunksCount: cRes.totalChunksCount,
+          embeddingsGeneratedCount: 0,
+          failedChunksCount: cRes.totalChunksCount,
+          durationMs: 0,
+          success: cRes.success,
+          embeddedChunks: [],
+          errors: cRes.errors,
+        });
+        continue;
+      }
+
+      const embedRes = await this.embeddingService.embedChunkingResult(cRes);
+      results.push(embedRes);
+    }
+
+    const totalEmbeddings = results.reduce((acc, r) => acc + r.embeddingsGeneratedCount, 0);
+    logger.info(
+      { totalCoursesEmbedded: results.length, totalEmbeddings },
+      'Embedding generation stage completed',
+    );
+    return results;
+  }
+
   async execute(options?: IngestionContextOptions): Promise<IngestionResult> {
     const startTime = Date.now();
     const context = this.createContext(options);
@@ -490,12 +550,40 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       );
     }
 
+    let embeddingResults: EmbeddingResult[] = [];
+    let failedEmbeddings = 0;
+    let totalEmbeddingsGenerated = 0;
+    try {
+      embeddingResults = await this.embed(chunkingResults);
+      for (const e of embeddingResults) {
+        totalEmbeddingsGenerated += e.embeddingsGeneratedCount;
+        if (!e.success) {
+          failedEmbeddings++;
+          failures.push({
+            archiveName: e.courseName || e.courseId,
+            error: `Embedding generation failed: ${e.errors.join('; ')}`,
+          });
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ err: errorMessage }, 'Workflow failed during embedding generation stage');
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new IngestionError(
+        `Ingestion workflow terminated unexpectedly during embedding generation stage: ${errorMessage}`,
+        { cause: error },
+      );
+    }
+
     const durationMs = Date.now() - startTime;
     const success =
       failedExtractions === 0 &&
       failedManifests === 0 &&
       failedParsings === 0 &&
-      failedChunkings === 0;
+      failedChunkings === 0 &&
+      failedEmbeddings === 0;
 
     const result: IngestionResult = {
       totalArchivesDiscovered: archives.length,
@@ -512,6 +600,9 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       totalChunksGenerated,
       failedChunkings,
       chunkingResults,
+      totalEmbeddingsGenerated,
+      failedEmbeddings,
+      embeddingResults,
       durationMs,
       success,
       failures,
@@ -530,6 +621,8 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
         totalCuesParsed: result.totalCuesParsed,
         totalChunksGenerated: result.totalChunksGenerated,
         failedChunkings: result.failedChunkings,
+        totalEmbeddingsGenerated: result.totalEmbeddingsGenerated,
+        failedEmbeddings: result.failedEmbeddings,
         durationMs: result.durationMs,
         success: result.success,
       },

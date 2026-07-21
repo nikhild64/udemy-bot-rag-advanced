@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runDiscover, runExtract } from '../src/cli';
+import { runDiscover, runExtract, runEmbed } from '../src/cli';
 import { IInputDiscoveryService, FileMetadata } from '../src/ingestion/discovery';
 import { IExtractionService, ExtractionResult } from '../src/ingestion/extraction';
 import { IIngestionOrchestrator, IngestionResult } from '../src/ingestion/orchestrator';
+import { CourseManifestDiscoveryService } from '../src/ingestion/manifest';
 import { NotFoundError } from '../src/shared/errors';
 
 describe('CLI Commands', () => {
@@ -16,6 +17,7 @@ describe('CLI Commands', () => {
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null | undefined) => {
       throw new Error(`process.exit called with ${code}`);
     });
+    vi.spyOn(CourseManifestDiscoveryService.prototype, 'discoverAll').mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -183,4 +185,69 @@ describe('CLI Commands', () => {
       expect(exitSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('runEmbed', () => {
+    it('should format output correctly when embeddings are generated', async () => {
+      const mockOrchestrator = {
+        embed: vi.fn().mockResolvedValue([
+          {
+            courseId: 'angular-masterclass',
+            courseName: 'Angular Masterclass',
+            providerName: 'Mistral',
+            embeddingModel: 'mistral-embed',
+            chunksCount: 2186,
+            embeddingsGeneratedCount: 2186,
+            failedChunksCount: 0,
+            durationMs: 500,
+            success: true,
+            embeddedChunks: [],
+            errors: [],
+          },
+        ]),
+      } as unknown as IIngestionOrchestrator;
+
+      await runEmbed(mockOrchestrator);
+
+      expect(logSpy).toHaveBeenCalledWith('Generating embedding vectors for semantic chunks...\n');
+      expect(logSpy).toHaveBeenCalledWith('Course');
+      expect(logSpy).toHaveBeenCalledWith('Angular Masterclass');
+      expect(logSpy).toHaveBeenCalledWith('Chunks');
+      expect(logSpy).toHaveBeenCalledWith('2,186');
+      expect(logSpy).toHaveBeenCalledWith('Provider');
+      expect(logSpy).toHaveBeenCalledWith('Mistral');
+      expect(logSpy).toHaveBeenCalledWith('Embedding Model');
+      expect(logSpy).toHaveBeenCalledWith('mistral-embed');
+      expect(logSpy).toHaveBeenCalledWith('Embeddings Generated');
+      expect(logSpy).toHaveBeenCalledWith('2,186');
+      expect(logSpy).toHaveBeenCalledWith('Completed successfully.');
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('should handle zero chunks gracefully', async () => {
+      const mockOrchestrator = {
+        embed: vi.fn().mockResolvedValue([]),
+      } as unknown as IIngestionOrchestrator;
+
+      await runEmbed(mockOrchestrator);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'No semantic chunks found to embed. Run chunking first (`pnpm chunk`).\n',
+      );
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('should print errors and exit with 1 if embedding stage throws', async () => {
+      const mockOrchestrator = {
+        embed: vi.fn().mockRejectedValue(new Error('Provider API unreachable')),
+      } as unknown as IIngestionOrchestrator;
+
+      await expect(runEmbed(mockOrchestrator)).rejects.toThrow('process.exit called with 1');
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Embedding generation failed:\n\nReason:\nProvider API unreachable',
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
 });
+
