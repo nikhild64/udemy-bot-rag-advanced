@@ -1,9 +1,11 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { vectorStoreConfig } from '../../config';
 
 export interface HealthResponse {
   readonly status: string;
   readonly service: string;
   readonly version: string;
+  readonly error?: string;
 }
 
 export async function getHealthStatus(
@@ -24,11 +26,19 @@ export async function getReadyStatus(
   reply: FastifyReply,
 ): Promise<void> {
   try {
-    // Pipeline is constructed synchronously in the DI plugin,
-    // so if it's available, the configuration is loaded and Qdrant/Mistral instances are instantiated.
-    // Further readiness checks could ping Qdrant here.
     if (!request.server.chatPipelineService) {
       throw new Error('Pipeline not initialized');
+    }
+
+    // Ping Qdrant to verify connectivity
+    const qdrantUrl = new URL('/readyz', vectorStoreConfig.qdrantUrl).toString();
+    const qdrantResponse = await fetch(qdrantUrl, {
+      headers: vectorStoreConfig.qdrantApiKey ? { 'api-key': vectorStoreConfig.qdrantApiKey } : {},
+      signal: AbortSignal.timeout(5000), // 5s timeout
+    });
+
+    if (!qdrantResponse.ok) {
+      throw new Error(`Qdrant connectivity failed with status ${qdrantResponse.status}`);
     }
 
     const responsePayload: HealthResponse = {
@@ -39,7 +49,7 @@ export async function getReadyStatus(
 
     await reply.status(200).send(responsePayload);
   } catch (error) {
-    const responsePayload = {
+    const responsePayload: HealthResponse = {
       status: 'unavailable',
       service: 'rag-engine',
       version: '0.1.0',

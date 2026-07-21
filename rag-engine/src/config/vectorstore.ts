@@ -5,8 +5,8 @@ dotenv.config();
 
 const vectorStoreSchema = z.object({
   VECTOR_STORE_PROVIDER: z.string().min(1).default('qdrant'),
-  QDRANT_URL: z.string().default('http://localhost:6333'),
-  QDRANT_API_KEY: z.string().default(''),
+  QDRANT_URL: z.string().url('QDRANT_URL must be a valid URL').min(1, 'QDRANT_URL is required'),
+  QDRANT_API_KEY: z.string().min(1, 'QDRANT_API_KEY is required'),
   VECTOR_COLLECTION_NAME: z.string().min(1).default('knowledge-base'),
   VECTOR_DISTANCE_METRIC: z.string().min(1).default('Cosine'),
   VECTOR_STORE_TIMEOUT: z.coerce.number().int().positive().default(30000),

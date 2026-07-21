@@ -14,6 +14,7 @@
     "chunk": "tsx src/cli/chunk.ts",
     "embed": "tsx src/cli/embed.ts",
     "index": "tsx src/cli/indexing.ts",
+    "ingest": "tsx src/cli/indexing.ts",
     "vectorstore": "tsx src/cli/vectorstore.ts",
     "search": "tsx src/cli/search.ts",
     "prompt": "tsx src/cli/prompt.ts",
@@ -30,6 +31,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fastify/compress": "^9.1.0",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/rate-limit": "^11.1.0",
     "@fastify/swagger": "^9.8.1",
     "@fastify/swagger-ui": "^6.1.0",
     "@qdrant/js-client-rest": "^1.18.0",

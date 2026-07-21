@@ -2,8 +2,13 @@ import { FastifyInstance } from 'fastify';
 
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyCors from '@fastify/cors';
+import fastifyCompress from '@fastify/compress';
+import fastifyRateLimit from '@fastify/rate-limit';
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
 import { diPlugin } from './di.plugin';
+import { config } from '../../config';
 
 /**
  * Centralized plugin registration
@@ -13,6 +18,29 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
   // Add Zod type provider compilers
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  // Security Headers
+  await app.register(fastifyHelmet, {
+    global: true,
+  });
+
+  // CORS Configuration
+  await app.register(fastifyCors, {
+    origin: process.env.FRONTEND_ORIGIN || (config.app.env === 'development' ? '*' : false),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
+
+  // Response Compression
+  await app.register(fastifyCompress, {
+    global: true,
+  });
+
+  // Rate Limiting
+  await app.register(fastifyRateLimit, {
+    max: 100, // 100 requests
+    timeWindow: '1 minute', // per minute per IP
+  });
 
   // Register Swagger
   await app.register(fastifySwagger, {
