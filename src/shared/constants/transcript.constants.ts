@@ -5,4 +5,6 @@ import { TranscriptFormat } from '@/types';
  */
 export const SUPPORTED_TRANSCRIPT_FORMATS: readonly TranscriptFormat[] = [
   TranscriptFormat.VTT,
+  TranscriptFormat.SRT,
 ] as const;
+

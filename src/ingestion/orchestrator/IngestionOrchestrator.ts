@@ -15,6 +15,11 @@ import {
   ManifestResult,
   DiscoveredCourse,
 } from '../manifest';
+import {
+  ITranscriptParsingService,
+  TranscriptParsingService,
+  ParsingResult,
+} from '../parsing';
 import { IngestionContext, IngestionContextOptions } from './IngestionContext';
 import { IngestionResult, ArchiveExtractionFailure } from './IngestionResult';
 
@@ -28,6 +33,11 @@ export interface IIngestionOrchestrator {
    * Run only the manifest generation stage of the ingestion pipeline.
    */
   manifest(options?: IngestionContextOptions): Promise<ManifestResult[]>;
+
+  /**
+   * Run only the transcript parsing stage of the ingestion pipeline.
+   */
+  parse(optionsOrManifests?: IngestionContextOptions | readonly ManifestResult[]): Promise<ParsingResult[]>;
 
   /**
    * Execute the full ingestion workflow.
@@ -46,6 +56,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
   private readonly manifestDiscoveryService: ICourseManifestDiscoveryService;
   private readonly manifestBuilder: ICourseManifestBuilder;
   private readonly manifestValidator: IManifestValidator;
+  private readonly parsingService: ITranscriptParsingService;
 
   constructor(
     discoveryService?: IInputDiscoveryService,
@@ -53,6 +64,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     manifestDiscoveryService?: ICourseManifestDiscoveryService,
     manifestBuilder?: ICourseManifestBuilder,
     manifestValidator?: IManifestValidator,
+    parsingService?: ITranscriptParsingService,
   ) {
     this.discoveryService = discoveryService ?? new InputDiscoveryService();
     this.extractionService = extractionService ?? new ExtractionService();
@@ -60,6 +72,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       manifestDiscoveryService ?? new CourseManifestDiscoveryService();
     this.manifestBuilder = manifestBuilder ?? new CourseManifestBuilder();
     this.manifestValidator = manifestValidator ?? new ManifestValidator();
+    this.parsingService = parsingService ?? new TranscriptParsingService();
   }
 
   async discover(options?: IngestionContextOptions): Promise<FileMetadata[]> {
@@ -195,6 +208,82 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     return results;
   }
 
+  async parse(
+    optionsOrManifests?: IngestionContextOptions | readonly ManifestResult[],
+  ): Promise<ParsingResult[]> {
+    const manifests: readonly ManifestResult[] = Array.isArray(optionsOrManifests)
+      ? optionsOrManifests
+      : await this.manifest(optionsOrManifests as IngestionContextOptions | undefined);
+
+    logger.info({ totalManifestsToParse: manifests.length }, 'Ingestion transcript parsing stage started');
+
+    const results: ParsingResult[] = [];
+    for (const m of manifests) {
+      if (!m.success || !m.manifest) {
+        logger.warn(
+          { courseId: m.courseId },
+          'Skipping transcript parsing for manifest with validation errors or missing manifest',
+        );
+        continue;
+      }
+
+      const startTime = Date.now();
+      try {
+        const parseRes = await this.parsingService.parseManifest(m.manifest);
+        results.push(parseRes);
+      } catch (error) {
+        if (
+          error instanceof NotFoundError ||
+          (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+        ) {
+          logger.info(
+            { courseId: m.courseId },
+            'Transcript files not found during parse stage; returning empty parse result for course',
+          );
+          results.push({
+            courseId: m.courseId,
+            courseName: m.courseName,
+            lessonsCount: m.lessonsCount,
+            transcriptsParsedCount: 0,
+            failedTranscriptsCount: 0,
+            totalCuesCount: 0,
+            durationMs: Date.now() - startTime,
+            success: true,
+            transcripts: [],
+            lessonResults: [],
+            errors: [],
+          });
+          continue;
+        }
+
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ courseId: m.courseId, err: errorMessage }, 'Transcript parsing failed for course');
+        const failedRes: ParsingResult = {
+          courseId: m.courseId,
+          courseName: m.courseName,
+          lessonsCount: m.lessonsCount,
+          transcriptsParsedCount: 0,
+          failedTranscriptsCount: m.preferredTranscriptsCount || m.transcriptsCount,
+          totalCuesCount: 0,
+          durationMs: Date.now() - startTime,
+          success: false,
+          transcripts: [],
+          lessonResults: [],
+          errors: [errorMessage],
+        };
+        results.push(failedRes);
+      }
+    }
+
+    const totalTranscripts = results.reduce((acc, r) => acc + r.transcriptsParsedCount, 0);
+    const totalCues = results.reduce((acc, r) => acc + r.totalCuesCount, 0);
+    logger.info(
+      { totalManifestsParsed: results.length, totalTranscripts, totalCues },
+      'Transcript parsing stage completed',
+    );
+    return results;
+  }
+
   async execute(options?: IngestionContextOptions): Promise<IngestionResult> {
     const startTime = Date.now();
     const context = this.createContext(options);
@@ -284,8 +373,37 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       );
     }
 
+    let parsingResults: ParsingResult[] = [];
+    let failedParsings = 0;
+    let totalTranscriptsParsed = 0;
+    let totalCuesParsed = 0;
+    try {
+      parsingResults = await this.parse(manifests);
+      for (const p of parsingResults) {
+        totalTranscriptsParsed += p.transcriptsParsedCount;
+        totalCuesParsed += p.totalCuesCount;
+        if (!p.success) {
+          failedParsings++;
+          failures.push({
+            archiveName: p.courseName || p.courseId,
+            error: `Transcript parsing failed: ${p.errors.join('; ')}`,
+          });
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ err: errorMessage }, 'Workflow failed during transcript parsing stage');
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new IngestionError(
+        `Ingestion workflow terminated unexpectedly during transcript parsing stage: ${errorMessage}`,
+        { cause: error },
+      );
+    }
+
     const durationMs = Date.now() - startTime;
-    const success = failedExtractions === 0 && failedManifests === 0;
+    const success = failedExtractions === 0 && failedManifests === 0 && failedParsings === 0;
 
     const result: IngestionResult = {
       totalArchivesDiscovered: archives.length,
@@ -295,6 +413,10 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       totalManifestsGenerated: manifests.length,
       failedManifests,
       manifests,
+      totalTranscriptsParsed,
+      failedParsings,
+      totalCuesParsed,
+      parsingResults,
       durationMs,
       success,
       failures,
@@ -308,6 +430,9 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
         failedExtractions: result.failedExtractions,
         totalManifestsGenerated: result.totalManifestsGenerated,
         failedManifests: result.failedManifests,
+        totalTranscriptsParsed: result.totalTranscriptsParsed,
+        failedParsings: result.failedParsings,
+        totalCuesParsed: result.totalCuesParsed,
         durationMs: result.durationMs,
         success: result.success,
       },

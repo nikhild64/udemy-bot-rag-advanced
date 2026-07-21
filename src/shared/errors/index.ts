@@ -8,3 +8,5 @@ export * from './provider.error';
 export * from './not-found.error';
 export * from './extraction.error';
 export * from './ingestion.error';
+export * from './parsing.error';
+

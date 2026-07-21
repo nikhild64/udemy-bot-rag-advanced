@@ -10,6 +10,7 @@
     "discover": "tsx src/cli/discover.ts",
     "extract": "tsx src/cli/extract.ts",
     "manifest": "tsx src/cli/manifest.ts",
+    "parse": "tsx src/cli/parse.ts",
     "lint": "eslint .",
     "test": "vitest run",
     "format": "prettier --write \"**/*.{ts,js,json,md}\""

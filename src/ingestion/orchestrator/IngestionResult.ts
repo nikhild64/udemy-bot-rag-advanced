@@ -1,4 +1,5 @@
 import { ManifestResult } from '@/ingestion/manifest';
+import { ParsingResult } from '@/ingestion/parsing';
 
 /**
  * Represents the failure details of an archive during the extraction stage.
@@ -55,8 +56,29 @@ export interface IngestionResult {
   readonly manifests?: readonly ManifestResult[];
 
   /**
+   * Total number of course transcripts parsed across generated manifests.
+   */
+  readonly totalTranscriptsParsed?: number;
+
+  /**
+   * Number of courses/manifests that failed transcript parsing.
+   */
+  readonly failedParsings?: number;
+
+  /**
+   * Total number of subtitle cues extracted across all parsed transcripts.
+   */
+  readonly totalCuesParsed?: number;
+
+  /**
+   * List of generated parsing results across course manifests.
+   */
+  readonly parsingResults?: readonly ParsingResult[];
+
+  /**
    * Overall duration of the ingestion workflow in milliseconds.
    */
+
   readonly durationMs: number;
 
   /**
