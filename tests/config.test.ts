@@ -20,5 +20,7 @@ describe('Configuration Layer', () => {
     expect(ingestionConfig).toBeDefined();
     expect(typeof ingestionConfig.inputDirectory).toBe('string');
     expect(ingestionConfig.inputDirectory.length).toBeGreaterThan(0);
+    expect(typeof ingestionConfig.extractionDirectory).toBe('string');
+    expect(ingestionConfig.extractionDirectory.length).toBeGreaterThan(0);
   });
 });

@@ -5,6 +5,7 @@ import {
   ConfigurationError,
   ProviderError,
   NotFoundError,
+  ExtractionError,
 } from '@/shared/errors';
 
 describe('Custom Error Hierarchy', () => {
@@ -64,5 +65,13 @@ describe('Custom Error Hierarchy', () => {
     expect(error.name).toBe('NotFoundError');
     expect(error.statusCode).toBe(404);
     expect(error.code).toBe('NOT_FOUND_ERROR');
+  });
+
+  it('should correctly initialize ExtractionError defaults', () => {
+    const error = new ExtractionError('Failed to extract ZIP');
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.name).toBe('ExtractionError');
+    expect(error.statusCode).toBe(500);
+    expect(error.code).toBe('EXTRACTION_ERROR');
   });
 });

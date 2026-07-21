@@ -5,10 +5,12 @@ dotenv.config();
 
 const ingestionSchema = z.object({
   DATA_INPUT_DIRECTORY: z.string().min(1).default('./data/input'),
+  DATA_EXTRACTION_DIRECTORY: z.string().min(1).default('./data/extracted'),
 });
 
 export interface IngestionConfig {
   readonly inputDirectory: string;
+  readonly extractionDirectory: string;
 }
 
 function loadIngestionConfig(): IngestionConfig {
@@ -23,6 +25,7 @@ function loadIngestionConfig(): IngestionConfig {
 
   return {
     inputDirectory: result.data.DATA_INPUT_DIRECTORY,
+    extractionDirectory: result.data.DATA_EXTRACTION_DIRECTORY,
   };
 }
 

@@ -4,3 +4,4 @@
  * Future implementation phases will add document pipelines here.
  */
 export * from './discovery';
+export * from './extraction';
