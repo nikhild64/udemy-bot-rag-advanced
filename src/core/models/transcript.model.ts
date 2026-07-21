@@ -23,5 +23,7 @@ export interface Transcript {
   readonly sourceFile?: string;
   readonly totalCues?: number;
   readonly cues: readonly TranscriptCue[];
+  readonly courseId?: string;
+  readonly moduleId?: string;
 }
 

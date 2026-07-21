@@ -72,7 +72,12 @@ export class TranscriptParsingService implements ITranscriptParsingService {
         for (const t of selectedTranscripts) {
           transcriptsAttempted++;
           try {
-            const transcript = await this.parseFile(lesson.lessonId, t.absolutePath, t.format);
+            const parsedTs = await this.parseFile(lesson.lessonId, t.absolutePath, t.format);
+            const transcript: Transcript = {
+              ...parsedTs,
+              courseId: manifest.courseId,
+              moduleId: mod.moduleId,
+            };
             transcripts.push(transcript);
             lessonResults.push({
               lessonId: lesson.lessonId,
@@ -82,6 +87,9 @@ export class TranscriptParsingService implements ITranscriptParsingService {
               cuesCount: transcript.cues.length,
               success: true,
               transcript,
+              courseId: manifest.courseId,
+              moduleId: mod.moduleId,
+              moduleName: mod.moduleName,
             });
           } catch (error) {
             if (
@@ -100,6 +108,9 @@ export class TranscriptParsingService implements ITranscriptParsingService {
               cuesCount: 0,
               success: false,
               error: errorMessage,
+              courseId: manifest.courseId,
+              moduleId: mod.moduleId,
+              moduleName: mod.moduleName,
             });
           }
         }

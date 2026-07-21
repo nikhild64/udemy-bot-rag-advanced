@@ -20,6 +20,11 @@ import {
   TranscriptParsingService,
   ParsingResult,
 } from '../parsing';
+import {
+  IChunkingService,
+  ChunkingService,
+  ChunkingResult,
+} from '../chunking';
 import { IngestionContext, IngestionContextOptions } from './IngestionContext';
 import { IngestionResult, ArchiveExtractionFailure } from './IngestionResult';
 
@@ -40,6 +45,11 @@ export interface IIngestionOrchestrator {
   parse(optionsOrManifests?: IngestionContextOptions | readonly ManifestResult[]): Promise<ParsingResult[]>;
 
   /**
+   * Run only the semantic chunking stage of the ingestion pipeline.
+   */
+  chunk(optionsOrParsingResults?: IngestionContextOptions | readonly ParsingResult[]): Promise<ChunkingResult[]>;
+
+  /**
    * Execute the full ingestion workflow.
    */
   execute(options?: IngestionContextOptions): Promise<IngestionResult>;
@@ -57,6 +67,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
   private readonly manifestBuilder: ICourseManifestBuilder;
   private readonly manifestValidator: IManifestValidator;
   private readonly parsingService: ITranscriptParsingService;
+  private readonly chunkingService: IChunkingService;
 
   constructor(
     discoveryService?: IInputDiscoveryService,
@@ -65,6 +76,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     manifestBuilder?: ICourseManifestBuilder,
     manifestValidator?: IManifestValidator,
     parsingService?: ITranscriptParsingService,
+    chunkingService?: IChunkingService,
   ) {
     this.discoveryService = discoveryService ?? new InputDiscoveryService();
     this.extractionService = extractionService ?? new ExtractionService();
@@ -73,6 +85,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     this.manifestBuilder = manifestBuilder ?? new CourseManifestBuilder();
     this.manifestValidator = manifestValidator ?? new ManifestValidator();
     this.parsingService = parsingService ?? new TranscriptParsingService();
+    this.chunkingService = chunkingService ?? new ChunkingService();
   }
 
   async discover(options?: IngestionContextOptions): Promise<FileMetadata[]> {
@@ -284,6 +297,54 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     return results;
   }
 
+  async chunk(
+    optionsOrParsingResults?: IngestionContextOptions | readonly ParsingResult[],
+  ): Promise<ChunkingResult[]> {
+    const parsingResults: readonly ParsingResult[] = Array.isArray(optionsOrParsingResults)
+      ? optionsOrParsingResults
+      : await this.parse(optionsOrParsingResults as IngestionContextOptions | undefined);
+
+    logger.info(
+      { totalCoursesToChunk: parsingResults.length },
+      'Ingestion semantic chunking stage started',
+    );
+
+    const results: ChunkingResult[] = [];
+    for (const pRes of parsingResults) {
+      if (!pRes.success || !pRes.lessonResults || pRes.lessonResults.length === 0) {
+        logger.warn(
+          { courseId: pRes.courseId },
+          'Skipping chunking for course with parse errors or 0 lessons parsed',
+        );
+        results.push({
+          courseId: pRes.courseId,
+          courseName: pRes.courseName,
+          lessonsCount: pRes.lessonsCount,
+          transcriptsChunkedCount: 0,
+          failedTranscriptsCount: pRes.failedTranscriptsCount,
+          totalChunksCount: 0,
+          averageChunkSize: 0,
+          durationMs: 0,
+          success: pRes.success,
+          chunks: [],
+          transcriptResults: [],
+          errors: pRes.errors,
+        });
+        continue;
+      }
+
+      const chunkRes = await this.chunkingService.chunkParsingResult(pRes);
+      results.push(chunkRes);
+    }
+
+    const totalChunks = results.reduce((acc, r) => acc + r.totalChunksCount, 0);
+    logger.info(
+      { totalCoursesChunked: results.length, totalChunks },
+      'Semantic chunking stage completed',
+    );
+    return results;
+  }
+
   async execute(options?: IngestionContextOptions): Promise<IngestionResult> {
     const startTime = Date.now();
     const context = this.createContext(options);
@@ -402,8 +463,39 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       );
     }
 
+    let chunkingResults: ChunkingResult[] = [];
+    let failedChunkings = 0;
+    let totalChunksGenerated = 0;
+    try {
+      chunkingResults = await this.chunk(parsingResults);
+      for (const c of chunkingResults) {
+        totalChunksGenerated += c.totalChunksCount;
+        if (!c.success) {
+          failedChunkings++;
+          failures.push({
+            archiveName: c.courseName || c.courseId,
+            error: `Semantic chunking failed: ${c.errors.join('; ')}`,
+          });
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ err: errorMessage }, 'Workflow failed during semantic chunking stage');
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new IngestionError(
+        `Ingestion workflow terminated unexpectedly during semantic chunking stage: ${errorMessage}`,
+        { cause: error },
+      );
+    }
+
     const durationMs = Date.now() - startTime;
-    const success = failedExtractions === 0 && failedManifests === 0 && failedParsings === 0;
+    const success =
+      failedExtractions === 0 &&
+      failedManifests === 0 &&
+      failedParsings === 0 &&
+      failedChunkings === 0;
 
     const result: IngestionResult = {
       totalArchivesDiscovered: archives.length,
@@ -417,6 +509,9 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       failedParsings,
       totalCuesParsed,
       parsingResults,
+      totalChunksGenerated,
+      failedChunkings,
+      chunkingResults,
       durationMs,
       success,
       failures,
@@ -433,6 +528,8 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
         totalTranscriptsParsed: result.totalTranscriptsParsed,
         failedParsings: result.failedParsings,
         totalCuesParsed: result.totalCuesParsed,
+        totalChunksGenerated: result.totalChunksGenerated,
+        failedChunkings: result.failedChunkings,
         durationMs: result.durationMs,
         success: result.success,
       },

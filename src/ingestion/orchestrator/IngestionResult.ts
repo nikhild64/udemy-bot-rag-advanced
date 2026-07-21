@@ -1,5 +1,6 @@
 import { ManifestResult } from '@/ingestion/manifest';
 import { ParsingResult } from '@/ingestion/parsing';
+import { ChunkingResult } from '@/ingestion/chunking';
 
 /**
  * Represents the failure details of an archive during the extraction stage.
@@ -74,6 +75,21 @@ export interface IngestionResult {
    * List of generated parsing results across course manifests.
    */
   readonly parsingResults?: readonly ParsingResult[];
+
+  /**
+   * Total number of semantic chunks generated across all parsed transcripts.
+   */
+  readonly totalChunksGenerated?: number;
+
+  /**
+   * Number of courses/manifests that failed during chunking stage.
+   */
+  readonly failedChunkings?: number;
+
+  /**
+   * List of generated chunking results across courses.
+   */
+  readonly chunkingResults?: readonly ChunkingResult[];
 
   /**
    * Overall duration of the ingestion workflow in milliseconds.

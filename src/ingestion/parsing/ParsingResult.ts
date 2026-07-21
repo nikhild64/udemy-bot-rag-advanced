@@ -12,6 +12,9 @@ export interface LessonParsingResult {
   readonly success: boolean;
   readonly transcript?: Transcript;
   readonly error?: string;
+  readonly courseId?: string;
+  readonly moduleId?: string;
+  readonly moduleName?: string;
 }
 
 /**

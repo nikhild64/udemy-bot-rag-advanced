@@ -11,6 +11,7 @@
     "extract": "tsx src/cli/extract.ts",
     "manifest": "tsx src/cli/manifest.ts",
     "parse": "tsx src/cli/parse.ts",
+    "chunk": "tsx src/cli/chunk.ts",
     "lint": "eslint .",
     "test": "vitest run",
     "format": "prettier --write \"**/*.{ts,js,json,md}\""
