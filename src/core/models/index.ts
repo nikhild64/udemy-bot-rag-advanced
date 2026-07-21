@@ -9,3 +9,4 @@ export * from './search.model';
 export * from './chat.model';
 export * from './query-transformation.model';
 export * from './rerank.model';
+export * from './prompt.model';
