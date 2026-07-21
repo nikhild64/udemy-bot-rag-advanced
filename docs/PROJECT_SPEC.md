@@ -1,4 +1,5 @@
 # Project Specification
+Use pnpm for package manager
 
 > **Status:** Draft v0.1
 >
