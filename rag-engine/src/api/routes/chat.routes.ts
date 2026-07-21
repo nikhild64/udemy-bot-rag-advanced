@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { postChat } from '../controllers/chat.controller';
+import { postChat, postChatStream } from '../controllers/chat.controller';
 
 const chatRequestSchema = z.object({
   query: z.string().min(1, 'Query cannot be empty'),
@@ -65,5 +65,21 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     postChat
+  );
+
+  server.post(
+    '/chat/stream',
+    {
+      schema: {
+        description: 'Submit a query to the Knowledge Engine and get an AI-generated answer as a stream of Server-Sent Events',
+        tags: ['Chat'],
+        body: chatRequestSchema,
+        // Using z.any() for response since we stream SSE directly
+        response: {
+          200: z.any(),
+        },
+      },
+    },
+    postChatStream
   );
 }

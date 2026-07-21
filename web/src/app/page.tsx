@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { useMutation } from "@tanstack/react-query"
+import { useState, useRef } from "react"
 import { SearchBar } from "@/components/search-bar"
 import { AnswerCard } from "@/components/answer-card"
 import { LearningTimeline } from "@/components/learning-timeline"
@@ -9,7 +8,8 @@ import { StatisticsCard } from "@/components/statistics-card"
 import { RetrievedContextPanel } from "@/components/retrieved-context-panel"
 import { PipelineProgress } from "@/components/pipeline-progress"
 import { ConfidenceBadge } from "@/components/confidence-badge"
-import { submitChatQuery } from "@/lib/api"
+import { streamChatQuery, ChatStreamEvent } from "@/lib/api"
+import { ChatResponse } from "@/types/api"
 import { GraduationCap, Smartphone, ServerCrash } from "lucide-react"
 
 const PIPELINE_STAGES = [
@@ -27,50 +27,106 @@ export default function Home() {
   const [query, setQuery] = useState("")
   const [activeCitation, setActiveCitation] = useState<string | null>(null)
   const [activeStageIndex, setActiveStageIndex] = useState(0)
+  
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [response, setResponse] = useState<ChatResponse | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
-  const chatMutation = useMutation({
-    mutationFn: (q: string) => submitChatQuery({ query: q }),
-    onMutate: () => {
-      setActiveCitation(null)
-      // Simulate pipeline progress for UI UX since actual streaming isn't in Phase 18
-      setActiveStageIndex(0)
-      const interval = setInterval(() => {
-        setActiveStageIndex(prev => {
-          if (prev >= PIPELINE_STAGES.length - 1) {
-            clearInterval(interval)
-            return prev
-          }
-          return prev + 1
-        })
-      }, 400) // Advance a stage every 400ms for demo
-      return { interval }
-    },
-    onSettled: (data, error, variables, context) => {
-      if (context?.interval) {
-        clearInterval(context.interval)
-      }
-      setActiveStageIndex(PIPELINE_STAGES.length)
+  const handleSearch = async (overrideQuery?: string) => {
+    const q = overrideQuery || query.trim()
+    if (!q) return
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
-  })
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
 
-  const handleSearch = () => {
-    if (!query.trim()) return
-    chatMutation.mutate(query.trim())
+    setIsStreaming(true)
+    setError(null)
+    setResponse({
+      answer: "",
+      citations: [],
+      retrievedChunks: [],
+      metadata: {}
+    })
+    setActiveCitation(null)
+    setActiveStageIndex(0)
+
+    const interval = setInterval(() => {
+      setActiveStageIndex(prev => {
+        if (prev >= PIPELINE_STAGES.length - 2) { 
+          clearInterval(interval)
+          return prev
+        }
+        return prev + 1
+      })
+    }, 400)
+
+    try {
+      await streamChatQuery(
+        { query: q }, 
+        (event: ChatStreamEvent) => {
+          if (event.type === 'start') {
+            clearInterval(interval)
+            setActiveStageIndex(PIPELINE_STAGES.length - 2)
+          } else if (event.type === 'citation') {
+            setResponse(prev => {
+              if (!prev) return prev;
+              const newCitations = [...(prev.citations || []), event.data];
+              const newChunks = [...(prev.retrievedChunks || []), { 
+                chunkId: event.data.chunkId || String(Math.random()), 
+                text: '...', 
+                score: event.data.similarityScore || 0,
+                metadata: {},
+                sourceReference: {
+                  courseName: event.data.courseName || '',
+                  moduleTitle: event.data.moduleTitle || '',
+                  lessonTitle: event.data.lessonTitle || '',
+                  transcriptFile: event.data.transcriptFile || '',
+                  startTime: event.data.startTime || 0,
+                  endTime: event.data.endTime || 0
+                },
+                citation: event.data 
+              }];
+              return { ...prev, citations: newCitations, retrievedChunks: newChunks };
+            })
+          } else if (event.type === 'token') {
+            setResponse(prev => prev ? {
+              ...prev,
+              answer: prev.answer + event.data
+            } : null)
+          } else if (event.type === 'done') {
+            setActiveStageIndex(PIPELINE_STAGES.length)
+          } else if (event.type === 'error') {
+            setError(event.data.message)
+            setActiveStageIndex(PIPELINE_STAGES.length)
+          }
+        },
+        abortController.signal
+      )
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        setError(err.message || 'An error occurred')
+      }
+    } finally {
+      setIsStreaming(false)
+      clearInterval(interval)
+    }
   }
-
-  const response = chatMutation.data
 
   const getPipelineStages = () => {
     return PIPELINE_STAGES.map((stage, index) => {
       let status: 'pending' | 'active' | 'completed' = 'pending'
-      if (chatMutation.isPending) {
+      if (isStreaming) {
         if (index < activeStageIndex) status = 'completed'
         else if (index === activeStageIndex) status = 'active'
-      } else if (chatMutation.isSuccess) {
+      } else if (response && !error) {
         status = 'completed'
-      } else if (chatMutation.isError) {
+      } else if (error) {
         if (index < activeStageIndex) status = 'completed'
-        else if (index === activeStageIndex) status = 'active' // stalled
+        else if (index === activeStageIndex) status = 'active' 
       }
       return { ...stage, status }
     })
@@ -92,7 +148,7 @@ export default function Home() {
       </header>
 
       <main className="flex-1 container mx-auto px-4 py-8 flex flex-col items-center">
-        {!chatMutation.data && !chatMutation.isPending && !chatMutation.isError ? (
+        {!response && !isStreaming && !error ? (
           // Initial State
           <div className="w-full max-w-2xl mt-20 flex flex-col items-center justify-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="text-center space-y-4">
@@ -124,7 +180,7 @@ export default function Home() {
                   className="px-4 py-2.5 rounded-full border border-muted bg-card/50 text-sm hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setQuery(example)
-                    chatMutation.mutate(example)
+                    handleSearch(example)
                   }}
                 >
                   {example}
@@ -139,17 +195,17 @@ export default function Home() {
               <SearchBar 
                 value={query} 
                 onChange={setQuery} 
-                onSubmit={handleSearch}
-                isLoading={chatMutation.isPending}
+                onSubmit={() => handleSearch()}
+                isLoading={isStreaming}
               />
             </div>
 
-            {chatMutation.isError && (
+            {error && (
               <div className="max-w-3xl mx-auto p-6 rounded-xl border-destructive/20 bg-destructive/10 text-destructive flex items-start gap-4 mb-8">
                 <ServerCrash className="w-6 h-6 shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-semibold text-lg">Unable to generate response</h3>
-                  <p className="mt-1 opacity-90">{chatMutation.error.message}</p>
+                  <p className="mt-1 opacity-90">{error}</p>
                 </div>
               </div>
             )}
@@ -157,7 +213,7 @@ export default function Home() {
             <div className="flex flex-col lg:flex-row gap-8 items-start">
               {/* Left Column: Answer & Context */}
               <div className="w-full lg:w-7/12 xl:w-2/3 flex flex-col gap-6">
-                {chatMutation.isPending && !chatMutation.data && (
+                {isStreaming && !response?.answer && !response?.citations?.length && (
                   <div className="border rounded-xl bg-card shadow-sm p-4">
                     <PipelineProgress stages={getPipelineStages()} />
                   </div>

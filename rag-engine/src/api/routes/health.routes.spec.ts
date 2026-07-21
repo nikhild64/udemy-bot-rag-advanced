@@ -33,7 +33,7 @@ describe('Health Routes', () => {
   describe('GET /ready', () => {
     it('should return 200 when pipeline is initialized', async () => {
       // Decorate mock pipeline service
-      app.decorate('chatPipelineService', {});
+      app.decorate('chatPipelineService', {} as any);
 
       const response = await app.inject({
         method: 'GET',

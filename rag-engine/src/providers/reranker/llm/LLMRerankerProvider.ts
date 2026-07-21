@@ -1,3 +1,4 @@
+import { ChatRole } from '@/types';
 import { logger } from '@/shared/logger';
 import { ChatProvider, RerankerProvider } from '@/core/contracts';
 import { RerankRequest, RerankResult } from '@/core/models';
@@ -90,7 +91,7 @@ export class LLMRerankerProvider<T = unknown> implements RerankerProvider<T> {
 
     try {
       const response = await this.chatProvider.generateResponse(
-        [{ role: 'user', content: prompt }],
+        [{ role: ChatRole.USER, content: prompt }],
         { task: 'reranking' }
       );
       return this.parseAndValidate(response.message.content, batch);

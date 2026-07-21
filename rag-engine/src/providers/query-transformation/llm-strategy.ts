@@ -1,3 +1,4 @@
+import { ChatRole } from '@/types';
 import { QueryTransformationStrategy } from '@/core/contracts/query-transformation-strategy.contract';
 import { QueryTransformationResult } from '@/core/models/query-transformation.model';
 import { ChatProvider } from '@/core/contracts/chat-provider.contract';
@@ -17,7 +18,7 @@ export class LLMQueryTransformationStrategy implements QueryTransformationStrate
       const response = await this.chatProvider.generateResponse(
         [
           {
-            role: 'system',
+            role: ChatRole.SYSTEM,
             content: `You are a search query optimization assistant.
 
 Rewrite the user's query to maximize semantic retrieval quality.
@@ -33,7 +34,7 @@ Do not change the meaning.
 Return ONLY the rewritten query.`,
           },
           {
-            role: 'user',
+            role: ChatRole.USER,
             content: `Original Query\n\n${trimmedQuery}`,
           },
         ],

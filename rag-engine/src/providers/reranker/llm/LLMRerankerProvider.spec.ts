@@ -1,3 +1,4 @@
+import { ChatRole } from '@/types';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LLMRerankerProvider } from './LLMRerankerProvider';
 import { ChatProvider } from '@/core/contracts';
@@ -33,7 +34,7 @@ describe('LLMRerankerProvider', () => {
 
       vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
         message: {
-          role: 'assistant',
+          role: ChatRole.ASSISTANT,
           content: '```json\n[\n  {"chunkId": "chunk-1", "score": 0.5},\n  {"chunkId": "chunk-2", "score": 0.9}\n]\n```',
         },
       });
@@ -63,7 +64,7 @@ describe('LLMRerankerProvider', () => {
       // Batch 1 (size 2)
       vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
         message: {
-          role: 'assistant',
+          role: ChatRole.ASSISTANT,
           content: '[{"chunkId": "chunk-1", "score": 0.3}, {"chunkId": "chunk-2", "score": 0.8}]',
         },
       });
@@ -71,7 +72,7 @@ describe('LLMRerankerProvider', () => {
       // Batch 2 (size 1)
       vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
         message: {
-          role: 'assistant',
+          role: ChatRole.ASSISTANT,
           content: '[{"chunkId": "chunk-3", "score": 0.9}]',
         },
       });
@@ -95,7 +96,7 @@ describe('LLMRerankerProvider', () => {
 
       vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
         message: {
-          role: 'assistant',
+          role: ChatRole.ASSISTANT,
           content: mockResponse,
         },
       });
@@ -164,11 +165,11 @@ describe('LLMRerankerProvider', () => {
       ];
       // Batch 1 (size 2)
       vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
-        message: { role: 'assistant', content: '[{"chunkId": "chunk-1", "score": 0.1}, {"chunkId": "chunk-2", "score": 0.9}]' },
+        message: { role: ChatRole.ASSISTANT, content: '[{"chunkId": "chunk-1", "score": 0.1}, {"chunkId": "chunk-2", "score": 0.9}]' },
       });
       // Batch 2 (size 2)
       vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
-        message: { role: 'assistant', content: '[{"chunkId": "chunk-3", "score": 0.8}, {"chunkId": "chunk-4", "score": 0.2}]' },
+        message: { role: ChatRole.ASSISTANT, content: '[{"chunkId": "chunk-3", "score": 0.8}, {"chunkId": "chunk-4", "score": 0.2}]' },
       });
 
       const result = await reranker.rerank({ query: 'q', chunks });

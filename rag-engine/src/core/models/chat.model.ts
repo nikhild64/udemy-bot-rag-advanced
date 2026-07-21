@@ -21,3 +21,11 @@ export interface ChatResponse {
   readonly message: ChatMessage;
   readonly sources?: readonly SearchResult[];
 }
+
+/**
+ * Represents an incremental piece of the generated response during streaming.
+ */
+export interface ChatChunk {
+  readonly content: string;
+  readonly done: boolean;
+}

@@ -1,3 +1,4 @@
+import { ChatRole } from '@/types';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LLMQueryTransformationStrategy } from './llm-strategy';
 import { ChatProvider } from '@/core/contracts/chat-provider.contract';
@@ -16,7 +17,7 @@ describe('LLMQueryTransformationStrategy', () => {
 
   it('transforms query successfully', async () => {
     vi.mocked(mockChatProvider.generateResponse).mockResolvedValue({
-      message: { role: 'assistant', content: 'How does Expo Router implement file-based routing in React Native applications?' }
+      message: { role: ChatRole.ASSISTANT, content: 'How does Expo Router implement file-based routing in React Native applications?' }
     });
 
     const result = await strategy.transform('expo routing');
@@ -27,9 +28,9 @@ describe('LLMQueryTransformationStrategy', () => {
     expect(result.metadata.transformed).toBe(true);
     
     expect(mockChatProvider.generateResponse).toHaveBeenCalledTimes(1);
-    const callArgs = vi.mocked(mockChatProvider.generateResponse).mock.calls[0];
-    const messages = callArgs[0];
-    const options = callArgs[1];
+    const callArgs! = vi.mocked(mockChatProvider.generateResponse).mock.calls[0];
+    const messages = callArgs![0];
+    const options = callArgs![1];
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).toContain('You are a search query optimization assistant');
     expect(messages[1].role).toBe('user');
@@ -50,7 +51,7 @@ describe('LLMQueryTransformationStrategy', () => {
 
   it('returns fallback result if response contains markdown', async () => {
     vi.mocked(mockChatProvider.generateResponse).mockResolvedValue({
-      message: { role: 'assistant', content: '```How does Expo Router work```' }
+      message: { role: ChatRole.ASSISTANT, content: '```How does Expo Router work```' }
     });
 
     const result = await strategy.transform('expo routing');
@@ -60,7 +61,7 @@ describe('LLMQueryTransformationStrategy', () => {
 
   it('returns fallback result if response contains multiple queries', async () => {
     vi.mocked(mockChatProvider.generateResponse).mockResolvedValue({
-      message: { role: 'assistant', content: 'How does Expo Router work?\nExplain Expo Router.' }
+      message: { role: ChatRole.ASSISTANT, content: 'How does Expo Router work?\nExplain Expo Router.' }
     });
 
     const result = await strategy.transform('expo routing');
@@ -69,7 +70,7 @@ describe('LLMQueryTransformationStrategy', () => {
 
   it('returns fallback result if response contains conversational text', async () => {
     vi.mocked(mockChatProvider.generateResponse).mockResolvedValue({
-      message: { role: 'assistant', content: 'Here is the rewritten query: How does Expo Router work?' }
+      message: { role: ChatRole.ASSISTANT, content: 'Here is the rewritten query: How does Expo Router work?' }
     });
 
     const result = await strategy.transform('expo routing');

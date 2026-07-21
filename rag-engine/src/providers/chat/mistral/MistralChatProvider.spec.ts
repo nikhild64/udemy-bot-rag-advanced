@@ -1,3 +1,4 @@
+import { ChatRole } from '@/types';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MistralChatProvider } from './MistralChatProvider';
 import { ProviderError, ConfigurationError } from '@/shared/errors';
@@ -39,7 +40,7 @@ describe('MistralChatProvider', () => {
         choices: [
           {
             message: {
-              role: 'assistant',
+              role: ChatRole.ASSISTANT,
               content: 'Hello world',
             },
           },
@@ -48,7 +49,7 @@ describe('MistralChatProvider', () => {
     } as Response);
 
     const response = await provider.generateResponse(
-      [{ role: 'user', content: 'Hi' }],
+      [{ role: ChatRole.USER, content: 'Hi' }],
       { task: 'chat' }
     );
 
@@ -63,15 +64,15 @@ describe('MistralChatProvider', () => {
     vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        choices: [{ message: { role: 'assistant', content: 'Success' } }],
+        choices: [{ message: { role: ChatRole.ASSISTANT, content: 'Success' } }],
       }),
     } as Response);
 
-    await provider.generateResponse([{ role: 'user', content: 'Hi' }], { task: 'query-transformation' });
+    await provider.generateResponse([{ role: ChatRole.USER, content: 'Hi' }], { task: 'query-transformation' });
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     const fetchCall = vi.mocked(global.fetch).mock.calls[0];
-    const fetchOptions = fetchCall[1] as RequestInit;
+    const fetchOptions = fetchCall![1] as RequestInit;
     const body = JSON.parse(fetchOptions.body as string);
     // Depends on config.chat.queryTransformationModel default which is 'mistral-small-latest'
     expect(body.model).toBe('mistral-small-latest');
@@ -79,7 +80,7 @@ describe('MistralChatProvider', () => {
 
   it('throws ConfigurationError on unknown task', async () => {
     const provider = createProvider();
-    await expect(provider.generateResponse([{ role: 'user', content: 'Hi' }], { task: 'unknown-task' as any })).rejects.toThrow(ConfigurationError);
+    await expect(provider.generateResponse([{ role: ChatRole.USER, content: 'Hi' }], { task: 'unknown-task' as any })).rejects.toThrow(ConfigurationError);
   });
 
   it('throws ProviderError on empty messages array', async () => {
@@ -100,11 +101,11 @@ describe('MistralChatProvider', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { role: 'assistant', content: 'Retried successfully' } }],
+          choices: [{ message: { role: ChatRole.ASSISTANT, content: 'Retried successfully' } }],
         }),
       } as Response);
 
-    const responsePromise = provider.generateResponse([{ role: 'user', content: 'Hi' }], { task: 'chat' });
+    const responsePromise = provider.generateResponse([{ role: ChatRole.USER, content: 'Hi' }], { task: 'chat' });
     
     await vi.runAllTimersAsync();
     
@@ -123,7 +124,7 @@ describe('MistralChatProvider', () => {
       json: async () => ({}),
     } as Response);
 
-    const promise = provider.generateResponse([{ role: 'user', content: 'Hi' }], { task: 'chat' });
+    const promise = provider.generateResponse([{ role: ChatRole.USER, content: 'Hi' }], { task: 'chat' });
     promise.catch(() => {}); // Prevent unhandled rejection warning
     
     // Fast-forward through all retries
@@ -146,8 +147,8 @@ describe('MistralChatProvider', () => {
       json: async () => ({}),
     } as Response);
 
-    await expect(provider.generateResponse([{ role: 'user', content: 'Hi' }], { task: 'chat' })).rejects.toThrow(ProviderError);
-    await expect(provider.generateResponse([{ role: 'user', content: 'Hi' }], { task: 'chat' })).rejects.toThrow(/Authentication failure/);
+    await expect(provider.generateResponse([{ role: ChatRole.USER, content: 'Hi' }], { task: 'chat' })).rejects.toThrow(ProviderError);
+    await expect(provider.generateResponse([{ role: ChatRole.USER, content: 'Hi' }], { task: 'chat' })).rejects.toThrow(/Authentication failure/);
     // Called 2 times because we did it twice in the asserts
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });

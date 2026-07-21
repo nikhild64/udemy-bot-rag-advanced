@@ -1,5 +1,15 @@
 import { RetrievedChunk } from '../../retrieval/RetrievalResult';
-import { Citation } from '../../retrieval/RetrievalResult';
+import { Citation } from '../../retrieval/Citation';
+
+/**
+ * Represents an event emitted during chat streaming.
+ */
+export type ChatStreamEvent =
+  | { type: 'start' }
+  | { type: 'token'; data: string }
+  | { type: 'citation'; data: Citation }
+  | { type: 'done' }
+  | { type: 'error'; data: { message: string } };
 
 /**
  * Represents the incoming chat request from a user.
@@ -14,7 +24,7 @@ export interface ChatRequest {
 /**
  * Represents the final answer returned by the RAG pipeline.
  */
-export interface ChatResponse {
+export interface ChatPipelineResponse {
   readonly answer: string;
   readonly citations?: Citation[];
   readonly retrievedChunks?: RetrievedChunk[];
@@ -30,5 +40,12 @@ export interface ChatPipeline {
    * @param request The user's chat request containing the query and options.
    * @returns The generated response, including the answer, citations, and metadata.
    */
-  chat(request: ChatRequest): Promise<ChatResponse>;
+  chat(request: ChatRequest): Promise<ChatPipelineResponse>;
+
+  /**
+   * Executes the RAG pipeline and streams the response incrementally.
+   * @param request The user's chat request containing the query and options.
+   * @returns An async iterable yielding stream events.
+   */
+  stream(request: ChatRequest): AsyncIterable<ChatStreamEvent>;
 }
