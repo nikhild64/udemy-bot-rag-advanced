@@ -15,6 +15,7 @@
     "embed": "tsx src/cli/embed.ts",
     "index": "tsx src/cli/indexing.ts",
     "vectorstore": "tsx src/cli/vectorstore.ts",
+    "search": "tsx src/cli/search.ts",
     "lint": "eslint .",
     "test": "vitest run",
     "format": "prettier --write \"**/*.{ts,js,json,md}\""

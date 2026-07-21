@@ -143,7 +143,7 @@ export class QdrantVectorStore implements VectorStore {
     }
   }
 
-  async search(queryEmbedding: number[], limit?: number, collectionName?: string): Promise<SearchResult[]> {
+  async search(queryEmbedding: number[], limit?: number, collectionName?: string, filters?: Record<string, unknown>): Promise<SearchResult[]> {
     const name = collectionName ?? this.collectionName;
 
     if (!queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
@@ -158,11 +158,23 @@ export class QdrantVectorStore implements VectorStore {
     const maxResults = limit && limit > 0 ? limit : 10;
     const startTime = Date.now();
 
+    // Construct Qdrant filters if any
+    let qdrantFilter: any;
+    if (filters && Object.keys(filters).length > 0) {
+      qdrantFilter = {
+        must: Object.entries(filters).map(([key, value]) => ({
+          key,
+          match: { value },
+        })),
+      };
+    }
+
     try {
       const scoredPoints = await this.client.search(name, {
         vector: queryEmbedding,
         limit: maxResults,
         with_payload: true,
+        filter: qdrantFilter,
       });
 
       const durationMs = Date.now() - startTime;
@@ -187,7 +199,7 @@ export class QdrantVectorStore implements VectorStore {
             chunkIndex: typeof payloadCopy.chunkIndex === 'number' ? payloadCopy.chunkIndex : undefined,
             startTime: typeof payloadCopy.startTime === 'number' ? payloadCopy.startTime : undefined,
             endTime: typeof payloadCopy.endTime === 'number' ? payloadCopy.endTime : undefined,
-          },
+          } as any,
         };
       });
     } catch (err) {

@@ -58,8 +58,9 @@ export interface VectorStore {
    * @param queryEmbedding The vector representation of the search query.
    * @param limit Optional maximum number of search results to return.
    * @param collectionName Optional collection name to target (defaults to configured collection).
+   * @param filters Optional metadata filters to apply to the search.
    */
-  search(queryEmbedding: number[], limit?: number, collectionName?: string): Promise<SearchResult[]>;
+  search(queryEmbedding: number[], limit?: number, collectionName?: string, filters?: Record<string, unknown>): Promise<SearchResult[]>;
 
   /**
    * Deletes vectors by their unique IDs from the target collection.

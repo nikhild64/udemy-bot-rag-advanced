@@ -6,4 +6,4 @@ export * from './chunk';
 export * from './embed';
 export * from './vectorstore';
 export * from './indexing';
-
+export * from './search';
