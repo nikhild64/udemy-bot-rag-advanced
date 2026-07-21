@@ -1,3 +1,5 @@
+import { ManifestResult } from '@/ingestion/manifest';
+
 /**
  * Represents the failure details of an archive during the extraction stage.
  */
@@ -36,6 +38,21 @@ export interface IngestionResult {
    * Number of archives that failed during extraction.
    */
   readonly failedExtractions: number;
+
+  /**
+   * Total number of course manifests generated.
+   */
+  readonly totalManifestsGenerated?: number;
+
+  /**
+   * Number of manifests that failed validation or construction.
+   */
+  readonly failedManifests?: number;
+
+  /**
+   * List of generated course manifest results.
+   */
+  readonly manifests?: readonly ManifestResult[];
 
   /**
    * Overall duration of the ingestion workflow in milliseconds.

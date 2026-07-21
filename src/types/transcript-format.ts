@@ -3,4 +3,5 @@
  */
 export enum TranscriptFormat {
   VTT = 'vtt',
+  SRT = 'srt',
 }

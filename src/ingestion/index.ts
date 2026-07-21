@@ -5,4 +5,5 @@
  */
 export * from './discovery';
 export * from './extraction';
+export * from './manifest';
 export * from './orchestrator';
