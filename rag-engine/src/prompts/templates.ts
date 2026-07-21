@@ -12,7 +12,7 @@ Do not invent facts.
 
 Do not use prior knowledge.
 
-Always reference the supplied sources.`;
+Always reference the supplied sources. When citing a source, include the module and lesson title along with the timestamp, using this exact format: (Source [Number], [Module Title] - [Lesson Title], Timestamp: [start] → [end]).`;
 
 export function formatTime(secs: number | undefined): string {
   if (secs === undefined) return 'Unknown';
