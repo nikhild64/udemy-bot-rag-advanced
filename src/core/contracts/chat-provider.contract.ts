@@ -1,4 +1,10 @@
-import { ChatMessage, ChatResponse } from '../models';
+import { ChatMessage, ChatResponse, ChatTask } from '../models';
+
+export interface ChatProviderOptions {
+  task: ChatTask;
+  temperature?: number;
+  maxTokens?: number;
+}
 
 /**
  * Contract for conversational AI providers.
@@ -8,7 +14,8 @@ export interface ChatProvider {
   /**
    * Generates a chat response given an array of conversation messages.
    * @param messages Array of chat messages representing the conversation history.
+   * @param options Configuration options, requiring a specific task identifier.
    * @returns Promise resolving to the chat response.
    */
-  generateResponse(messages: ChatMessage[]): Promise<ChatResponse>;
+  generateResponse(messages: ChatMessage[], options: ChatProviderOptions): Promise<ChatResponse>;
 }

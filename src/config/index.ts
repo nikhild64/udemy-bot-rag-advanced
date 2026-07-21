@@ -6,6 +6,7 @@ import { embeddingsConfig, EmbeddingsConfig } from './embeddings';
 import { vectorStoreConfig, VectorStoreConfig } from './vectorstore';
 import { indexingConfig, IndexingConfig } from './indexing';
 import { retrievalConfig, RetrievalConfig } from './retrieval';
+import { chatConfig, ChatConfig } from './chat';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -16,6 +17,7 @@ export interface ApplicationConfig {
   readonly vectorStore: VectorStoreConfig;
   readonly indexing: IndexingConfig;
   readonly retrieval: RetrievalConfig;
+  readonly chat: ChatConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -27,6 +29,7 @@ export const config: ApplicationConfig = {
   vectorStore: vectorStoreConfig,
   indexing: indexingConfig,
   retrieval: retrievalConfig,
+  chat: chatConfig,
 };
 
 export * from './app';
@@ -37,3 +40,4 @@ export * from './embeddings';
 export * from './vectorstore';
 export * from './indexing';
 export * from './retrieval';
+export * from './chat';

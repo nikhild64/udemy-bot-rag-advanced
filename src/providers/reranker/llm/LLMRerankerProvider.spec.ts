@@ -40,11 +40,13 @@ describe('LLMRerankerProvider', () => {
 
       const result = await reranker.rerank({ query: 'test query', chunks });
       
-      expect(mockChatProvider.generateResponse).toHaveBeenCalledOnce();
-      const callArgs = vi.mocked(mockChatProvider.generateResponse).mock.calls[0][0];
-      expect(callArgs[0].content).toContain('chunk-1');
-      expect(callArgs[0].content).toContain('Text 1');
-      expect(callArgs[0].content).toContain('test query');
+      expect(mockChatProvider.generateResponse).toHaveBeenCalledTimes(1);
+      const mockCalls = vi.mocked(mockChatProvider.generateResponse).mock.calls;
+      expect(mockCalls[0][0][0].content).toContain('Candidate Passages');
+      expect(mockCalls[0][1]).toEqual({ task: 'reranking' });
+      expect(mockCalls[0][0][0].content).toContain('chunk-1');
+      expect(mockCalls[0][0][0].content).toContain('Text 1');
+      expect(mockCalls[0][0][0].content).toContain('test query');
 
       expect(result.chunks).toHaveLength(2);
       expect(result.chunks[0].id).toBe('chunk-2'); // Score 0.9

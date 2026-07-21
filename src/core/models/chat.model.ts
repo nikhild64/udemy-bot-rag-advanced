@@ -2,6 +2,11 @@ import { ChatRole } from '@/types';
 import { SearchResult } from './search.model';
 
 /**
+ * Defines the specific task context for the Chat Provider request.
+ */
+export type ChatTask = 'query-transformation' | 'reranking' | 'chat';
+
+/**
  * Represents an individual message in a chat conversation.
  */
 export interface ChatMessage {

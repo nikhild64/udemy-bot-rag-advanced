@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { QueryTransformationFactory } from '@/query/factory/query-transformation.factory';
 import { NoOpQueryTransformationStrategy } from '@/providers/query-transformation/noop-strategy';
 import { AppError } from '@/shared/errors';
+import { config } from '@/config';
 
 describe('QueryTransformationFactory', () => {
   it('should return NoOpQueryTransformationStrategy for "noop"', () => {
@@ -15,9 +16,16 @@ describe('QueryTransformationFactory', () => {
   });
 
   it('should default to the configured strategy if none is provided', () => {
-    // Assuming default config is 'noop'
-    const strategy = QueryTransformationFactory.create();
-    expect(strategy).toBeInstanceOf(NoOpQueryTransformationStrategy);
+    // Temporarily mock config
+    const originalStrategy = config.retrieval.queryTransformationStrategy;
+    config.retrieval.queryTransformationStrategy = 'noop';
+    
+    try {
+      const strategy = QueryTransformationFactory.create();
+      expect(strategy).toBeInstanceOf(NoOpQueryTransformationStrategy);
+    } finally {
+      config.retrieval.queryTransformationStrategy = originalStrategy;
+    }
   });
 
   it('should throw an AppError for an unsupported strategy', () => {

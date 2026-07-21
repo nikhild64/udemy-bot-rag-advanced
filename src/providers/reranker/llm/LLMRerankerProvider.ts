@@ -89,9 +89,10 @@ export class LLMRerankerProvider<T = unknown> implements RerankerProvider<T> {
     logger.debug('Prompt generation completed');
 
     try {
-      const response = await this.chatProvider.generateResponse([
-        { role: 'user', content: prompt }
-      ]);
+      const response = await this.chatProvider.generateResponse(
+        [{ role: 'user', content: prompt }],
+        { task: 'reranking' }
+      );
       return this.parseAndValidate(response.message.content, batch);
     } catch (error) {
       logger.error({ err: error }, 'Chat provider failed during reranking batch');
