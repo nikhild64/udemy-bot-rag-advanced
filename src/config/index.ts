@@ -3,6 +3,7 @@ import { loggerConfig, LoggerConfig } from './logger';
 import { ingestionConfig, IngestionConfig } from './ingestion';
 import { chunkingConfig, ChunkingConfig } from './chunking';
 import { embeddingsConfig, EmbeddingsConfig } from './embeddings';
+import { vectorStoreConfig, VectorStoreConfig } from './vectorstore';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -10,6 +11,7 @@ export interface ApplicationConfig {
   readonly ingestion: IngestionConfig;
   readonly chunking: ChunkingConfig;
   readonly embeddings: EmbeddingsConfig;
+  readonly vectorStore: VectorStoreConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -18,6 +20,7 @@ export const config: ApplicationConfig = {
   ingestion: ingestionConfig,
   chunking: chunkingConfig,
   embeddings: embeddingsConfig,
+  vectorStore: vectorStoreConfig,
 };
 
 export * from './app';
@@ -25,4 +28,5 @@ export * from './logger';
 export * from './ingestion';
 export * from './chunking';
 export * from './embeddings';
+export * from './vectorstore';
 

@@ -4,4 +4,5 @@
  * Future implementation phases will register provider implementations here following Clean Architecture.
  */
 export * from './embeddings';
+export * from './vectorstore';
 

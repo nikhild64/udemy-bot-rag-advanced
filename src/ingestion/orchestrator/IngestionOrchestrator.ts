@@ -30,6 +30,7 @@ import {
   EmbeddingService,
   EmbeddingResult,
 } from '../embeddings';
+import { VectorStore, VectorStoreFactory } from '@/providers/vectorstore';
 import { IngestionContext, IngestionContextOptions } from './IngestionContext';
 import { IngestionResult, ArchiveExtractionFailure } from './IngestionResult';
 
@@ -60,6 +61,11 @@ export interface IIngestionOrchestrator {
   embed(optionsOrChunkingResults?: IngestionContextOptions | readonly ChunkingResult[]): Promise<EmbeddingResult[]>;
 
   /**
+   * Run only the vector store validation stage of the ingestion pipeline.
+   */
+  validateVectorStore(optionsOrEmbeddingResults?: IngestionContextOptions | readonly EmbeddingResult[]): Promise<boolean>;
+
+  /**
    * Execute the full ingestion workflow.
    */
   execute(options?: IngestionContextOptions): Promise<IngestionResult>;
@@ -79,6 +85,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
   private readonly parsingService: ITranscriptParsingService;
   private readonly chunkingService: IChunkingService;
   private readonly embeddingService: IEmbeddingService;
+  private readonly vectorStore: VectorStore;
 
   constructor(
     discoveryService?: IInputDiscoveryService,
@@ -89,6 +96,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     parsingService?: ITranscriptParsingService,
     chunkingService?: IChunkingService,
     embeddingService?: IEmbeddingService,
+    vectorStore?: VectorStore,
   ) {
     this.discoveryService = discoveryService ?? new InputDiscoveryService();
     this.extractionService = extractionService ?? new ExtractionService();
@@ -99,6 +107,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     this.parsingService = parsingService ?? new TranscriptParsingService();
     this.chunkingService = chunkingService ?? new ChunkingService();
     this.embeddingService = embeddingService ?? new EmbeddingService();
+    this.vectorStore = vectorStore ?? VectorStoreFactory.create();
   }
 
   async discover(options?: IngestionContextOptions): Promise<FileMetadata[]> {
@@ -405,6 +414,47 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     return results;
   }
 
+  async validateVectorStore(
+    optionsOrEmbeddingResults?: IngestionContextOptions | readonly EmbeddingResult[],
+  ): Promise<boolean> {
+    const options = (
+      !Array.isArray(optionsOrEmbeddingResults) ? optionsOrEmbeddingResults : undefined
+    ) as (IngestionContextOptions & { isWorkflowStage?: boolean; embeddingResults?: readonly EmbeddingResult[] }) | undefined;
+
+    logger.info('Ingestion vector store validation stage started');
+
+    if (options?.isWorkflowStage === true) {
+      const embeddingResults = options.embeddingResults ?? [];
+      const totalEmbeddings = embeddingResults.reduce((acc, r) => acc + (r.embeddingsGeneratedCount || 0), 0);
+      const totalFailedEmbeddings = embeddingResults.reduce((acc, r) => acc + (r.failedChunksCount || 0), 0);
+
+      if (totalEmbeddings === 0 || totalFailedEmbeddings > 0) {
+        logger.warn('Skipping vector store initialization/validation due to 0 embeddings or embedding errors');
+        return false;
+      }
+    }
+
+    try {
+      const exists = await this.vectorStore.collectionExists();
+      if (!exists) {
+        await this.vectorStore.createCollection();
+      }
+      const valid = await this.vectorStore.validateCollection();
+      logger.info({ valid }, 'Vector store validation completed');
+      return valid;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ err: errorMessage }, 'Vector store validation stage failed');
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new IngestionError(
+        `Ingestion workflow terminated unexpectedly during vector store validation stage: ${errorMessage}`,
+        { cause: error },
+      );
+    }
+  }
+
   async execute(options?: IngestionContextOptions): Promise<IngestionResult> {
     const startTime = Date.now();
     const context = this.createContext(options);
@@ -577,13 +627,39 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       );
     }
 
+    let vectorStoreValidated = false;
+    let vectorStoreInitialized = false;
+    if (
+      failedExtractions === 0 &&
+      failedManifests === 0 &&
+      failedParsings === 0 &&
+      failedChunkings === 0 &&
+      failedEmbeddings === 0
+    ) {
+      try {
+        vectorStoreValidated = await this.validateVectorStore({
+          ...context,
+          isWorkflowStage: true,
+          embeddingResults,
+        } as IngestionContextOptions);
+        vectorStoreInitialized = vectorStoreValidated;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        failures.push({
+          archiveName: 'vectorstore',
+          error: `Vector store validation failed: ${errorMessage}`,
+        });
+      }
+    }
+
     const durationMs = Date.now() - startTime;
     const success =
       failedExtractions === 0 &&
       failedManifests === 0 &&
       failedParsings === 0 &&
       failedChunkings === 0 &&
-      failedEmbeddings === 0;
+      failedEmbeddings === 0 &&
+      failures.length === 0;
 
     const result: IngestionResult = {
       totalArchivesDiscovered: archives.length,
@@ -603,6 +679,8 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       totalEmbeddingsGenerated,
       failedEmbeddings,
       embeddingResults,
+      vectorStoreInitialized,
+      vectorStoreValidated,
       durationMs,
       success,
       failures,

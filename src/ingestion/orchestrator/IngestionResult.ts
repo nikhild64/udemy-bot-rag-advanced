@@ -108,6 +108,16 @@ export interface IngestionResult {
   readonly embeddingResults?: readonly EmbeddingResult[];
 
   /**
+   * Whether the target vector store collection was initialized.
+   */
+  readonly vectorStoreInitialized?: boolean;
+
+  /**
+   * Whether the target vector store collection was successfully validated.
+   */
+  readonly vectorStoreValidated?: boolean;
+
+  /**
    * Overall duration of the ingestion workflow in milliseconds.
    */
   readonly durationMs: number;

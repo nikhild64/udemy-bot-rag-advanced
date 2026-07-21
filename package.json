@@ -13,6 +13,7 @@
     "parse": "tsx src/cli/parse.ts",
     "chunk": "tsx src/cli/chunk.ts",
     "embed": "tsx src/cli/embed.ts",
+    "vectorstore": "tsx src/cli/vectorstore.ts",
     "lint": "eslint .",
     "test": "vitest run",
     "format": "prettier --write \"**/*.{ts,js,json,md}\""
@@ -26,6 +27,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@qdrant/js-client-rest": "^1.18.0",
     "dotenv": "^16.4.7",
     "extract-zip": "^2.0.1",
     "fastify": "^5.2.1",

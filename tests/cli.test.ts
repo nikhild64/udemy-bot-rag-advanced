@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runDiscover, runExtract, runEmbed } from '../src/cli';
+import { runDiscover, runExtract, runEmbed, runVectorStore } from '../src/cli';
 import { IInputDiscoveryService, FileMetadata } from '../src/ingestion/discovery';
 import { IExtractionService, ExtractionResult } from '../src/ingestion/extraction';
 import { IIngestionOrchestrator, IngestionResult } from '../src/ingestion/orchestrator';
 import { CourseManifestDiscoveryService } from '../src/ingestion/manifest';
 import { NotFoundError } from '../src/shared/errors';
+import { config } from '../src/config';
 
 describe('CLI Commands', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -245,6 +246,51 @@ describe('CLI Commands', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Embedding generation failed:\n\nReason:\nProvider API unreachable',
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('runVectorStore', () => {
+    it('should format output correctly when vector store connection and validation succeed', async () => {
+      const mockOrchestrator = {
+        validateVectorStore: vi.fn().mockResolvedValue(true),
+      } as unknown as IIngestionOrchestrator;
+
+      await runVectorStore(mockOrchestrator);
+
+      expect(logSpy).toHaveBeenCalledWith('Checking Vector Store connection and status...\n');
+      expect(logSpy).toHaveBeenCalledWith('Provider');
+      expect(logSpy).toHaveBeenCalledWith('Qdrant Cloud');
+      expect(logSpy).toHaveBeenCalledWith('Collection');
+      expect(logSpy).toHaveBeenCalledWith(config.vectorStore.vectorCollectionName);
+      expect(logSpy).toHaveBeenCalledWith('Status');
+      expect(logSpy).toHaveBeenCalledWith('Ready');
+      expect(logSpy).toHaveBeenCalledWith('Connection successful.');
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('should format output as Not Ready when validation returns false', async () => {
+      const mockOrchestrator = {
+        validateVectorStore: vi.fn().mockResolvedValue(false),
+      } as unknown as IIngestionOrchestrator;
+
+      await runVectorStore(mockOrchestrator);
+
+      expect(logSpy).toHaveBeenCalledWith('Status');
+      expect(logSpy).toHaveBeenCalledWith('Not Ready');
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('should print error message and exit with 1 if vector store validation throws', async () => {
+      const mockOrchestrator = {
+        validateVectorStore: vi.fn().mockRejectedValue(new Error('Connection refused')),
+      } as unknown as IIngestionOrchestrator;
+
+      await expect(runVectorStore(mockOrchestrator)).rejects.toThrow('process.exit called with 1');
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Vector store check failed:\n\nReason:\nConnection refused',
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
