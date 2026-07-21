@@ -142,9 +142,9 @@ describe('PiiGuard', () => {
       expect(result.decision).toBe(GuardDecision.REJECT);
       const pii = result.details?.pii as DetectedItem[];
       
-      expect(pii[0].startIndex).toBe(6);
-      expect(pii[0].endIndex).toBe(16);
-      expect(query.substring(pii[0].startIndex, pii[0].endIndex)).toBe('ABCDE1234F');
+      expect(pii[0]!.startIndex).toBe(6);
+      expect(pii[0]!.endIndex).toBe(16);
+      expect(query.substring(pii[0]!.startIndex, pii[0]!.endIndex)).toBe('ABCDE1234F');
     });
   });
 });

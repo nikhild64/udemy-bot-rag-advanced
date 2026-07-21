@@ -150,7 +150,7 @@ export class MistralChatProvider implements ChatProvider {
         }
 
         const choice = data.choices[0];
-        if (!choice.message || !choice.message.content) {
+        if (!choice || !choice.message || !choice.message.content) {
           throw new ProviderError('Invalid chat response format received from Mistral API: message content is empty');
         }
 

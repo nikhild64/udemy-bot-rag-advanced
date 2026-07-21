@@ -1,3 +1,5 @@
+import { ChatResponse } from './chat.model';
+
 export enum GuardDecision {
   ALLOW = 'ALLOW',
   REJECT = 'REJECT',
@@ -12,5 +14,6 @@ export interface GuardResult {
   readonly decision: GuardDecision;
   readonly message?: string;
   readonly modifiedRequest?: GuardRequest;
+  readonly modifiedResponse?: ChatResponse;
   readonly details?: Record<string, any>;
 }

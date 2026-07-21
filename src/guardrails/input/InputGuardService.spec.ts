@@ -14,6 +14,16 @@ describe('InputGuardService', () => {
     ENABLE_PATH_TRAVERSAL_GUARD: true,
     ENABLE_SPAM_GUARD: true,
     ENABLE_PII_GUARD: true,
+
+    OUTPUT_MAX_RESPONSE_LENGTH: 25000,
+    ENABLE_EMPTY_RESPONSE_GUARD: true,
+    ENABLE_CITATION_GUARD: true,
+    ENABLE_PROMPT_LEAKAGE_GUARD: true,
+    ENABLE_CHAIN_OF_THOUGHT_GUARD: true,
+    ENABLE_SENSITIVE_DATA_GUARD: true,
+    ENABLE_HALLUCINATED_CITATION_GUARD: true,
+    ENABLE_MARKDOWN_GUARD: true,
+    ENABLE_HTML_GUARD: true,
   };
 
   it('should allow a valid query to pass through all guards', async () => {
