@@ -10,7 +10,7 @@ interface SearchBarProps {
 
 export function SearchBar({ value, onChange, onSubmit, isLoading }: SearchBarProps) {
   return (
-    <div className="relative w-full max-w-2xl mx-auto shadow-sm rounded-xl">
+    <div className="relative w-full shadow-sm rounded-xl">
       <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground">
         {isLoading ? (
           <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -28,7 +28,7 @@ export function SearchBar({ value, onChange, onSubmit, isLoading }: SearchBarPro
             onSubmit()
           }
         }}
-        placeholder="Ask anything about the knowledge base..."
+        placeholder="Ask anything about mobile dev udemy course..."
         className="pl-12 pr-4 py-6 text-lg rounded-xl shadow-sm border-muted bg-card focus-visible:ring-primary h-14"
         disabled={isLoading}
         autoFocus

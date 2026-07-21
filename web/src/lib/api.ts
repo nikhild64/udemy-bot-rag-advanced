@@ -2,12 +2,18 @@ import { ChatRequest, ChatResponse } from "@/types/api"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
 
-export async function submitChatQuery(request: ChatRequest): Promise<ChatResponse> {
+export async function submitChatQuery(request: ChatRequest, token?: string | null): Promise<ChatResponse> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  }
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
   const response = await fetch(`${API_URL}/chat`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(request),
   })
 
@@ -29,13 +35,20 @@ export type ChatStreamEvent =
 export async function streamChatQuery(
   request: ChatRequest,
   onEvent: (event: ChatStreamEvent) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  token?: string | null
 ): Promise<void> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  }
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
   const response = await fetch(`${API_URL}/chat/stream`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(request),
     signal,
   })
