@@ -210,9 +210,13 @@ export class SemanticChunkingStrategy implements ChunkingStrategy {
 
     const metadata: ChunkMetadata = {
       courseId,
+      courseTitle: context.courseTitle,
       moduleId,
+      moduleTitle: context.moduleTitle,
       lessonId,
+      lessonTitle: context.lessonTitle,
       transcriptId,
+      transcriptFile: sourceTranscriptPath ? sourceTranscriptPath.split(/[/\\]/).pop() : undefined,
       chunkIndex: index,
       startTime,
       endTime,
@@ -225,7 +229,7 @@ export class SemanticChunkingStrategy implements ChunkingStrategy {
         startOrder: startCue.order ?? 0,
         endOrder: endCue.order ?? chunkCues.length - 1,
       },
-      sourceTranscriptPath,
+      language: context.language ?? transcript.language,
     };
 
     return {

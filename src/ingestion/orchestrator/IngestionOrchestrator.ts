@@ -442,7 +442,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
 
     const reports = await this.indexingService.indexChunks(
       chunkingResults,
-      !Array.isArray(optionsOrChunkingResults) ? optionsOrChunkingResults : undefined
+      !Array.isArray(optionsOrChunkingResults) ? (optionsOrChunkingResults as IndexingOptions) : undefined
     );
 
     const totalUploads = reports.reduce((acc, r) => acc + r.successfulUploads, 0);

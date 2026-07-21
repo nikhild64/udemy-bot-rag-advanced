@@ -79,7 +79,7 @@ export class BatchProcessor {
 
           // 2. Upload successfully embedded chunks to VectorStore
           if (embedRes.embeddedChunks.length > 0) {
-            const rawVectors = embedRes.embeddedChunks.map((c) => c.embedding!);
+            const rawVectors = embedRes.embeddedChunks.map((c) => c.embedding as number[]);
             // Base chunks without the 'embedding' property
             const baseChunks: Chunk[] = embedRes.embeddedChunks.map((c) => {
               // eslint-disable-next-line @typescript-eslint/no-unused-vars

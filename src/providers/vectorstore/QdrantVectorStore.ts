@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { VectorStore, VectorStoreCollectionInfo } from '@/core/contracts/vector-store.contract';
 import { Chunk, SearchResult } from '@/core/models';
@@ -105,6 +104,24 @@ export class QdrantVectorStore implements VectorStore {
 
       if (vector.length !== expectedDimension) {
         throw new ValidationError(`Invalid vector dimensions: expected ${expectedDimension}, got ${vector.length}`);
+      }
+
+      const requiredMetadata = [
+        'courseId',
+        'courseTitle',
+        'moduleId',
+        'moduleTitle',
+        'lessonId',
+        'lessonTitle',
+        'transcriptFile',
+        'startTime',
+        'endTime',
+      ];
+
+      for (const field of requiredMetadata) {
+        if (chunk.metadata[field] === undefined || chunk.metadata[field] === null) {
+          throw new ValidationError(`Invalid payload: missing required metadata field '${field}' for chunk '${chunk.id}'`);
+        }
       }
     }
 

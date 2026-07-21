@@ -10,6 +10,7 @@ const embeddingsSchema = z.object({
   EMBEDDING_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   EMBEDDING_TIMEOUT: z.coerce.number().int().positive().default(30000),
   MISTRAL_API_URL: z.string().default('https://api.mistral.ai/v1/embeddings'),
+  EMBEDDING_DIMENSION: z.coerce.number().int().positive().default(1024),
 });
 
 export interface EmbeddingsConfig {
@@ -19,6 +20,7 @@ export interface EmbeddingsConfig {
   readonly batchSize: number;
   readonly timeoutMs: number;
   readonly mistralApiUrl: string;
+  readonly dimension: number;
 }
 
 function loadEmbeddingsConfig(): EmbeddingsConfig {
@@ -38,6 +40,7 @@ function loadEmbeddingsConfig(): EmbeddingsConfig {
     batchSize: result.data.EMBEDDING_BATCH_SIZE,
     timeoutMs: result.data.EMBEDDING_TIMEOUT,
     mistralApiUrl: result.data.MISTRAL_API_URL,
+    dimension: result.data.EMBEDDING_DIMENSION,
   };
 }
 

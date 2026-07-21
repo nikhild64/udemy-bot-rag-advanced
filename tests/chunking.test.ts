@@ -229,7 +229,7 @@ describe('Phase 7 — Semantic Chunking Module', () => {
       expect(meta.moduleId).toBe('module-meta-2');
       expect(meta.lessonId).toBe('lesson-meta-99');
       expect(meta.transcriptId).toBe('ts-meta');
-      expect(meta.sourceTranscriptPath).toBe('/path/to/transcript.vtt');
+      expect(meta.transcriptFile).toBe('transcript.vtt');
       expect(meta.originalCueRange).toEqual({
         startCueId: 'cue-100',
         endCueId: 'cue-101',

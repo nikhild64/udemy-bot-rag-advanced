@@ -9,10 +9,10 @@ export interface VectorStoreCollectionInfo {
   readonly status: string;
   readonly vectorsCount: number;
   readonly pointsCount: number;
-  readonly segmentsCount?: number;
-  readonly dimension?: number;
-  readonly distanceMetric?: string;
-  readonly config?: Record<string, unknown>;
+  readonly segmentsCount?: number | undefined;
+  readonly dimension?: number | undefined;
+  readonly distanceMetric?: string | undefined;
+  readonly config?: Record<string, unknown> | undefined;
 }
 
 /**

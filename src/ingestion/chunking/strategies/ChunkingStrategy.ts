@@ -6,10 +6,14 @@ import { ChunkingConfig } from '@/config';
  */
 export interface ChunkingStrategyContext {
   readonly courseId: string;
+  readonly courseTitle?: string | undefined;
   readonly moduleId: string;
+  readonly moduleTitle?: string | undefined;
   readonly lessonId: string;
+  readonly lessonTitle?: string | undefined;
   readonly transcriptId: string;
   readonly sourceFile?: string | undefined;
+  readonly language?: string | undefined;
   readonly config?: Partial<ChunkingConfig> | undefined;
 }
 

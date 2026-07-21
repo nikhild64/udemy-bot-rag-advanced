@@ -3,9 +3,13 @@
  */
 export interface ChunkMetadata {
   readonly courseId: string;
+  readonly courseTitle?: string | undefined;
   readonly moduleId: string;
+  readonly moduleTitle?: string | undefined;
   readonly lessonId: string;
+  readonly lessonTitle?: string | undefined;
   readonly transcriptId: string;
+  readonly transcriptFile?: string | undefined;
   readonly chunkIndex?: number;
   readonly startTime?: number;
   readonly endTime?: number;
@@ -18,7 +22,7 @@ export interface ChunkMetadata {
     readonly startOrder?: number;
     readonly endOrder?: number;
   };
-  readonly sourceTranscriptPath?: string;
+  readonly language?: string | undefined;
   readonly [key: string]: unknown;
 }
 

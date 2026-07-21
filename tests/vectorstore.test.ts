@@ -210,10 +210,16 @@ describe('VectorStore Layer Implementation Tests', () => {
         text: 'Semantic chunk text content',
         metadata: {
           courseId: 'course-101',
+          courseTitle: 'Course 101',
           moduleId: 'mod-1',
+          moduleTitle: 'Module 1',
           lessonId: 'less-1',
+          lessonTitle: 'Lesson 1',
           transcriptId: 'trans-1',
+          transcriptFile: 'trans-1.vtt',
           chunkIndex: 0,
+          startTime: 10,
+          endTime: 20,
         },
       };
 

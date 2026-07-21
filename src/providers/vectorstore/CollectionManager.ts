@@ -92,7 +92,7 @@ export class CollectionManager implements ICollectionManager {
       return {
         name,
         status: String(info.status),
-        vectorsCount: info.vectors_count ?? 0,
+        vectorsCount: Number((info as any).vectors_count || 0),
         pointsCount: info.points_count ?? 0,
         segmentsCount: info.segments_count ?? 0,
         dimension,

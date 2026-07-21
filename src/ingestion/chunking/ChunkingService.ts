@@ -17,7 +17,11 @@ export interface IChunkingService {
       strategy?: string | undefined;
       config?: Partial<ChunkingConfig> | undefined;
       courseId?: string | undefined;
+      courseTitle?: string | undefined;
       moduleId?: string | undefined;
+      moduleTitle?: string | undefined;
+      lessonTitle?: string | undefined;
+      language?: string | undefined;
     },
   ): Promise<readonly Chunk[]>;
 
@@ -55,7 +59,11 @@ export class ChunkingService implements IChunkingService {
       strategy?: string | undefined;
       config?: Partial<ChunkingConfig> | undefined;
       courseId?: string | undefined;
+      courseTitle?: string | undefined;
       moduleId?: string | undefined;
+      moduleTitle?: string | undefined;
+      lessonTitle?: string | undefined;
+      language?: string | undefined;
     },
   ): Promise<readonly Chunk[]> {
     const startTime = Date.now();
@@ -94,10 +102,14 @@ export class ChunkingService implements IChunkingService {
 
     const chunksResult = await strategy.chunk(transcript, {
       courseId,
+      courseTitle: options?.courseTitle,
       moduleId,
+      moduleTitle: options?.moduleTitle,
       lessonId,
+      lessonTitle: options?.lessonTitle,
       transcriptId,
       sourceFile: transcript.sourceFile,
+      language: options?.language ?? transcript.language,
       config: chunkConfig,
     });
 
@@ -157,7 +169,10 @@ export class ChunkingService implements IChunkingService {
           strategy: options?.strategy,
           config: options?.config,
           courseId: lessonRes.courseId ?? ts.courseId ?? parsingResult.courseId,
+          courseTitle: parsingResult.courseName,
           moduleId: lessonRes.moduleId ?? ts.moduleId ?? 'unknown-module',
+          moduleTitle: lessonRes.moduleName,
+          lessonTitle: lessonRes.lessonName,
         });
 
         transcriptsChunkedCount++;
