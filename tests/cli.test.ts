@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import path from 'node:path';
 import { runDiscover, runExtract } from '../src/cli';
 import { IInputDiscoveryService, FileMetadata } from '../src/ingestion/discovery';
 import { IExtractionService, ExtractionResult } from '../src/ingestion/extraction';
+import { IIngestionOrchestrator, IngestionResult } from '../src/ingestion/orchestrator';
+import { NotFoundError } from '../src/shared/errors';
 
 describe('CLI Commands', () => {
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -51,7 +52,7 @@ describe('CLI Commands', () => {
 
     it('should print error message and exit with code 1 if discovery fails', async () => {
       const mockDiscoveryService: IInputDiscoveryService = {
-        discover: vi.fn().mockRejectedValue(new Error('Input directory not found')),
+        discover: vi.fn().mockRejectedValue(new NotFoundError('Input directory not found')),
       };
 
       await expect(runDiscover(mockDiscoveryService)).rejects.toThrow('process.exit called with 1');
@@ -61,92 +62,125 @@ describe('CLI Commands', () => {
       );
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should allow delegating directly to IIngestionOrchestrator', async () => {
+      const mockOrchestrator: IIngestionOrchestrator = {
+        discover: vi.fn().mockResolvedValue([
+          { name: 'orchestrated.zip', path: '/input/orchestrated.zip', extension: '.zip', size: 512, modifiedAt: new Date() } as FileMetadata,
+        ]),
+        execute: vi.fn(),
+        run: vi.fn(),
+      };
+
+      await runDiscover(mockOrchestrator);
+
+      expect(mockOrchestrator.discover).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith('✓ orchestrated.zip');
+    });
   });
 
   describe('runExtract', () => {
-    it('should discover archives, extract each, and print progress and destination folders', async () => {
+    it('should delegate to orchestrator.execute and display summarized workflow result', async () => {
+      const mockResult: IngestionResult = {
+        totalArchivesDiscovered: 2,
+        totalArchivesExtracted: 2,
+        successfulExtractions: 2,
+        failedExtractions: 0,
+        durationMs: 25,
+        success: true,
+        failures: [],
+      };
+
+      const mockOrchestrator: IIngestionOrchestrator = {
+        discover: vi.fn(),
+        execute: vi.fn().mockResolvedValue(mockResult),
+        run: vi.fn(),
+      };
+
+      await runExtract(mockOrchestrator);
+
+      expect(mockOrchestrator.execute).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith('Executing ingestion workflow...\n');
+      expect(logSpy).toHaveBeenCalledWith('Ingestion Summary:');
+      expect(logSpy).toHaveBeenCalledWith('  Discovered: 2 archive(s)');
+      expect(logSpy).toHaveBeenCalledWith('  Extracted:  2 archive(s)');
+      expect(logSpy).toHaveBeenCalledWith('  Success:    2');
+      expect(logSpy).toHaveBeenCalledWith('  Failed:     0');
+      expect(logSpy).toHaveBeenCalledWith('  Duration:   25 ms\n');
+      expect(exitSpy).not.toHaveBeenCalled();
+    });
+
+    it('should display failure breakdown and exit with code 1 if extraction of any archive fails', async () => {
+      const mockResult: IngestionResult = {
+        totalArchivesDiscovered: 2,
+        totalArchivesExtracted: 2,
+        successfulExtractions: 1,
+        failedExtractions: 1,
+        durationMs: 30,
+        success: false,
+        failures: [
+          {
+            archiveName: 'corrupt-course.zip',
+            error: 'Archive is corrupt.',
+          },
+        ],
+      };
+
+      const mockOrchestrator: IIngestionOrchestrator = {
+        discover: vi.fn(),
+        execute: vi.fn().mockResolvedValue(mockResult),
+        run: vi.fn(),
+      };
+
+      await expect(runExtract(mockOrchestrator)).rejects.toThrow('process.exit called with 1');
+
+      expect(logSpy).toHaveBeenCalledWith('Failures:');
+      expect(logSpy).toHaveBeenCalledWith('  ✗ corrupt-course.zip: Archive is corrupt.');
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('should print error message and exit 1 if unexpected error occurs during orchestration execution', async () => {
+      const mockOrchestrator: IIngestionOrchestrator = {
+        discover: vi.fn(),
+        execute: vi.fn().mockRejectedValue(new Error('Cannot access input folder.')),
+        run: vi.fn(),
+      };
+
+      await expect(runExtract(mockOrchestrator)).rejects.toThrow('process.exit called with 1');
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Ingestion workflow failed:\n\nReason:\nCannot access input folder.',
+      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    it('should wrap legacy discovery/extraction services inside orchestrator when passed directly', async () => {
       const mockArchives: FileMetadata[] = [
         { name: 'angular-course.zip', path: '/input/angular-course.zip', extension: '.zip', size: 1024, modifiedAt: new Date() },
-        { name: 'react-course.zip', path: '/input/react-course.zip', extension: '.zip', size: 2048, modifiedAt: new Date() },
       ];
 
       const mockDiscoveryService: IInputDiscoveryService = {
         discover: vi.fn().mockResolvedValue(mockArchives),
       };
 
-      const angularDestPath = path.resolve(process.cwd(), 'data/extracted/angular-course');
-      const reactDestPath = path.resolve(process.cwd(), 'data/extracted/react-course');
-
       const mockExtractionService: IExtractionService = {
-        extract: vi.fn().mockImplementation(async (archive: FileMetadata) => {
-          if (archive.name === 'angular-course.zip') {
-            return {
-              archiveName: 'angular-course.zip',
-              destinationPath: angularDestPath,
-              filesExtracted: ['lesson1.vtt'],
-              durationMs: 10,
-              success: true,
-            } as ExtractionResult;
-          }
-          return {
-            archiveName: 'react-course.zip',
-            destinationPath: reactDestPath,
-            filesExtracted: ['lesson2.vtt'],
-            durationMs: 12,
-            success: true,
-          } as ExtractionResult;
-        }),
+        extract: vi.fn().mockResolvedValue({
+          archiveName: 'angular-course.zip',
+          destinationPath: '/extracted/angular-course',
+          filesExtracted: ['lesson1.vtt'],
+          durationMs: 10,
+          success: true,
+        } as ExtractionResult),
         extractAll: vi.fn(),
       };
 
       await runExtract(mockDiscoveryService, mockExtractionService);
 
-      expect(logSpy).toHaveBeenCalledWith('Extracting...\n');
-      expect(logSpy).toHaveBeenCalledWith('✓ angular-course.zip');
-      expect(logSpy).toHaveBeenCalledWith('  → data/extracted/angular-course\n');
-      expect(logSpy).toHaveBeenCalledWith('✓ react-course.zip');
-      expect(logSpy).toHaveBeenCalledWith('  → data/extracted/react-course\n');
-      expect(logSpy).toHaveBeenCalledWith('Extraction complete.');
-    });
-
-    it('should print error message with archive name and exit if extracting a specific archive fails', async () => {
-      const mockArchives: FileMetadata[] = [
-        { name: 'corrupt-course.zip', path: '/input/corrupt-course.zip', extension: '.zip', size: 1024, modifiedAt: new Date() },
-      ];
-
-      const mockDiscoveryService: IInputDiscoveryService = {
-        discover: vi.fn().mockResolvedValue(mockArchives),
-      };
-
-      const mockExtractionService: IExtractionService = {
-        extract: vi.fn().mockRejectedValue(new Error('Archive is corrupt.')),
-        extractAll: vi.fn(),
-      };
-
-      await expect(runExtract(mockDiscoveryService, mockExtractionService)).rejects.toThrow('process.exit called with 1');
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Extraction failed:\n\ncorrupt-course.zip\n\nReason:\nArchive is corrupt.',
-      );
-      expect(exitSpy).toHaveBeenCalledWith(1);
-    });
-
-    it('should print error message without archive name if discovery fails during extraction run', async () => {
-      const mockDiscoveryService: IInputDiscoveryService = {
-        discover: vi.fn().mockRejectedValue(new Error('Cannot access input folder.')),
-      };
-
-      const mockExtractionService: IExtractionService = {
-        extract: vi.fn(),
-        extractAll: vi.fn(),
-      };
-
-      await expect(runExtract(mockDiscoveryService, mockExtractionService)).rejects.toThrow('process.exit called with 1');
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Extraction failed:\n\nReason:\nCannot access input folder.',
-      );
-      expect(exitSpy).toHaveBeenCalledWith(1);
+      expect(mockDiscoveryService.discover).toHaveBeenCalledTimes(1);
+      expect(mockExtractionService.extract).toHaveBeenCalledTimes(1);
+      expect(logSpy).toHaveBeenCalledWith('Ingestion Summary:');
+      expect(logSpy).toHaveBeenCalledWith('  Success:    1');
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 });

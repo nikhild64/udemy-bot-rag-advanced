@@ -1,15 +1,19 @@
-import { IInputDiscoveryService, InputDiscoveryService } from '@/ingestion/discovery';
 import { config } from '@/config';
+import { IInputDiscoveryService } from '@/ingestion/discovery';
+import { IIngestionOrchestrator, IngestionOrchestrator } from '@/ingestion/orchestrator';
 
 export async function runDiscover(
-  discoveryService?: IInputDiscoveryService,
+  orchestrator?: IIngestionOrchestrator | IInputDiscoveryService,
 ): Promise<void> {
-  const service = discoveryService ?? new InputDiscoveryService();
+  const orch: IIngestionOrchestrator =
+    orchestrator && 'execute' in orchestrator
+      ? orchestrator
+      : new IngestionOrchestrator(orchestrator as IInputDiscoveryService | undefined);
 
   console.log('Scanning input directory...\n');
 
   try {
-    const archives = await service.discover();
+    const archives = await orch.discover();
 
     for (const archive of archives) {
       console.log(`✓ ${archive.name}`);

@@ -1,48 +1,52 @@
-import path from 'node:path';
-import { IInputDiscoveryService, InputDiscoveryService } from '@/ingestion/discovery';
-import { IExtractionService, ExtractionService } from '@/ingestion/extraction';
 import { config } from '@/config';
+import { IInputDiscoveryService } from '@/ingestion/discovery';
+import { IExtractionService } from '@/ingestion/extraction';
+import { IIngestionOrchestrator, IngestionOrchestrator } from '@/ingestion/orchestrator';
 
 export async function runExtract(
-  discoveryService?: IInputDiscoveryService,
+  orchestrator?: IIngestionOrchestrator | IInputDiscoveryService,
   extractionService?: IExtractionService,
 ): Promise<void> {
-  const discovery = discoveryService ?? new InputDiscoveryService();
-  const extraction = extractionService ?? new ExtractionService();
+  const orch: IIngestionOrchestrator =
+    orchestrator && 'execute' in orchestrator
+      ? orchestrator
+      : new IngestionOrchestrator(
+          orchestrator as IInputDiscoveryService | undefined,
+          extractionService,
+        );
 
-  console.log('Extracting...\n');
+  console.log('Executing ingestion workflow...\n');
 
-  let currentArchiveName: string | undefined;
-
+  let result;
   try {
-    const archives = await discovery.discover();
-
-    for (const archive of archives) {
-      currentArchiveName = archive.name;
-      const result = await extraction.extract(archive);
-      const relativeDest = path
-        .relative(process.cwd(), result.destinationPath)
-        .split(path.sep)
-        .join('/');
-
-      console.log(`✓ ${result.archiveName}`);
-      console.log(`  → ${relativeDest}\n`);
-    }
-
-    console.log('Extraction complete.');
+    result = await orch.execute();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-
-    if (currentArchiveName) {
-      console.error(`Extraction failed:\n\n${currentArchiveName}\n\nReason:\n${errorMessage}`);
-    } else {
-      console.error(`Extraction failed:\n\nReason:\n${errorMessage}`);
-    }
+    console.error(`Ingestion workflow failed:\n\nReason:\n${errorMessage}`);
 
     if (config.app.env === 'development' && error instanceof Error && error.stack) {
       console.error(`\n${error.stack}`);
     }
 
+    process.exit(1);
+  }
+
+  console.log('Ingestion Summary:');
+  console.log(`  Discovered: ${result.totalArchivesDiscovered} archive(s)`);
+  console.log(`  Extracted:  ${result.totalArchivesExtracted} archive(s)`);
+  console.log(`  Success:    ${result.successfulExtractions}`);
+  console.log(`  Failed:     ${result.failedExtractions}`);
+  console.log(`  Duration:   ${result.durationMs} ms\n`);
+
+  if (result.failures.length > 0) {
+    console.log('Failures:');
+    for (const failure of result.failures) {
+      console.log(`  ✗ ${failure.archiveName}: ${failure.error}`);
+    }
+    console.log();
+  }
+
+  if (!result.success) {
     process.exit(1);
   }
 }
