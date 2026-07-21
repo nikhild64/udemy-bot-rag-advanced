@@ -5,6 +5,7 @@ import { chunkingConfig, ChunkingConfig } from './chunking';
 import { embeddingsConfig, EmbeddingsConfig } from './embeddings';
 import { vectorStoreConfig, VectorStoreConfig } from './vectorstore';
 import { indexingConfig, IndexingConfig } from './indexing';
+import { retrievalConfig, RetrievalConfig } from './retrieval';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -14,6 +15,7 @@ export interface ApplicationConfig {
   readonly embeddings: EmbeddingsConfig;
   readonly vectorStore: VectorStoreConfig;
   readonly indexing: IndexingConfig;
+  readonly retrieval: RetrievalConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -24,6 +26,7 @@ export const config: ApplicationConfig = {
   embeddings: embeddingsConfig,
   vectorStore: vectorStoreConfig,
   indexing: indexingConfig,
+  retrieval: retrievalConfig,
 };
 
 export * from './app';
@@ -33,4 +36,4 @@ export * from './chunking';
 export * from './embeddings';
 export * from './vectorstore';
 export * from './indexing';
-
+export * from './retrieval';

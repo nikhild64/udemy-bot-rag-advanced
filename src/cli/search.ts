@@ -2,6 +2,7 @@ import { config } from '@/config';
 import { RetrievalService } from '@/retrieval';
 import { EmbeddingProviderFactory } from '@/providers/embeddings/EmbeddingProviderFactory';
 import { VectorStoreFactory } from '@/providers/vectorstore/VectorStoreFactory';
+import { QueryTransformationFactory, QueryTransformationService } from '@/query';
 
 export async function runSearch(queryArg?: string): Promise<void> {
   const query = queryArg || process.argv.slice(2).join(' ');
@@ -15,17 +16,29 @@ export async function runSearch(queryArg?: string): Promise<void> {
   console.log('Searching...\n');
 
   try {
+    const queryTransformationStrategy = QueryTransformationFactory.create();
+    const queryTransformationService = new QueryTransformationService(queryTransformationStrategy);
+    const transformationResult = await queryTransformationService.transform(query.trim());
+
     const embeddingProvider = EmbeddingProviderFactory.create();
     const vectorStore = VectorStoreFactory.create();
     
     const retrievalService = new RetrievalService(embeddingProvider, vectorStore);
 
     const result = await retrievalService.search({
-      query: query.trim(),
+      query: transformationResult.transformedQuery,
     });
 
-    console.log('Query');
-    console.log(result.query);
+    console.log('Original Query');
+    console.log(transformationResult.originalQuery);
+    console.log();
+    
+    console.log('Transformed Query');
+    console.log(transformationResult.transformedQuery);
+    console.log();
+
+    console.log('Strategy');
+    console.log(transformationResult.strategy);
     console.log();
     
     console.log('Results');
