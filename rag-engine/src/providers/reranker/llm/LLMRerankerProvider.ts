@@ -114,11 +114,11 @@ Return ONLY valid JSON.
 Example response:
 [
   {
-    "chunkId": "chunk-1",
+    "chunkId": "idx-ref-0",
     "score": 0.96
   },
   {
-    "chunkId": "chunk-2",
+    "chunkId": "idx-ref-1",
     "score": 0.81
   }
 ]
@@ -129,10 +129,10 @@ ${query}
 Candidate Passages
 `;
 
-    for (const item of batch) {
-      const id = this.getChunkId(item);
+    for (let idx = 0; idx < batch.length; idx++) {
+      const item = batch[idx];
       const text = this.getChunkText(item);
-      prompt += `\nChunk ID:\n${id}\n\nContent:\n${text}\n\n--------------------\n`;
+      prompt += `\nChunk ID:\nidx-ref-${idx}\n\nContent:\n${text}\n\n--------------------\n`;
     }
 
     return prompt;
@@ -148,50 +148,78 @@ Candidate Passages
         return null;
       }
 
-      const batchIds = new Set(batch.map(item => this.getChunkId(item)));
       const scores = new Map<string, number>();
 
       for (const item of parsed) {
         if (!item || typeof item !== 'object') {
-          logger.warn('Invalid item in reranker response. Skipping.');
-          continue;
+          logger.error('Invalid item in reranker response.');
+          return null;
         }
         
         if (typeof item.chunkId !== 'string' || typeof item.score !== 'number') {
-          logger.warn('Invalid chunkId or score format in reranker response. Skipping.');
-          continue;
+          logger.error('Invalid chunkId or score format in reranker response.');
+          return null;
         }
 
         if (item.score < 0 || item.score > 1) {
-          logger.warn(`Invalid score value (must be between 0 and 1): ${item.score}. Skipping.`);
-          continue;
+          logger.error(`Invalid score value (must be between 0 and 1): ${item.score}.`);
+          return null;
         }
 
-        let matchedId = item.chunkId;
-        if (!batchIds.has(matchedId)) {
-          // Attempt fuzzy prefix/substring matching in case the LLM truncated the UUID
-          const found = Array.from(batchIds).find(
-            (id) => id.startsWith(matchedId) || matchedId.startsWith(id)
-          );
-          if (found) {
-            matchedId = found;
-          } else {
-            logger.warn(`Unknown chunk ID in response: ${item.chunkId}. Skipping.`);
-            continue;
+        const chunkId = item.chunkId;
+        let matchedId: string | undefined;
+
+        // Try mapping from index-based ID idx-ref-idx to original ID first
+        const match = chunkId.match(/^idx-ref-(\d+)$/);
+        if (match) {
+          const idx = parseInt(match[1], 10);
+          if (idx >= 0 && idx < batch.length) {
+            matchedId = this.getChunkId(batch[idx]);
           }
         }
 
+        // Backward compatibility fallback for tests and direct matches
+        if (!matchedId) {
+          const batchIds = new Set(batch.map(b => this.getChunkId(b)));
+          if (batchIds.has(chunkId)) {
+            matchedId = chunkId;
+          } else {
+            // Fuzzy match on original IDs
+            const foundOriginal = Array.from(batchIds).find(
+              (id) => id.startsWith(chunkId) || chunkId.startsWith(id)
+            );
+            if (foundOriginal) {
+              matchedId = foundOriginal;
+            } else {
+              // Fuzzy match on idx-ref-idx patterns
+              const foundIdxKey = batch.findIndex((_, idx) => {
+                const key = `idx-ref-${idx}`;
+                return key.startsWith(chunkId) || chunkId.startsWith(key);
+              });
+              if (foundIdxKey !== -1) {
+                matchedId = this.getChunkId(batch[foundIdxKey]);
+              }
+            }
+          }
+        }
+
+        if (!matchedId) {
+          logger.error(`Unknown chunk ID in response: ${item.chunkId}.`);
+          return null;
+        }
+
         if (scores.has(matchedId)) {
-          logger.warn(`Duplicate chunk ID in response: ${matchedId}. Skipping duplicate.`);
-          continue;
+          logger.error(`Duplicate chunk ID in response: ${matchedId}.`);
+          return null;
         }
         
         scores.set(matchedId, item.score);
       }
 
       // Check for missing chunk IDs
-      if (scores.size !== batchIds.size) {
-        logger.warn(`Missing chunk IDs in response. Expected ${batchIds.size}, got ${scores.size}. Assigning 0 to missing chunks.`);
+      const batchIds = batch.map(item => this.getChunkId(item));
+      if (scores.size !== batchIds.length) {
+        logger.warn(`Missing chunk IDs in response. Expected ${batchIds.length}, got ${scores.size}. Assigning 0 to missing chunks.`);
         for (const id of batchIds) {
           if (!scores.has(id)) {
             scores.set(id, 0);

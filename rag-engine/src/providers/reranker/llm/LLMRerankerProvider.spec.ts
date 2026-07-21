@@ -45,7 +45,7 @@ describe('LLMRerankerProvider', () => {
       const mockCalls = vi.mocked(mockChatProvider.generateResponse).mock.calls;
       expect(mockCalls[0][0][0].content).toContain('Candidate Passages');
       expect(mockCalls[0][1]).toEqual({ task: 'reranking' });
-      expect(mockCalls[0][0][0].content).toContain('chunk-1');
+      expect(mockCalls[0][0][0].content).toContain('idx-ref-0');
       expect(mockCalls[0][0][0].content).toContain('Text 1');
       expect(mockCalls[0][0][0].content).toContain('test query');
 
