@@ -67,10 +67,10 @@ export class RetrievalService {
       .map((result) => {
         const metadata = result.chunk.metadata;
         const sourceReference = {
-          courseName: (metadata.courseName as string) || 'Unknown Course',
+          courseName: (metadata.courseTitle as string) || (metadata.courseName as string) || 'Unknown Course',
           moduleTitle: (metadata.moduleTitle as string) || 'Unknown Module',
           lessonTitle: (metadata.lessonTitle as string) || 'Unknown Lesson',
-          transcriptFile: (metadata.sourceTranscriptPath as string) || 'unknown.vtt',
+          transcriptFile: (metadata.transcriptFile as string) || (metadata.sourceTranscriptPath as string) || 'unknown.vtt',
           startTime: (metadata.startTime as number) || 0,
           endTime: (metadata.endTime as number) || 0,
         };
