@@ -10,7 +10,7 @@ import { StatisticsCard } from "@/components/statistics-card"
 import { RetrievedContextPanel } from "@/components/retrieved-context-panel"
 import { PipelineProgress } from "@/components/pipeline-progress"
 import { ConfidenceBadge } from "@/components/confidence-badge"
-import { streamChatQuery, ChatStreamEvent } from "@/lib/api"
+import { streamChatQuery, submitChatQuery, ChatStreamEvent } from "@/lib/api"
 import { ChatResponse } from "@/types/api"
 import { GraduationCap, Smartphone, ServerCrash } from "lucide-react"
 
@@ -87,51 +87,60 @@ function ChatExperience() {
 
     try {
       const token = await getToken()
-      await streamChatQuery(
-        { query: q }, 
-        (event: ChatStreamEvent) => {
-          if (event.type === 'start') {
-            clearInterval(interval)
-            setActiveStageIndex(PIPELINE_STAGES.length - 2)
-          } else if (event.type === 'citation') {
-            setResponse(prev => {
-              const prevResponse = prev || { answer: "", citations: [], retrievedChunks: [], metadata: {} };
-              const newCitations = [...(prevResponse.citations || []), event.data];
-              const newChunks = [...(prevResponse.retrievedChunks || []), { 
-                chunkId: event.data.chunkId || String(Math.random()), 
-                text: '...', 
-                score: event.data.similarityScore || 0,
-                metadata: {},
-                sourceReference: {
-                  courseName: event.data.courseName || '',
-                  moduleTitle: event.data.moduleTitle || '',
-                  lessonTitle: event.data.lessonTitle || '',
-                  transcriptFile: event.data.transcriptFile || '',
-                  startTime: event.data.startTime || 0,
-                  endTime: event.data.endTime || 0
-                },
-                citation: event.data 
-              }];
-              return { ...prevResponse, citations: newCitations, retrievedChunks: newChunks };
-            })
-          } else if (event.type === 'token') {
-            setResponse(prev => {
-              const prevResponse = prev || { answer: "", citations: [], retrievedChunks: [], metadata: {} };
-              return {
-                ...prevResponse,
-                answer: prevResponse.answer + event.data
-              }
-            })
-          } else if (event.type === 'done') {
-            setActiveStageIndex(PIPELINE_STAGES.length)
-          } else if (event.type === 'error') {
-            setError(event.data.message)
-            setActiveStageIndex(PIPELINE_STAGES.length)
-          }
-        },
-        abortController.signal,
-        token
-      )
+      const useStreaming = process.env.NEXT_PUBLIC_USE_STREAMING === 'true'
+      
+      if (useStreaming) {
+        await streamChatQuery(
+          { query: q }, 
+          (event: ChatStreamEvent) => {
+            if (event.type === 'start') {
+              clearInterval(interval)
+              setActiveStageIndex(PIPELINE_STAGES.length - 2)
+            } else if (event.type === 'citation') {
+              setResponse(prev => {
+                const prevResponse = prev || { answer: "", citations: [], retrievedChunks: [], metadata: {} };
+                const newCitations = [...(prevResponse.citations || []), event.data];
+                const newChunks = [...(prevResponse.retrievedChunks || []), { 
+                  chunkId: event.data.chunkId || String(Math.random()), 
+                  text: event.data.text || '...', 
+                  score: event.data.similarityScore || 0,
+                  metadata: {},
+                  sourceReference: {
+                    courseName: event.data.courseName || '',
+                    moduleTitle: event.data.moduleTitle || '',
+                    lessonTitle: event.data.lessonTitle || '',
+                    transcriptFile: event.data.transcriptFile || '',
+                    startTime: event.data.startTime || 0,
+                    endTime: event.data.endTime || 0
+                  },
+                  citation: event.data 
+                }];
+                return { ...prevResponse, citations: newCitations, retrievedChunks: newChunks };
+              })
+            } else if (event.type === 'token') {
+              setResponse(prev => {
+                const prevResponse = prev || { answer: "", citations: [], retrievedChunks: [], metadata: {} };
+                return {
+                  ...prevResponse,
+                  answer: prevResponse.answer + event.data
+                }
+              })
+            } else if (event.type === 'done') {
+              setActiveStageIndex(PIPELINE_STAGES.length)
+            } else if (event.type === 'error') {
+              setError(event.data.message)
+              setActiveStageIndex(PIPELINE_STAGES.length)
+            }
+          },
+          abortController.signal,
+          token
+        )
+      } else {
+        const res = await submitChatQuery({ query: q }, token)
+        clearInterval(interval)
+        setActiveStageIndex(PIPELINE_STAGES.length)
+        setResponse(res)
+      }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         setError(err.message || 'An error occurred')
@@ -156,6 +165,22 @@ function ChatExperience() {
       }
       return { ...stage, status }
     })
+  }
+  const getCitedChunks = () => {
+    if (!response?.retrievedChunks) return []
+    const answer = response.answer || ""
+    // Find all occurrences of "Source X" in the answer
+    const matches = Array.from(answer.matchAll(/Source\s+(\d+)/gi))
+    const citedIndices = new Set(matches.map(match => parseInt(match[1], 10) - 1))
+    
+    // During active streaming, before any citations are printed in the text,
+    // we show all chunks so the UI doesn't look empty.
+    // Once the first citation is printed, we strictly filter.
+    if (isStreaming && citedIndices.size === 0) {
+      return response.retrievedChunks
+    }
+    
+    return response.retrievedChunks.filter((_, index) => citedIndices.has(index))
   }
 
   return (
@@ -188,7 +213,7 @@ function ChatExperience() {
           </div>
           <div className="flex items-center gap-4">
             {isLoaded && isSignedIn && (
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
             )}
             {isLoaded && !isSignedIn && (
               <SignInButton mode="modal">
@@ -289,14 +314,15 @@ function ChatExperience() {
                             content={response.answer}
                             activeCitation={activeCitation}
                             onCitationClick={setActiveCitation}
+                            chunks={response.retrievedChunks}
                           />
                           
                           {!noAnswerFound && (
                             <>
                               <StatisticsCard 
-                                totalResults={response.retrievedChunks?.length}
+                                totalResults={getCitedChunks().length}
                                 elapsedTime={response.metadata?.elapsedTime}
-                                uniqueSources={new Set(response.citations?.map((c) => c.lessonId)).size}
+                                uniqueSources={new Set(getCitedChunks().map((c) => c.citation.lessonId)).size}
                                 highestScore={(response.metadata as Record<string, unknown>)?.highestScore as number || 0.93}
                               />
 
@@ -316,7 +342,7 @@ function ChatExperience() {
             {response?.retrievedChunks && !response.answer.includes("I couldn't find this information") && !response.answer.includes("I do not have sufficient information") && (
               <div className="w-full lg:w-5/12 xl:w-1/3 lg:sticky lg:top-24 h-auto lg:h-[calc(100vh-8rem)] overflow-y-auto pb-8 scrollbar-thin">
                 <LearningTimeline 
-                  chunks={response.retrievedChunks}
+                  chunks={getCitedChunks()}
                   activeCitation={activeCitation}
                   onCitationClick={setActiveCitation}
                 />

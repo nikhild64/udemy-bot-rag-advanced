@@ -153,31 +153,40 @@ Candidate Passages
 
       for (const item of parsed) {
         if (!item || typeof item !== 'object') {
-          logger.error('Invalid item in reranker response');
-          return null;
+          logger.warn('Invalid item in reranker response. Skipping.');
+          continue;
         }
         
         if (typeof item.chunkId !== 'string' || typeof item.score !== 'number') {
-          logger.error('Invalid chunkId or score format in reranker response');
-          return null;
+          logger.warn('Invalid chunkId or score format in reranker response. Skipping.');
+          continue;
         }
 
         if (item.score < 0 || item.score > 1) {
-          logger.error(`Invalid score value (must be between 0 and 1): ${item.score}`);
-          return null;
+          logger.warn(`Invalid score value (must be between 0 and 1): ${item.score}. Skipping.`);
+          continue;
         }
 
-        if (!batchIds.has(item.chunkId)) {
-          logger.error(`Unknown chunk ID in response: ${item.chunkId}`);
-          return null;
+        let matchedId = item.chunkId;
+        if (!batchIds.has(matchedId)) {
+          // Attempt fuzzy prefix/substring matching in case the LLM truncated the UUID
+          const found = Array.from(batchIds).find(
+            (id) => id.startsWith(matchedId) || matchedId.startsWith(id)
+          );
+          if (found) {
+            matchedId = found;
+          } else {
+            logger.warn(`Unknown chunk ID in response: ${item.chunkId}. Skipping.`);
+            continue;
+          }
         }
 
-        if (scores.has(item.chunkId)) {
-          logger.error(`Duplicate chunk ID in response: ${item.chunkId}`);
-          return null;
+        if (scores.has(matchedId)) {
+          logger.warn(`Duplicate chunk ID in response: ${matchedId}. Skipping duplicate.`);
+          continue;
         }
         
-        scores.set(item.chunkId, item.score);
+        scores.set(matchedId, item.score);
       }
 
       // Check for missing chunk IDs

@@ -54,7 +54,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             {isLoaded && isSignedIn && (
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
             )}
             {isLoaded && !isSignedIn && (
               <SignInButton mode="modal">

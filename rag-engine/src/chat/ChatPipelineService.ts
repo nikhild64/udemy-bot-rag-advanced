@@ -157,10 +157,16 @@ export class ChatPipelineService implements ChatPipeline {
       };
       const rerankResult = await this.rerankerProvider.rerank(rerankRequest) as RerankResult<RetrievedChunk>;
 
-      // Yield citations
-      if (retrievalResult.citations) {
-        for (const citation of retrievalResult.citations) {
-          yield { type: 'citation', data: citation };
+      // Yield citations in reranked order to match prompt formatting
+      if (rerankResult.chunks) {
+        for (const chunk of rerankResult.chunks) {
+          yield { 
+            type: 'citation', 
+            data: { 
+              ...chunk.citation, 
+              text: chunk.text 
+            } 
+          };
         }
       }
 

@@ -10,6 +10,7 @@ export interface Citation {
   startTime: number;
   endTime: number;
   similarityScore: number;
+  text?: string;
 }
 
 export interface SourceReference {

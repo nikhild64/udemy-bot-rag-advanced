@@ -10,7 +10,7 @@ export function RetrievedContextPanel({ chunks }: RetrievedContextPanelProps) {
   if (chunks.length === 0) return null
 
   return (
-    <div className="mt-8 border rounded-xl overflow-hidden bg-card shadow-sm">
+    <div className="mt-8 border rounded-xl hidden overflow-hidden bg-card shadow-sm">
       <Accordion className="w-full">
         <AccordionItem value="context" className="border-b-0">
           <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-muted/30">

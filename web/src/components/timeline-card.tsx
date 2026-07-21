@@ -55,7 +55,8 @@ export function TimelineCard({ citation, isActive, onClick, textPreview }: Timel
             <h4 className="font-semibold text-sm truncate">{citation.lessonTitle}</h4>
             <p className="text-xs text-muted-foreground truncate mt-1">{citation.courseName}</p>
             <p className="text-xs text-muted-foreground truncate">{citation.moduleTitle}</p>
-            <div className="mt-3">
+            {/* Hiding Open Video button temporarily per user request */}
+            {/* <div className="mt-3">
               <Button 
                 variant={isActive ? "default" : "secondary"}
                 size="sm" 
@@ -65,7 +66,7 @@ export function TimelineCard({ citation, isActive, onClick, textPreview }: Timel
                 <ExternalLink className="w-3 h-3 mr-1.5" />
                 Open Video
               </Button>
-            </div>
+            </div> */}
           </div>
         </div>
 
