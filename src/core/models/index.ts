@@ -8,3 +8,4 @@ export * from './chunk.model';
 export * from './search.model';
 export * from './chat.model';
 export * from './query-transformation.model';
+export * from './rerank.model';

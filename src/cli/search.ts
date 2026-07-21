@@ -3,6 +3,7 @@ import { RetrievalService } from '@/retrieval';
 import { EmbeddingProviderFactory } from '@/providers/embeddings/EmbeddingProviderFactory';
 import { VectorStoreFactory } from '@/providers/vectorstore/VectorStoreFactory';
 import { QueryTransformationFactory, QueryTransformationService } from '@/query';
+import { RerankerProviderFactory, RerankingService } from '@/reranking';
 
 export async function runSearch(queryArg?: string): Promise<void> {
   const query = queryArg || process.argv.slice(2).join(' ');
@@ -29,6 +30,13 @@ export async function runSearch(queryArg?: string): Promise<void> {
       query: transformationResult.transformedQuery,
     });
 
+    const rerankerProvider = RerankerProviderFactory.create();
+    const rerankingService = new RerankingService(rerankerProvider);
+    const rerankResult = await rerankingService.rerank(
+      transformationResult.transformedQuery,
+      result.retrievedChunks
+    );
+
     console.log('Original Query');
     console.log(transformationResult.originalQuery);
     console.log();
@@ -41,12 +49,16 @@ export async function runSearch(queryArg?: string): Promise<void> {
     console.log(transformationResult.strategy);
     console.log();
     
+    console.log('Reranker');
+    console.log(rerankResult.provider);
+    console.log();
+    
     console.log('Results');
-    console.log(result.totalResults);
+    console.log(rerankResult.rerankedCount);
     console.log();
 
-    if (result.totalResults > 0) {
-      result.retrievedChunks.forEach((match) => {
+    if (rerankResult.rerankedCount > 0) {
+      rerankResult.chunks.forEach((match) => {
         const citation = match.citation;
         
         console.log('────────────────────────────\n');
@@ -64,7 +76,7 @@ export async function runSearch(queryArg?: string): Promise<void> {
         console.log();
         
         console.log('Timestamp');
-        const formatTime = (secs: number) => {
+        const formatTime = (secs: number): string => {
           const m = Math.floor(secs / 60).toString().padStart(2, '0');
           const s = Math.floor(secs % 60).toString().padStart(2, '0');
           return `${m}:${s}`;

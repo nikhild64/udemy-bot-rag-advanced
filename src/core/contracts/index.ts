@@ -6,3 +6,4 @@ export * from './chat-provider.contract';
 export * from './vector-store.contract';
 export * from './transcript-parser.contract';
 export * from './query-transformation-strategy.contract';
+export * from './reranker-provider.contract';
