@@ -10,4 +10,5 @@ export * from './extraction.error';
 export * from './ingestion.error';
 export * from './parsing.error';
 export * from './chunking.error';
+export * from './guardrail.error';
 

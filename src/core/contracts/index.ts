@@ -7,3 +7,4 @@ export * from './vector-store.contract';
 export * from './transcript-parser.contract';
 export * from './query-transformation-strategy.contract';
 export * from './reranker-provider.contract';
+export * from './input-guard.contract';

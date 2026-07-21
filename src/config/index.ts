@@ -7,6 +7,7 @@ import { vectorStoreConfig, VectorStoreConfig } from './vectorstore';
 import { indexingConfig, IndexingConfig } from './indexing';
 import { retrievalConfig, RetrievalConfig } from './retrieval';
 import { chatConfig, ChatConfig } from './chat';
+import { guardrailsConfig, GuardrailsConfig } from './guardrails';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -18,6 +19,7 @@ export interface ApplicationConfig {
   readonly indexing: IndexingConfig;
   readonly retrieval: RetrievalConfig;
   readonly chat: ChatConfig;
+  readonly guardrails: GuardrailsConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -30,6 +32,7 @@ export const config: ApplicationConfig = {
   indexing: indexingConfig,
   retrieval: retrievalConfig,
   chat: chatConfig,
+  guardrails: guardrailsConfig,
 };
 
 export * from './app';
@@ -41,3 +44,4 @@ export * from './vectorstore';
 export * from './indexing';
 export * from './retrieval';
 export * from './chat';
+export * from './guardrails';
