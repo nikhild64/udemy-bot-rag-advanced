@@ -181,8 +181,12 @@ Candidate Passages
 
       // Check for missing chunk IDs
       if (scores.size !== batchIds.size) {
-        logger.error('Missing chunk ID in response');
-        return null;
+        logger.warn(`Missing chunk IDs in response. Expected ${batchIds.size}, got ${scores.size}. Assigning 0 to missing chunks.`);
+        for (const id of batchIds) {
+          if (!scores.has(id)) {
+            scores.set(id, 0);
+          }
+        }
       }
 
       logger.debug('Response validation completed');
@@ -196,7 +200,7 @@ Candidate Passages
   private getChunkId(item: T): string {
     const record = item as Record<string, unknown>;
     const chunk = record?.chunk as Record<string, unknown> | undefined;
-    return String(chunk?.id ?? record?.id ?? 'unknown');
+    return String(record?.chunkId ?? chunk?.id ?? record?.id ?? 'unknown');
   }
 
   private getChunkText(item: T): string {

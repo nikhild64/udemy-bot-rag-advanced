@@ -85,7 +85,7 @@ export default function Home() {
             <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
               <GraduationCap className="w-5 h-5" />
             </div>
-            Chai Code Mobile Dev Support
+            Chai Code Expo Mobile Dev Support
           </div>
           {/* Add ThemeToggle if necessary */}
         </div>
@@ -99,7 +99,7 @@ export default function Home() {
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Smartphone className="w-6 h-6 text-primary" />
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">Ask anything about the Chai Code Mobile Dev Course.</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Ask anything about the Chai Code Expo Mobile Dev Course.</h1>
               <p className="text-muted-foreground text-lg">Get instant, verified answers based on course lectures and materials.</p>
             </div>
             
@@ -111,16 +111,17 @@ export default function Home() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-8">
+            <div className="flex flex-wrap justify-center gap-3 w-full mt-8">
               {[
-                "How do I manage state in React Native?",
-                "What's the difference between Flutter and React Native?",
-                "Explain the iOS App Lifecycle.",
-                "How to handle permissions in Android?"
+                "How does Expo Router work?",
+                "What are the limitations of Expo Go?",
+                "How do I use expo-camera?",
+                "Setting up push notifications in Expo",
+                "How to cook a perfect steak?"
               ].map(example => (
                 <button
                   key={example}
-                  className="px-4 py-3 rounded-lg border border-muted bg-card/50 text-sm text-left hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  className="px-4 py-2.5 rounded-full border border-muted bg-card/50 text-sm hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                   onClick={() => {
                     setQuery(example)
                     chatMutation.mutate(example)
