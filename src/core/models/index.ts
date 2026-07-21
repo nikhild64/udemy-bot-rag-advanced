@@ -11,3 +11,4 @@ export * from './query-transformation.model';
 export * from './rerank.model';
 export * from './prompt.model';
 export * from './guardrail.model';
+export * from './chat-pipeline.model';
