@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { createHash } from 'crypto';
 import { Transcript } from '@/core/models';
 import { CourseManifest, ManifestTranscript } from '@/ingestion/manifest';
 import { TranscriptFormat } from '@/types';
@@ -208,8 +209,9 @@ export class TranscriptParsingService implements ITranscriptParsingService {
         ? TranscriptFormat.VTT
         : TranscriptFormat.SRT);
 
+    const pathHash = createHash('md5').update(absolutePath).digest('hex').substring(0, 8);
     const transcript: Transcript = {
-      id: `ts-${lessonId}`,
+      id: `ts-${lessonId}-${pathHash}`,
       lessonId,
       format: transcriptFormat,
       sourceFile: absolutePath,

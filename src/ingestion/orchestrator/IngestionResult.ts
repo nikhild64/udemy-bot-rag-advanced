@@ -2,6 +2,7 @@ import { ManifestResult } from '@/ingestion/manifest';
 import { ParsingResult } from '@/ingestion/parsing';
 import { ChunkingResult } from '@/ingestion/chunking';
 import { EmbeddingResult } from '@/ingestion/embeddings';
+import { IndexingReport } from '@/ingestion/indexing';
 
 /**
  * Represents the failure details of an archive during the extraction stage.
@@ -106,6 +107,21 @@ export interface IngestionResult {
    * List of generated embedding results across courses.
    */
   readonly embeddingResults?: readonly EmbeddingResult[];
+
+  /**
+   * Total number of chunks successfully uploaded to the vector store.
+   */
+  readonly totalUploadsGenerated?: number;
+
+  /**
+   * Number of courses/manifests that failed during indexing stage.
+   */
+  readonly failedUploads?: number;
+
+  /**
+   * List of generated indexing reports across courses.
+   */
+  readonly indexingReports?: readonly IndexingReport[];
 
   /**
    * Whether the target vector store collection was initialized.

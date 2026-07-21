@@ -30,6 +30,12 @@ import {
   EmbeddingService,
   EmbeddingResult,
 } from '../embeddings';
+import {
+  IKnowledgeIndexingService,
+  KnowledgeIndexingService,
+  IndexingReport,
+  IndexingOptions,
+} from '../indexing';
 import { VectorStore, VectorStoreFactory } from '@/providers/vectorstore';
 import { IngestionContext, IngestionContextOptions } from './IngestionContext';
 import { IngestionResult, ArchiveExtractionFailure } from './IngestionResult';
@@ -61,6 +67,11 @@ export interface IIngestionOrchestrator {
   embed(optionsOrChunkingResults?: IngestionContextOptions | readonly ChunkingResult[]): Promise<EmbeddingResult[]>;
 
   /**
+   * Run only the indexing stage of the ingestion pipeline.
+   */
+  index(optionsOrChunkingResults?: IndexingOptions | readonly ChunkingResult[]): Promise<IndexingReport[]>;
+
+  /**
    * Run only the vector store validation stage of the ingestion pipeline.
    */
   validateVectorStore(optionsOrEmbeddingResults?: IngestionContextOptions | readonly EmbeddingResult[]): Promise<boolean>;
@@ -85,6 +96,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
   private readonly parsingService: ITranscriptParsingService;
   private readonly chunkingService: IChunkingService;
   private readonly embeddingService: IEmbeddingService;
+  private readonly indexingService: IKnowledgeIndexingService;
   private readonly vectorStore: VectorStore;
 
   constructor(
@@ -96,6 +108,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     parsingService?: ITranscriptParsingService,
     chunkingService?: IChunkingService,
     embeddingService?: IEmbeddingService,
+    indexingService?: IKnowledgeIndexingService,
     vectorStore?: VectorStore,
   ) {
     this.discoveryService = discoveryService ?? new InputDiscoveryService();
@@ -107,6 +120,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     this.parsingService = parsingService ?? new TranscriptParsingService();
     this.chunkingService = chunkingService ?? new ChunkingService();
     this.embeddingService = embeddingService ?? new EmbeddingService();
+    this.indexingService = indexingService ?? new KnowledgeIndexingService(this.embeddingService, vectorStore ?? VectorStoreFactory.create());
     this.vectorStore = vectorStore ?? VectorStoreFactory.create();
   }
 
@@ -414,6 +428,32 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
     return results;
   }
 
+  async index(
+    optionsOrChunkingResults?: IndexingOptions | readonly ChunkingResult[],
+  ): Promise<IndexingReport[]> {
+    const chunkingResults: readonly ChunkingResult[] = Array.isArray(optionsOrChunkingResults)
+      ? optionsOrChunkingResults
+      : await this.chunk(optionsOrChunkingResults as IngestionContextOptions | undefined);
+
+    logger.info(
+      { totalCoursesToIndex: chunkingResults.length },
+      'Ingestion knowledge indexing stage started',
+    );
+
+    const reports = await this.indexingService.indexChunks(
+      chunkingResults,
+      !Array.isArray(optionsOrChunkingResults) ? optionsOrChunkingResults : undefined
+    );
+
+    const totalUploads = reports.reduce((acc, r) => acc + r.successfulUploads, 0);
+    logger.info(
+      { totalCoursesIndexed: reports.length, totalUploads },
+      'Knowledge indexing stage completed',
+    );
+
+    return reports;
+  }
+
   async validateVectorStore(
     optionsOrEmbeddingResults?: IngestionContextOptions | readonly EmbeddingResult[],
   ): Promise<boolean> {
@@ -600,29 +640,29 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       );
     }
 
-    let embeddingResults: EmbeddingResult[] = [];
-    let failedEmbeddings = 0;
-    let totalEmbeddingsGenerated = 0;
+    let indexingReports: IndexingReport[] = [];
+    let failedUploads = 0;
+    let totalUploadsGenerated = 0;
     try {
-      embeddingResults = await this.embed(chunkingResults);
-      for (const e of embeddingResults) {
-        totalEmbeddingsGenerated += e.embeddingsGeneratedCount;
+      indexingReports = await this.index(chunkingResults);
+      for (const e of indexingReports) {
+        totalUploadsGenerated += e.successfulUploads;
         if (!e.success) {
-          failedEmbeddings++;
+          failedUploads++;
           failures.push({
             archiveName: e.courseName || e.courseId,
-            error: `Embedding generation failed: ${e.errors.join('; ')}`,
+            error: `Indexing failed: ${e.errors.join('; ')}`,
           });
         }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({ err: errorMessage }, 'Workflow failed during embedding generation stage');
+      logger.error({ err: errorMessage }, 'Workflow failed during indexing stage');
       if (error instanceof AppError) {
         throw error;
       }
       throw new IngestionError(
-        `Ingestion workflow terminated unexpectedly during embedding generation stage: ${errorMessage}`,
+        `Ingestion workflow terminated unexpectedly during indexing stage: ${errorMessage}`,
         { cause: error },
       );
     }
@@ -634,14 +674,10 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       failedManifests === 0 &&
       failedParsings === 0 &&
       failedChunkings === 0 &&
-      failedEmbeddings === 0
+      failedUploads === 0
     ) {
       try {
-        vectorStoreValidated = await this.validateVectorStore({
-          ...context,
-          isWorkflowStage: true,
-          embeddingResults,
-        } as IngestionContextOptions);
+        vectorStoreValidated = await this.validateVectorStore();
         vectorStoreInitialized = vectorStoreValidated;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -658,7 +694,7 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       failedManifests === 0 &&
       failedParsings === 0 &&
       failedChunkings === 0 &&
-      failedEmbeddings === 0 &&
+      failedUploads === 0 &&
       failures.length === 0;
 
     const result: IngestionResult = {
@@ -676,9 +712,9 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
       totalChunksGenerated,
       failedChunkings,
       chunkingResults,
-      totalEmbeddingsGenerated,
-      failedEmbeddings,
-      embeddingResults,
+      totalUploadsGenerated,
+      failedUploads,
+      indexingReports,
       vectorStoreInitialized,
       vectorStoreValidated,
       durationMs,
@@ -699,8 +735,8 @@ export class IngestionOrchestrator implements IIngestionOrchestrator {
         totalCuesParsed: result.totalCuesParsed,
         totalChunksGenerated: result.totalChunksGenerated,
         failedChunkings: result.failedChunkings,
-        totalEmbeddingsGenerated: result.totalEmbeddingsGenerated,
-        failedEmbeddings: result.failedEmbeddings,
+        totalUploadsGenerated: result.totalUploadsGenerated,
+        failedUploads: result.failedUploads,
         durationMs: result.durationMs,
         success: result.success,
       },

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { VectorStore, VectorStoreCollectionInfo } from '@/core/contracts/vector-store.contract';
 import { Chunk, SearchResult } from '@/core/models';
@@ -14,6 +15,8 @@ export interface QdrantVectorStoreOptions {
   readonly timeoutMs?: number;
   readonly client?: QdrantClient;
 }
+
+
 
 export class QdrantVectorStore implements VectorStore {
   readonly providerName = 'Qdrant Cloud';

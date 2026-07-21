@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Chunk, ChunkMetadata, Transcript, TranscriptCue } from '@/core/models';
 import { ChunkingStrategy, ChunkingStrategyContext } from './ChunkingStrategy';
 import { chunkingConfig } from '@/config';
@@ -203,7 +204,9 @@ export class SemanticChunkingStrategy implements ChunkingStrategy {
     const transcriptId = context.transcriptId || transcript.id || `ts-${lessonId}`;
     const sourceTranscriptPath = context.sourceFile ?? transcript.sourceFile ?? '';
 
-    const id = `${transcriptId}-chk-${index}`;
+    const chunkIdentity = `${courseId}|${moduleId}|${lessonId}|${index}`;
+    const hash = createHash('sha256').update(chunkIdentity).digest('hex');
+    const id = `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-a${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
 
     const metadata: ChunkMetadata = {
       courseId,

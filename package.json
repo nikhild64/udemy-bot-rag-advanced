@@ -13,6 +13,7 @@
     "parse": "tsx src/cli/parse.ts",
     "chunk": "tsx src/cli/chunk.ts",
     "embed": "tsx src/cli/embed.ts",
+    "index": "tsx src/cli/indexing.ts",
     "vectorstore": "tsx src/cli/vectorstore.ts",
     "lint": "eslint .",
     "test": "vitest run",
