@@ -9,6 +9,7 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
 import { diPlugin } from './di.plugin';
 import { config } from '../../config';
+import { clerkPlugin } from '@clerk/fastify';
 
 /**
  * Centralized plugin registration
@@ -66,4 +67,10 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
 
   // Register Dependency Injection
   await app.register(diPlugin);
+
+  // Register Clerk Authentication
+  await app.register(clerkPlugin, {
+    publishableKey: config.auth.publishableKey,
+    secretKey: config.auth.secretKey,
+  });
 }

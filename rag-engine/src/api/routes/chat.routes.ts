@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { postChat, postChatStream } from '../controllers/chat.controller';
+import { requireAuth } from '../middlewares/auth.middleware';
 
 const chatRequestSchema = z.object({
   query: z.string().min(1, 'Query cannot be empty'),
@@ -41,6 +42,7 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
   server.post(
     '/chat',
     {
+      preHandler: [requireAuth],
       schema: {
         description: 'Submit a query to the Knowledge Engine and get an AI-generated answer',
         tags: ['Chat'],
@@ -70,6 +72,7 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
   server.post(
     '/chat/stream',
     {
+      preHandler: [requireAuth],
       schema: {
         description: 'Submit a query to the Knowledge Engine and get an AI-generated answer as a stream of Server-Sent Events',
         tags: ['Chat'],

@@ -130,8 +130,18 @@ describe('LLMRerankerProvider', () => {
       await runFailureTest('[{"chunkId": "unknown-id", "score": 0.5}]');
     });
 
-    it('falls back on missing chunk ID from batch', async () => {
-      await runFailureTest('[{"chunkId": "chunk-1", "score": 0.5}]');
+    it('assigns 0 score and warns on missing chunk ID from batch', async () => {
+      const chunks = [
+        { id: 'chunk-1', text: 'Text 1' },
+        { id: 'chunk-2', text: 'Text 2' }
+      ];
+      vi.mocked(mockChatProvider.generateResponse).mockResolvedValueOnce({
+        message: { role: ChatRole.ASSISTANT, content: '[{"chunkId": "chunk-1", "score": 0.5}]' },
+      });
+      const result = await reranker.rerank({ query: 'q', chunks });
+      expect(result.chunks[0].id).toBe('chunk-1'); // Score 0.5
+      expect(result.chunks[1].id).toBe('chunk-2'); // Score 0
+      expect(logger.warn).toHaveBeenCalled();
     });
 
     it('falls back on duplicate chunk ID', async () => {

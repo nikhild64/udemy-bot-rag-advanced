@@ -28,7 +28,7 @@ describe('LLMQueryTransformationStrategy', () => {
     expect(result.metadata.transformed).toBe(true);
     
     expect(mockChatProvider.generateResponse).toHaveBeenCalledTimes(1);
-    const callArgs! = vi.mocked(mockChatProvider.generateResponse).mock.calls[0];
+    const callArgs = vi.mocked(mockChatProvider.generateResponse).mock.calls[0];
     const messages = callArgs![0];
     const options = callArgs![1];
     expect(messages[0].role).toBe('system');

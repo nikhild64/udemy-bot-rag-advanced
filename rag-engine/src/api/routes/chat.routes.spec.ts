@@ -5,6 +5,10 @@ import { chatRoutes } from './chat.routes';
 import { globalErrorHandler } from '../middlewares/error.handler';
 import { InputGuardError } from '../../shared/errors';
 
+vi.mock('../middlewares/auth.middleware', () => ({
+  requireAuth: vi.fn((req, reply, done) => done()),
+}));
+
 describe('Chat Routes', () => {
   let app: FastifyInstance;
   let mockChatPipelineService: any;

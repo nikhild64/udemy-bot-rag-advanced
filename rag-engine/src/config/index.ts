@@ -8,6 +8,7 @@ import { indexingConfig, IndexingConfig } from './indexing';
 import { retrievalConfig, RetrievalConfig } from './retrieval';
 import { chatConfig, ChatConfig } from './chat';
 import { guardrailsConfig, GuardrailsConfig } from './guardrails';
+import { authConfig, AuthConfig } from './auth';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -20,6 +21,7 @@ export interface ApplicationConfig {
   readonly retrieval: RetrievalConfig;
   readonly chat: ChatConfig;
   readonly guardrails: GuardrailsConfig;
+  readonly auth: AuthConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -33,6 +35,7 @@ export const config: ApplicationConfig = {
   retrieval: retrievalConfig,
   chat: chatConfig,
   guardrails: guardrailsConfig,
+  auth: authConfig,
 };
 
 export * from './app';
@@ -45,3 +48,4 @@ export * from './indexing';
 export * from './retrieval';
 export * from './chat';
 export * from './guardrails';
+export * from './auth';
