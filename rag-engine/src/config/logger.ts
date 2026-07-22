@@ -4,7 +4,12 @@ import { z } from 'zod';
 dotenv.config();
 
 const loggerSchema = z.object({
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']),
+  LOG_LEVEL: z
+    .preprocess(
+      (val) => (val === undefined || val === '' ? 'info' : val),
+      z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+    )
+    .default('info'),
 });
 
 export interface LoggerConfig {
