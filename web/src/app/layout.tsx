@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toaster";
 import { ClerkProvider } from "@clerk/nextjs";
 
 const manrope = Manrope({
@@ -12,8 +13,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Knowledge Engine",
-  description: "AI-powered learning assistant",
+  title: "AI Notebook Knowledge Engine",
+  description: "AI-powered notebook and knowledge assistant with grounded citations",
 };
 
 export default function RootLayout({
@@ -36,7 +37,10 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <QueryProvider>
-              <TooltipProvider>{children}</TooltipProvider>
+              <TooltipProvider>
+                {children}
+                <Toaster />
+              </TooltipProvider>
             </QueryProvider>
           </ThemeProvider>
         </body>
