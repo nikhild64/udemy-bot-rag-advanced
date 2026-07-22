@@ -4,8 +4,11 @@ import { UploadService } from '@/services/UploadService';
 import { createSourceSchema, updateSourceSchema, listSourcesQuerySchema } from '../schemas/source.schema';
 import { UnauthorizedError, ValidationError } from '@/shared/errors';
 
+import { IngestionQueue } from '@/infrastructure/queue/IngestionQueue';
+
 const sourceService = new SourceService();
 const defaultUploadService = new UploadService();
+const ingestionQueue = new IngestionQueue();
 
 function getUserId(request: FastifyRequest): string {
   const userId = request.auth?.userId || (request as any).userId;
@@ -117,3 +120,64 @@ export async function uploadSourceFileController(
 
   await reply.status(200).send(result);
 }
+
+export async function getSourceStatusController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+
+  if (!sourceId) {
+    throw new ValidationError('Source ID is required');
+  }
+
+  // 1. Verify source existence & ownership
+  const service: SourceService = request.server.sourceService || sourceService;
+  const source = await service.getSource(sourceId, userId);
+
+  // 2. Fetch live job status from IngestionQueue
+  const jobProgress = await ingestionQueue.getJobStatus(sourceId);
+
+  if (jobProgress) {
+    await reply.status(200).send({
+      sourceId: source.id,
+      status: jobProgress.status,
+      progress: jobProgress.progress,
+      currentStage: jobProgress.currentStage,
+      error: jobProgress.error || null,
+      updatedAt: jobProgress.updatedAt,
+    });
+    return;
+  }
+
+  // 3. Fallback status derived from database Source record
+  const meta = (source.metadata as Record<string, any>) || {};
+  let progress = 0;
+  let currentStage = 'Queued';
+
+  if (source.status === 'Indexed') {
+    progress = 100;
+    currentStage = 'Completed';
+  } else if (source.status === 'Failed') {
+    progress = 0;
+    currentStage = 'Failed';
+  } else if (source.status === 'Processing') {
+    progress = 50;
+    currentStage = 'Processing';
+  } else if (source.status === 'Queued' || source.status === 'Uploaded') {
+    progress = 0;
+    currentStage = 'Queued';
+  }
+
+  await reply.status(200).send({
+    sourceId: source.id,
+    status: source.status,
+    progress,
+    currentStage,
+    error: meta.error || null,
+    updatedAt: source.updatedAt.toISOString(),
+  });
+}
+

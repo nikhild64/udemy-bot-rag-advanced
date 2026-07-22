@@ -72,6 +72,20 @@ export class StorageService {
     };
   }
 
+  async downloadFile(storagePath: string): Promise<Buffer> {
+    const { data, error } = await this.supabase.storage
+      .from(this.bucketName)
+      .download(storagePath);
+
+    if (error || !data) {
+      logger.error({ error, path: storagePath }, 'Failed to download file from storage');
+      throw new StorageError(`Storage download failed: ${error?.message || 'File not found'}`);
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
   getPublicUrl(storagePath: string): string {
     const { data } = this.supabase.storage.from(this.bucketName).getPublicUrl(storagePath);
     return data.publicUrl;

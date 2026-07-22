@@ -7,6 +7,8 @@ import { NotFoundError, ValidationError, UnauthorizedError } from '@/shared/erro
 import { logger } from '@/shared/logger';
 import path from 'node:path';
 
+import { IngestionQueue } from '@/infrastructure/queue/IngestionQueue';
+
 export interface FileUploadPayload {
   filename: string;
   buffer: Buffer;
@@ -26,6 +28,7 @@ export class UploadService {
     private readonly sourceRepository: ISourceRepository = new PrismaSourceRepository(),
     private readonly notebookRepository: INotebookRepository = new PrismaNotebookRepository(),
     private readonly storageService: StorageService = new StorageService(),
+    private readonly queue: IngestionQueue = new IngestionQueue(),
   ) {}
 
   async uploadSourceFile(
@@ -117,6 +120,21 @@ export class UploadService {
         { sourceId, storagePath, size: filePayload.buffer.length },
         'File uploaded and source status updated to Uploaded',
       );
+
+      // 9. Enqueue Ingestion Job asynchronously
+      try {
+        await this.queue.enqueueJob({
+          sourceId: updatedSource.id,
+          notebookId: source.notebookId,
+          userId,
+          storagePath: updatedSource.storagePath || storagePath,
+          mimeType: filePayload.mimetype,
+        });
+
+        await this.sourceRepository.updateStatus(sourceId, SourceStatus.Queued);
+      } catch (queueErr) {
+        logger.warn({ queueErr, sourceId }, 'Failed to enqueue ingestion job; source remains Uploaded');
+      }
 
       return {
         sourceId: updatedSource.id,
