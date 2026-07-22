@@ -35,4 +35,24 @@ export const sourcesApi = {
   uploadSourceFile: async (sourceId: string, file: File): Promise<Source> => {
     return apiClient.uploadFile<Source>(`/api/sources/${sourceId}/upload`, file);
   },
+
+  reindexSource: async (sourceId: string): Promise<Source> => {
+    return apiClient.post<Source>(`/api/sources/${sourceId}/reindex`);
+  },
+
+  retrySource: async (sourceId: string): Promise<Source> => {
+    return apiClient.post<Source>(`/api/sources/${sourceId}/retry`);
+  },
+
+  cancelSource: async (sourceId: string): Promise<Source> => {
+    return apiClient.post<Source>(`/api/sources/${sourceId}/cancel`);
+  },
+
+  getSourceMetadata: async (sourceId: string): Promise<Record<string, any>> => {
+    return apiClient.get<Record<string, any>>(`/api/sources/${sourceId}/metadata`);
+  },
+
+  downloadSource: async (sourceId: string): Promise<{ downloadUrl: string; filename: string; mimeType?: string; size?: number }> => {
+    return apiClient.get<{ downloadUrl: string; filename: string; mimeType?: string; size?: number }>(`/api/sources/${sourceId}/download`);
+  },
 };

@@ -78,3 +78,71 @@ export async function deleteNotebookController(
 
   await reply.status(200).send({ success: true, message: 'Notebook deleted successfully' });
 }
+
+export async function duplicateNotebookController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const { id } = request.params as { id: string };
+
+  const notebook = await notebookService.duplicateNotebook(id, userId);
+  await reply.status(201).send(notebook);
+}
+
+export async function archiveNotebookController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const { id } = request.params as { id: string };
+
+  const notebook = await notebookService.archiveNotebook(id, userId, true);
+  await reply.status(200).send(notebook);
+}
+
+export async function restoreNotebookController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const { id } = request.params as { id: string };
+
+  const notebook = await notebookService.archiveNotebook(id, userId, false);
+  await reply.status(200).send(notebook);
+}
+
+export async function favoriteNotebookController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const { id } = request.params as { id: string };
+  const body = (request.body as { isFavorite?: boolean }) || {};
+
+  const notebook = await notebookService.toggleFavorite(id, userId, body.isFavorite);
+  await reply.status(200).send(notebook);
+}
+
+export async function touchLastOpenedController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const { id } = request.params as { id: string };
+
+  const notebook = await notebookService.touchLastOpened(id, userId);
+  await reply.status(200).send(notebook);
+}
+
+export async function getRecentNotebooksController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const query = request.query as { limit?: string };
+  const limit = query.limit ? parseInt(query.limit, 10) : 5;
+
+  const notebooks = await notebookService.getRecentNotebooks(userId, limit);
+  await reply.status(200).send(notebooks);
+}

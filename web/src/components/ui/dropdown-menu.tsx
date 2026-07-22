@@ -1,43 +1,113 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 
 interface DropdownMenuProps {
   trigger: React.ReactNode
   children: React.ReactNode
   align?: "left" | "right"
+  className?: string
 }
 
-export function DropdownMenu({ trigger, children, align = "right" }: DropdownMenuProps) {
+export function DropdownMenu({ trigger, children, align = "right", className }: DropdownMenuProps) {
   const [open, setOpen] = React.useState(false)
+  const [mounted, setMounted] = React.useState(false)
+  const [coords, setCoords] = React.useState<{ top: number; left?: number; right?: number }>({ top: 0 })
+  const triggerRef = React.useRef<HTMLDivElement>(null)
   const menuRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const updatePosition = React.useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    if (align === "right") {
+      setCoords({
+        top: rect.bottom + 6,
+        right: Math.max(8, window.innerWidth - rect.right),
+      })
+    } else {
+      setCoords({
+        top: rect.bottom + 6,
+        left: Math.max(8, rect.left),
+      })
+    }
+  }, [align])
+
+  const toggleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (!open) {
+      updatePosition()
+    }
+    setOpen((prev) => !prev)
+  }
+
+  React.useEffect(() => {
+    if (!open) return
+
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(event.target as Node)
+      ) {
         setOpen(false)
       }
     }
+
+    function handleScroll() {
+      setOpen(false)
+    }
+
+    window.addEventListener("resize", updatePosition)
+    document.addEventListener("scroll", handleScroll, true)
     document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+
+    return () => {
+      window.removeEventListener("resize", updatePosition)
+      document.removeEventListener("scroll", handleScroll, true)
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [open, updatePosition])
+
+  const menuElement = open && mounted ? (
+    createPortal(
+      <div
+        ref={menuRef}
+        style={{
+          position: "fixed",
+          top: `${coords.top}px`,
+          ...(coords.left !== undefined ? { left: `${coords.left}px` } : {}),
+          ...(coords.right !== undefined ? { right: `${coords.right}px` } : {}),
+        }}
+        className={cn(
+          "z-[99999] min-w-[11rem] overflow-hidden rounded-xl border border-border bg-card p-1.5 text-card-foreground shadow-2xl animate-in fade-in-80 zoom-in-95 backdrop-blur-xl",
+          className
+        )}
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen(false)
+        }}
+      >
+        {children}
+      </div>,
+      document.body
+    )
+  ) : null
 
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
-      <div onClick={() => setOpen(!open)}>{trigger}</div>
-      {open && (
-        <div
-          className={cn(
-            "absolute z-50 mt-1 min-w-[8rem] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-80 zoom-in-95",
-            align === "right" ? "right-0" : "left-0"
-          )}
-          onClick={() => setOpen(false)}
-        >
-          {children}
-        </div>
-      )}
-    </div>
+    <>
+      <div ref={triggerRef} onClick={toggleOpen} className="inline-flex items-center cursor-pointer">
+        {trigger}
+      </div>
+      {menuElement}
+    </>
   )
 }
 
@@ -51,7 +121,7 @@ export function DropdownMenuItem({
   return (
     <div
       className={cn(
-        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground",
+        "relative flex cursor-pointer select-none items-center rounded-lg px-2.5 py-2 text-xs font-medium outline-none transition-colors hover:bg-muted hover:text-foreground",
         destructive && "text-destructive hover:bg-destructive/10 hover:text-destructive",
         className
       )}

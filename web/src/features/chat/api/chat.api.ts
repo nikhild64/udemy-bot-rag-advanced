@@ -4,8 +4,11 @@ import { Message, ListMessagesResponse, Citation } from '@/shared/types';
 export const chatApi = {
   getMessages: async (notebookId: string): Promise<Message[]> => {
     const res = await apiClient.get<ListMessagesResponse | Message[]>(`/api/notebooks/${notebookId}/messages`);
-    if (Array.isArray(res)) return res;
-    return res.data || [];
+    const rawList = Array.isArray(res) ? res : (res as ListMessagesResponse).data || [];
+    return rawList.map((msg) => ({
+      ...msg,
+      role: (msg.role ? String(msg.role).toLowerCase() : 'assistant') as 'user' | 'assistant' | 'system',
+    }));
   },
 
   streamChat: async (

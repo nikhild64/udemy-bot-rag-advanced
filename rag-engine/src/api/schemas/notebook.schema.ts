@@ -16,13 +16,17 @@ export const updateNotebookSchema = z.object({
     .max(255, 'Title cannot exceed 255 characters')
     .optional(),
   description: z.string().optional().nullable(),
+  isArchived: z.boolean().optional(),
+  isFavorite: z.boolean().optional(),
   settings: z.record(z.any()).optional().nullable(),
 });
 
 export const listNotebooksQuerySchema = z.object({
+  isArchived: z.coerce.boolean().optional(),
+  isFavorite: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
-  sortBy: z.enum(['createdAt', 'updatedAt', 'title']).optional().default('updatedAt'),
+  sortBy: z.enum(['createdAt', 'updatedAt', 'lastOpenedAt', 'title']).optional().default('updatedAt'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 

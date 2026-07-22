@@ -49,7 +49,13 @@ export class PrismaNotebookRepository implements INotebookRepository {
     const sortBy = query.sortBy ?? 'updatedAt';
     const sortOrder = query.sortOrder ?? 'desc';
 
-    const where = { userId: query.userId };
+    const where: any = { userId: query.userId };
+    if (query.isArchived !== undefined) {
+      where.isArchived = query.isArchived;
+    }
+    if (query.isFavorite !== undefined) {
+      where.isFavorite = query.isFavorite;
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.notebook.findMany({
@@ -90,6 +96,9 @@ export class PrismaNotebookRepository implements INotebookRepository {
       data: {
         ...(data.title !== undefined && { title: data.title }),
         ...(data.description !== undefined && { description: data.description ?? null }),
+        ...(data.isArchived !== undefined && { isArchived: data.isArchived }),
+        ...(data.isFavorite !== undefined && { isFavorite: data.isFavorite }),
+        ...(data.lastOpenedAt !== undefined && { lastOpenedAt: data.lastOpenedAt }),
         ...(data.settings !== undefined && { settings: data.settings ?? {} }),
       },
     });

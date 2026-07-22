@@ -1,4 +1,4 @@
-import { User, Notebook, Source, Message, SourceType, SourceStatus, MessageRole } from '@prisma/client';
+import { User, Notebook, Source, Message, UserPreference, SourceType, SourceStatus, MessageRole } from '@prisma/client';
 
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
@@ -15,14 +15,19 @@ export interface CreateNotebookInput {
 export interface UpdateNotebookInput {
   title?: string | undefined;
   description?: string | null | undefined;
+  isArchived?: boolean | undefined;
+  isFavorite?: boolean | undefined;
+  lastOpenedAt?: Date | null | undefined;
   settings?: Record<string, any> | null | undefined;
 }
 
 export interface ListNotebooksQuery {
   userId: string;
+  isArchived?: boolean | undefined;
+  isFavorite?: boolean | undefined;
   page?: number | undefined;
   limit?: number | undefined;
-  sortBy?: 'createdAt' | 'updatedAt' | 'title' | undefined;
+  sortBy?: 'createdAt' | 'updatedAt' | 'lastOpenedAt' | 'title' | undefined;
   sortOrder?: 'asc' | 'desc' | undefined;
 }
 
@@ -43,6 +48,28 @@ export interface INotebookRepository {
   findMany(query: ListNotebooksQuery): Promise<PaginatedResult<Notebook>>;
   update(id: string, userId: string, data: UpdateNotebookInput): Promise<Notebook>;
   delete(id: string, userId: string): Promise<boolean>;
+}
+
+export interface CreateUserPreferenceInput {
+  userId: string;
+  theme?: string | undefined;
+  language?: string | undefined;
+  defaultNotebookId?: string | null | undefined;
+  timezone?: string | undefined;
+  notifications?: Record<string, any> | null | undefined;
+}
+
+export interface UpdateUserPreferenceInput {
+  theme?: string | undefined;
+  language?: string | undefined;
+  defaultNotebookId?: string | null | undefined;
+  timezone?: string | undefined;
+  notifications?: Record<string, any> | null | undefined;
+}
+
+export interface IUserPreferenceRepository {
+  findByUserId(userId: string): Promise<UserPreference | null>;
+  upsert(userId: string, data: UpdateUserPreferenceInput): Promise<UserPreference>;
 }
 
 export interface CreateSourceInput {

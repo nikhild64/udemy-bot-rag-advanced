@@ -21,11 +21,13 @@ export class VectorStoreService {
     if (!systemExists) {
       systemCreated = await this.collectionManager.createCollection(systemCollectionName, dimension, distanceMetric);
     }
+    await this.collectionManager.createPayloadIndexes(systemCollectionName);
 
     const userExists = await this.collectionManager.collectionExists(userCollectionName);
     if (!userExists) {
       userCreated = await this.collectionManager.createCollection(userCollectionName, dimension, distanceMetric);
     }
+    await this.collectionManager.createPayloadIndexes(userCollectionName);
 
     return {
       systemCollection: systemExists || systemCreated,

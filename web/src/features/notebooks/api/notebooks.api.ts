@@ -23,4 +23,24 @@ export const notebooksApi = {
   deleteNotebook: async (id: string): Promise<{ success: boolean }> => {
     return apiClient.delete<{ success: boolean }>(`/api/notebooks/${id}`);
   },
+
+  duplicateNotebook: async (id: string): Promise<Notebook> => {
+    return apiClient.post<Notebook>(`/api/notebooks/${id}/duplicate`);
+  },
+
+  archiveNotebook: async (id: string): Promise<Notebook> => {
+    return apiClient.post<Notebook>(`/api/notebooks/${id}/archive`);
+  },
+
+  restoreNotebook: async (id: string): Promise<Notebook> => {
+    return apiClient.post<Notebook>(`/api/notebooks/${id}/restore`);
+  },
+
+  favoriteNotebook: async (id: string, isFavorite?: boolean): Promise<Notebook> => {
+    return apiClient.post<Notebook>(`/api/notebooks/${id}/favorite`, { isFavorite });
+  },
+
+  touchNotebook: async (id: string): Promise<Notebook> => {
+    return apiClient.post<Notebook>(`/api/notebooks/${id}/touch`);
+  },
 };

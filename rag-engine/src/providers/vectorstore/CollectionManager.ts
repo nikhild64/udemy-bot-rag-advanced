@@ -111,7 +111,8 @@ export class CollectionManager implements ICollectionManager {
 
     const exists = await this.collectionExists(name);
     if (exists) {
-      logger.info({ collectionName: name }, 'Collection already exists');
+      logger.info({ collectionName: name }, 'Collection already exists, ensuring payload indexes...');
+      await this.createPayloadIndexes(name);
       return false;
     }
 
@@ -123,9 +124,27 @@ export class CollectionManager implements ICollectionManager {
         },
       });
       logger.info({ collectionName: name, dimension: dim, distanceMetric: dist }, 'Collection created');
+      await this.createPayloadIndexes(name);
       return true;
     } catch (err) {
       this.handleQdrantError(err, name);
+    }
+  }
+
+  async createPayloadIndexes(collectionName?: string): Promise<void> {
+    const name = collectionName ?? this.defaultCollectionName;
+    const fields = ['notebookId', 'sourceId', 'courseId', 'moduleId', 'lessonId'];
+    for (const field of fields) {
+      try {
+        await this.client.createPayloadIndex(name, {
+          field_name: field,
+          field_schema: 'keyword',
+          wait: true,
+        });
+        logger.info({ collectionName: name, field }, 'Payload index verified/created in Qdrant');
+      } catch (err) {
+        // Index may already exist or mock client in tests
+      }
     }
   }
 

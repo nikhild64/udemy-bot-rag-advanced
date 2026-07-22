@@ -2,11 +2,17 @@ import { buildApp } from './app';
 import { config } from './config';
 import { logger } from './shared';
 import { InfrastructureInitializer } from './infrastructure/InfrastructureInitializer';
+import { IngestionWorker } from './workers/IngestionWorker';
 
 async function startServer(): Promise<void> {
   try {
     // Run Infrastructure Initialization
     await InfrastructureInitializer.initialize();
+
+    // Start background ingestion worker loop
+    const worker = new IngestionWorker();
+    worker.start(2000);
+    logger.info('Background IngestionWorker loop started');
 
     const app = await buildApp();
 
@@ -21,6 +27,7 @@ async function startServer(): Promise<void> {
     for (const signal of signals) {
       process.on(signal, () => {
         logger.info(`Received ${signal}, initiating graceful shutdown...`);
+        worker.stop();
         app.close().then(
           () => {
             logger.info('Server closed gracefully');

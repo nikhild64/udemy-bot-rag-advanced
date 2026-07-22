@@ -156,7 +156,7 @@ describe('UploadService', () => {
     mockSourceRepository.findById.mockResolvedValue({
       id: mockSourceId,
       notebookId: mockNotebookId,
-      status: SourceStatus.Uploaded,
+      status: SourceStatus.Indexed,
     });
     mockNotebookRepository.findById.mockResolvedValue({
       id: mockNotebookId,

@@ -22,6 +22,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { getToken } = useAuth();
   const sourcesPanelOpen = useUIStore((s) => s.sourcesPanelOpen);
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
+  const settingsModalOpen = useUIStore((s) => s.settingsModalOpen);
+  const setSettingsModalOpen = useUIStore((s) => s.setSettingsModalOpen);
 
   // Set up token getter for API client
   useEffect(() => {
@@ -59,7 +61,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <RenameNotebookModal />
       <DeleteNotebookModal />
       <UploadModal />
-      <SettingsModal />
+      <SettingsModal isOpen={settingsModalOpen} onClose={() => setSettingsModalOpen(false)} />
     </div>
   );
 }

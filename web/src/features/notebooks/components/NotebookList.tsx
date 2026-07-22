@@ -1,16 +1,23 @@
 "use client"
 
 import { useState } from 'react';
-import { useNotebooksQuery } from '../hooks/useNotebooks';
+import {
+  useNotebooksQuery,
+  useDuplicateNotebookMutation,
+  useArchiveNotebookMutation,
+  useFavoriteNotebookMutation,
+} from '../hooks/useNotebooks';
 import { useUIStore } from '@/shared/lib/store';
-import { BookOpen, Plus, Search, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { BookOpen, Plus, Search, MoreVertical, Edit2, Trash2, Copy, Star, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 export function NotebookList() {
+  const router = useRouter();
   const { data: notebooks, isLoading, isError, error } = useNotebooksQuery();
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const setActiveNotebookId = useUIStore((s) => s.setActiveNotebookId);
@@ -18,11 +25,21 @@ export function NotebookList() {
   const setEditingNotebook = useUIStore((s) => s.setEditingNotebook);
   const setDeletingNotebook = useUIStore((s) => s.setDeletingNotebook);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const duplicateMutation = useDuplicateNotebookMutation();
+  const archiveMutation = useArchiveNotebookMutation();
+  const favoriteMutation = useFavoriteNotebookMutation();
 
-  const filteredNotebooks = (notebooks || []).filter((nb) =>
-    nb.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterTab, setFilterTab] = useState<'all' | 'favorites' | 'archived'>('all');
+
+  const filteredNotebooks = (notebooks || []).filter((nb) => {
+    const matchesSearch = nb.title.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (filterTab === 'favorites') return nb.isFavorite && !nb.isArchived;
+    if (filterTab === 'archived') return nb.isArchived;
+    return !nb.isArchived;
+  });
 
   return (
     <div className="flex flex-col h-full space-y-3">
@@ -38,6 +55,24 @@ export function NotebookList() {
           <Plus className="w-3.5 h-3.5" />
           <span>New</span>
         </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1 px-2 border-b border-border/40 pb-2">
+        {(['all', 'favorites', 'archived'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setFilterTab(tab)}
+            className={cn(
+              'px-2.5 py-1 rounded-md text-[11px] font-medium capitalize transition',
+              filterTab === tab
+                ? 'bg-primary/10 text-primary font-semibold'
+                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+            )}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {/* Search Input */}
@@ -65,7 +100,7 @@ export function NotebookList() {
           </div>
         ) : filteredNotebooks.length === 0 ? (
           <div className="p-4 text-center text-xs text-muted-foreground">
-            {searchQuery ? 'No matching notebooks found.' : 'No notebooks yet. Click "New" to create one.'}
+            {searchQuery ? 'No matching notebooks found.' : 'No notebooks found in this view.'}
           </div>
         ) : (
           filteredNotebooks.map((nb) => {
@@ -73,7 +108,10 @@ export function NotebookList() {
             return (
               <div
                 key={nb.id}
-                onClick={() => setActiveNotebookId(nb.id)}
+                onClick={() => {
+                  setActiveNotebookId(nb.id);
+                  router.push(`/notebooks/${nb.id}`);
+                }}
                 className={cn(
                   'group relative flex items-center justify-between p-2.5 rounded-lg text-sm cursor-pointer transition-all border border-transparent',
                   isActive
@@ -81,22 +119,42 @@ export function NotebookList() {
                     : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                 )}
               >
-                <div className="flex items-center gap-2.5 min-w-0 pr-6">
-                  <BookOpen className={cn('w-4 h-4 shrink-0', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  {nb.isFavorite ? (
+                    <Star className="w-4 h-4 shrink-0 text-amber-400 fill-amber-400" />
+                  ) : (
+                    <BookOpen className={cn('w-4 h-4 shrink-0', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                  )}
                   <span className="truncate">{nb.title}</span>
                 </div>
 
-                <div className="absolute right-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="shrink-0 ml-1" onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu
+                    align="right"
                     trigger={
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="p-1 hover:bg-muted/80 rounded-md text-muted-foreground hover:text-foreground transition-all">
+                        <MoreVertical className="w-4 h-4" />
+                      </div>
                     }
                   >
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        favoriteMutation.mutate({ id: nb.id, isFavorite: !nb.isFavorite });
+                      }}
+                    >
+                      <Star className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                      {nb.isFavorite ? 'Unfavorite' : 'Favorite'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateMutation.mutate(nb.id);
+                      }}
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-2" />
+                      Duplicate
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
@@ -105,6 +163,15 @@ export function NotebookList() {
                     >
                       <Edit2 className="w-3.5 h-3.5 mr-2" />
                       Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        archiveMutation.mutate({ id: nb.id, archive: !nb.isArchived });
+                      }}
+                    >
+                      <Archive className="w-3.5 h-3.5 mr-2" />
+                      {nb.isArchived ? 'Restore' : 'Archive'}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       destructive

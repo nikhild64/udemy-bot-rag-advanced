@@ -74,8 +74,8 @@ export class SourceIngestionOrchestrator {
         throw new UnauthorizedError(`User '${userId}' does not own notebook '${notebookId}'`);
       }
 
-      if (!source.storagePath && !source.fileUrl && (!source.metadata || !(source.metadata as any).url)) {
-        throw new ValidationError(`Source '${sourceId}' does not have a storagePath or fileUrl`);
+      if (!source.storagePath && !source.fileUrl && (!source.metadata || (!(source.metadata as any).url && !(source.metadata as any).rawText))) {
+        throw new ValidationError(`Source '${sourceId}' does not have a storagePath, fileUrl, or rawText`);
       }
 
       // Update Source status in DB to Processing
@@ -161,7 +161,9 @@ export class SourceIngestionOrchestrator {
           lessonId: sourceId,
           lessonTitle: source.title,
           transcriptId: c.chunkId,
-          transcriptFile: source.storagePath || undefined,
+          transcriptFile: source.storagePath || source.fileUrl || source.title || '',
+          startTime: c.metadata.startChar ?? 0,
+          endTime: c.metadata.endChar ?? 0,
           sourceId: c.sourceId,
           notebookId: c.notebookId,
           chunkIndex: c.chunkIndex,
@@ -193,10 +195,18 @@ export class SourceIngestionOrchestrator {
 
       const collectionName = config.vectorStore.userKnowledgeCollection;
 
-      // Ensure user knowledge collection exists
+      // Ensure user knowledge collection exists with correct dimension
+      const expectedDim = config.embeddings.dimension ?? 1024;
       const exists = await this.vectorStore.collectionExists(collectionName);
       if (!exists) {
-        await this.vectorStore.createCollection(collectionName, config.embeddings.dimension ?? 1024);
+        await this.vectorStore.createCollection(collectionName, expectedDim);
+      } else if (typeof this.vectorStore.getCollectionInfo === 'function') {
+        const info = await this.vectorStore.getCollectionInfo(collectionName).catch(() => null);
+        if (info && info.dimension !== undefined && info.dimension !== expectedDim) {
+          logger.warn({ collectionName, oldDim: info.dimension, newDim: expectedDim }, 'Recreating Qdrant collection due to dimension mismatch');
+          await this.vectorStore.deleteCollection(collectionName).catch(() => {});
+          await this.vectorStore.createCollection(collectionName, expectedDim);
+        }
       }
 
       // Idempotency: Delete existing vectors for this source before indexing fresh vectors

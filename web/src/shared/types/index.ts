@@ -1,10 +1,13 @@
-export type SourceStatus = 'Uploaded' | 'Queued' | 'Processing' | 'Indexed' | 'Failed';
+export type SourceStatus = 'Uploaded' | 'Queued' | 'Processing' | 'Indexed' | 'Failed' | 'Cancelled' | 'PendingUpload';
 
 export interface Notebook {
   id: string;
   userId: string;
   title: string;
   description?: string | null;
+  isArchived?: boolean;
+  isFavorite?: boolean;
+  lastOpenedAt?: string | Date | null;
   settings?: Record<string, any> | null;
   createdAt: string;
   updatedAt: string;

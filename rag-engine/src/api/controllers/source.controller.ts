@@ -26,6 +26,10 @@ export async function createSourceController(
   const { id: notebookId } = request.params as { id: string };
   const body = createSourceSchema.parse(request.body);
 
+  const initialStatus = (body.fileUrl || body.type === 'WEBSITE' || body.type === 'YOUTUBE' || body.type === 'TEXT')
+    ? 'Queued'
+    : (body.status || 'PendingUpload');
+
   const source = await sourceService.createSource(userId, {
     notebookId,
     type: body.type,
@@ -36,8 +40,20 @@ export async function createSourceController(
     mimeType: body.mimeType ?? undefined,
     size: body.size ?? undefined,
     metadata: body.metadata ?? undefined,
-    status: body.status,
+    status: initialStatus as any,
   });
+
+  if (initialStatus === 'Queued') {
+    try {
+      await ingestionQueue.enqueueJob({
+        sourceId: source.id,
+        notebookId,
+        userId,
+      });
+    } catch (queueErr) {
+      request.log.warn({ queueErr, sourceId: source.id }, 'Failed to enqueue ingestion job');
+    }
+  }
 
   await reply.status(201).send(source);
 }
@@ -178,6 +194,80 @@ export async function getSourceStatusController(
     currentStage,
     error: meta.error || null,
     updatedAt: source.updatedAt.toISOString(),
+  });
+}
+
+export async function reindexSourceController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+  if (!sourceId) throw new ValidationError('Source ID is required');
+
+  const source = await sourceService.reindexSource(sourceId, userId);
+  await reply.status(200).send(source);
+}
+
+export async function retrySourceController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+  if (!sourceId) throw new ValidationError('Source ID is required');
+
+  const source = await sourceService.retrySource(sourceId, userId);
+  await reply.status(200).send(source);
+}
+
+export async function cancelSourceController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+  if (!sourceId) throw new ValidationError('Source ID is required');
+
+  const source = await sourceService.cancelSource(sourceId, userId);
+  await reply.status(200).send(source);
+}
+
+export async function getSourceMetadataController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+  if (!sourceId) throw new ValidationError('Source ID is required');
+
+  const metadata = await sourceService.getSourceMetadata(sourceId, userId);
+  await reply.status(200).send(metadata);
+}
+
+export async function downloadSourceFileController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+  if (!sourceId) throw new ValidationError('Source ID is required');
+
+  const source = await sourceService.getSource(sourceId, userId);
+  if (!source.fileUrl && !source.storagePath) {
+    throw new ValidationError('Source does not have an attached file for download');
+  }
+
+  await reply.status(200).send({
+    downloadUrl: source.fileUrl || `/api/storage/files/${source.storagePath}`,
+    filename: source.displayName || source.title,
+    mimeType: source.mimeType,
+    size: source.size,
   });
 }
 

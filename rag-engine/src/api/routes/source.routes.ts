@@ -7,6 +7,11 @@ import {
   deleteSourceController,
   uploadSourceFileController,
   getSourceStatusController,
+  reindexSourceController,
+  retrySourceController,
+  cancelSourceController,
+  getSourceMetadataController,
+  downloadSourceFileController,
 } from '../controllers/source.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 
@@ -18,5 +23,10 @@ export async function sourceRoutes(app: FastifyInstance): Promise<void> {
   app.patch('/api/sources/:id', { preHandler: [requireAuth] }, updateSourceController);
   app.delete('/api/sources/:id', { preHandler: [requireAuth] }, deleteSourceController);
   app.post('/api/sources/:sourceId/upload', { preHandler: [requireAuth] }, uploadSourceFileController);
+  app.post('/api/sources/:id/reindex', { preHandler: [requireAuth] }, reindexSourceController);
+  app.post('/api/sources/:id/retry', { preHandler: [requireAuth] }, retrySourceController);
+  app.post('/api/sources/:id/cancel', { preHandler: [requireAuth] }, cancelSourceController);
+  app.get('/api/sources/:id/metadata', { preHandler: [requireAuth] }, getSourceMetadataController);
+  app.get('/api/sources/:id/download', { preHandler: [requireAuth] }, downloadSourceFileController);
 }
 

@@ -1,25 +1,51 @@
 "use client"
 
 import { useUIStore } from '@/shared/lib/store';
-import { useNotebookQuery } from '@/features/notebooks/hooks/useNotebooks';
+import {
+  useNotebookQuery,
+  useDuplicateNotebookMutation,
+  useArchiveNotebookMutation,
+  useFavoriteNotebookMutation,
+} from '@/features/notebooks/hooks/useNotebooks';
 import { UserButton, SignInButton, useAuth } from '@clerk/nextjs';
-import { PanelLeft, PanelRight, Settings, BookOpen, Sparkles } from 'lucide-react';
+import {
+  PanelLeft,
+  PanelRight,
+  Settings,
+  BookOpen,
+  Sparkles,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  Copy,
+  Star,
+  Archive,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { useRouter } from 'next/navigation';
 
 export function Header() {
   const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const toggleSourcesPanel = useUIStore((s) => s.toggleSourcesPanel);
   const sourcesPanelOpen = useUIStore((s) => s.sourcesPanelOpen);
   const setSettingsModalOpen = useUIStore((s) => s.setSettingsModalOpen);
+  const setEditingNotebook = useUIStore((s) => s.setEditingNotebook);
+  const setDeletingNotebook = useUIStore((s) => s.setDeletingNotebook);
+
+  const duplicateMutation = useDuplicateNotebookMutation();
+  const archiveMutation = useArchiveNotebookMutation();
+  const favoriteMutation = useFavoriteNotebookMutation();
 
   const { data: notebook } = useNotebookQuery(activeNotebookId);
 
   return (
     <header className="h-14 border-b border-border bg-card/50 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
-      {/* Left section: Sidebar toggle & Notebook info */}
+      {/* Left section: Sidebar toggle & Notebook info + actions */}
       <div className="flex items-center gap-3 min-w-0">
         <Button
           size="icon"
@@ -38,6 +64,53 @@ export function Header() {
             <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 hidden sm:inline-flex">
               Notebook
             </Badge>
+
+            {/* Individual Notebook Actions Dropdown */}
+            <DropdownMenu
+              align="left"
+              trigger={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  title="Notebook Options"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              }
+            >
+              <DropdownMenuItem
+                onClick={() => favoriteMutation.mutate({ id: notebook.id, isFavorite: !notebook.isFavorite })}
+              >
+                <Star className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                {notebook.isFavorite ? 'Unfavorite Notebook' : 'Favorite Notebook'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => duplicateMutation.mutate(notebook.id)}
+              >
+                <Copy className="w-3.5 h-3.5 mr-2" />
+                Duplicate Notebook
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setEditingNotebook({ id: notebook.id, title: notebook.title, description: notebook.description })}
+              >
+                <Edit2 className="w-3.5 h-3.5 mr-2" />
+                Rename Notebook
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => archiveMutation.mutate({ id: notebook.id, archive: !notebook.isArchived })}
+              >
+                <Archive className="w-3.5 h-3.5 mr-2" />
+                {notebook.isArchived ? 'Restore Notebook' : 'Archive Notebook'}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                destructive
+                onClick={() => setDeletingNotebook({ id: notebook.id, title: notebook.title })}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-2" />
+                Delete Notebook
+              </DropdownMenuItem>
+            </DropdownMenu>
           </div>
         ) : (
           <div className="flex items-center gap-2">

@@ -68,12 +68,61 @@ export function useDeleteNotebookMutation() {
       queryClient.invalidateQueries({ queryKey: ['notebooks'] });
       if (activeNotebookId === deletedId) {
         setActiveNotebookId(null);
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
       }
       setDeletingNotebook(null);
       toast.success('Notebook deleted');
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to delete notebook');
+    },
+  });
+}
+
+export function useDuplicateNotebookMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => notebooksApi.duplicateNotebook(id),
+    onSuccess: (dup) => {
+      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+      toast.success(`Duplicated notebook "${dup.title}"`);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to duplicate notebook');
+    },
+  });
+}
+
+export function useArchiveNotebookMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, archive }: { id: string; archive: boolean }) =>
+      archive ? notebooksApi.archiveNotebook(id) : notebooksApi.restoreNotebook(id),
+    onSuccess: (nb) => {
+      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+      toast.success(nb.isArchived ? 'Notebook archived' : 'Notebook restored');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to update notebook archive status');
+    },
+  });
+}
+
+export function useFavoriteNotebookMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, isFavorite }: { id: string; isFavorite?: boolean }) =>
+      notebooksApi.favoriteNotebook(id, isFavorite),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to toggle favorite status');
     },
   });
 }

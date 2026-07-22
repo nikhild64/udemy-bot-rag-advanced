@@ -18,7 +18,7 @@ export function setAuthTokenGetter(getter: TokenGetter) {
   tokenGetter = getter;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 async function getHeaders(customHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
   const headers: Record<string, string> = { ...customHeaders };
@@ -73,6 +73,23 @@ export const apiClient = {
     });
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new ApiError(errorData.message || res.statusText || 'API Request failed', res.status, errorData);
+    }
+    return res.json();
+  },
+
+  async put<T>(path: string, body: any, headers: Record<string, string> = {}): Promise<T> {
+    const authHeaders = await getHeaders({
+      'Content-Type': 'application/json',
+      ...headers,
+    });
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: 'PUT',
       headers: authHeaders,
       body: JSON.stringify(body),
     });

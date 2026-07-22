@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { VectorStore, VectorStoreCollectionInfo } from '@/core/contracts/vector-store.contract';
 import { Chunk, SearchResult } from '@/core/models';
@@ -5,6 +6,15 @@ import { CollectionManager } from './CollectionManager';
 import { config } from '@/config';
 import { logger } from '@/shared/logger';
 import { ValidationError } from '@/shared/errors';
+
+function toValidQdrantId(id: string): string {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(id)) {
+    return id;
+  }
+  const hash = crypto.createHash('md5').update(id).digest('hex');
+  return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-8${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
+}
 
 export interface QdrantVectorStoreOptions {
   readonly url?: string;
@@ -106,53 +116,44 @@ export class QdrantVectorStore implements VectorStore {
         throw new ValidationError(`Invalid vector dimensions: expected ${expectedDimension}, got ${vector.length}`);
       }
 
-      const requiredMetadata = [
-        'courseId',
-        'courseTitle',
-        'moduleId',
-        'moduleTitle',
-        'lessonId',
-        'lessonTitle',
-        'transcriptFile',
-        'startTime',
-        'endTime',
-      ];
-
-      for (const field of requiredMetadata) {
-        if (chunk.metadata[field] === undefined || chunk.metadata[field] === null) {
-          throw new ValidationError(`Invalid payload: missing required metadata field '${field}' for chunk '${chunk.id}'`);
-        }
-      }
     }
 
     const points = chunks.map((chunk, i) => {
       const vector = embeddings[i]!;
+      const meta = (chunk.metadata ?? {}) as Record<string, any>;
       const payload: Record<string, unknown> = {
-        ...chunk.metadata,
+        ...meta,
+        courseId: meta.courseId ?? (chunk as any).courseId ?? meta.notebookId ?? 'knowledge-base',
+        courseTitle: meta.courseTitle ?? meta.title ?? 'Knowledge Base',
+        moduleId: meta.moduleId ?? (chunk as any).moduleId ?? meta.courseId ?? 'module-1',
+        moduleTitle: meta.moduleTitle ?? meta.courseTitle ?? 'Knowledge Module',
+        lessonId: meta.lessonId ?? (chunk as any).lessonId ?? meta.sourceId ?? chunk.id,
+        lessonTitle: meta.lessonTitle ?? meta.displayName ?? meta.title ?? 'Source Document',
+        transcriptFile: meta.transcriptFile ?? meta.storagePath ?? meta.fileUrl ?? '',
+        startTime: meta.startTime ?? (chunk as any).startTime ?? 0,
+        endTime: meta.endTime ?? (chunk as any).endTime ?? 0,
         text: chunk.text,
         chunkId: chunk.id,
       };
-      if (chunk.courseId !== undefined) payload.courseId = chunk.courseId;
-      if (chunk.moduleId !== undefined) payload.moduleId = chunk.moduleId;
-      if (chunk.lessonId !== undefined) payload.lessonId = chunk.lessonId;
-      if (chunk.transcriptId !== undefined) payload.transcriptId = chunk.transcriptId;
-      if (chunk.chunkIndex !== undefined) payload.chunkIndex = chunk.chunkIndex;
-      if (chunk.startTime !== undefined) payload.startTime = chunk.startTime;
-      if (chunk.endTime !== undefined) payload.endTime = chunk.endTime;
 
       return {
-        id: chunk.id,
+        id: toValidQdrantId(chunk.id),
         vector: vector,
         payload: payload,
       };
     });
 
     const startTime = Date.now();
+    const BATCH_SIZE = 100;
+
     try {
-      await this.client.upsert(name, {
-        wait: true,
-        points: points,
-      });
+      for (let i = 0; i < points.length; i += BATCH_SIZE) {
+        const batch = points.slice(i, i + BATCH_SIZE);
+        await this.client.upsert(name, {
+          wait: true,
+          points: batch,
+        });
+      }
       const durationMs = Date.now() - startTime;
       logger.info({ collectionName: name, pointsCount: points.length, durationMs }, 'Upsert completed');
     } catch (err) {
@@ -176,52 +177,71 @@ export class QdrantVectorStore implements VectorStore {
     const startTime = Date.now();
 
     // Construct Qdrant filters if any
-    let qdrantFilter: any;
+    let qdrantFilter: any = undefined;
     if (filters && Object.keys(filters).length > 0) {
-      qdrantFilter = {
-        must: Object.entries(filters).map(([key, value]) => ({
+      const validConditions = Object.entries(filters)
+        .filter(([_, val]) => val !== undefined && val !== null && val !== '')
+        .map(([key, value]) => ({
           key,
-          match: { value },
-        })),
-      };
+          match: { value: value as string | number | boolean },
+        }));
+
+      if (validConditions.length > 0) {
+        qdrantFilter = { must: validConditions };
+      }
     }
 
+    const searchParams: any = {
+      vector: queryEmbedding,
+      limit: maxResults,
+      with_payload: true,
+    };
+    if (qdrantFilter) {
+      searchParams.filter = qdrantFilter;
+    }
+
+    let scoredPoints: any[] = [];
     try {
-      const scoredPoints = await this.client.search(name, {
-        vector: queryEmbedding,
-        limit: maxResults,
-        with_payload: true,
-        filter: qdrantFilter,
-      });
-
-      const durationMs = Date.now() - startTime;
-      logger.info({ collectionName: name, resultsCount: scoredPoints.length, durationMs }, 'Search completed');
-
-      return scoredPoints.map((point) => {
-        const payloadCopy = { ...(point.payload ?? {}) } as Record<string, unknown>;
-        const text = typeof payloadCopy.text === 'string' ? payloadCopy.text : '';
-        const id = String(point.id);
-        delete payloadCopy.text;
-
-        return {
-          score: typeof point.score === 'number' ? point.score : 0,
-          chunk: {
-            id,
-            text,
-            metadata: payloadCopy,
-            courseId: typeof payloadCopy.courseId === 'string' ? payloadCopy.courseId : undefined,
-            moduleId: typeof payloadCopy.moduleId === 'string' ? payloadCopy.moduleId : undefined,
-            lessonId: typeof payloadCopy.lessonId === 'string' ? payloadCopy.lessonId : undefined,
-            transcriptId: typeof payloadCopy.transcriptId === 'string' ? payloadCopy.transcriptId : undefined,
-            chunkIndex: typeof payloadCopy.chunkIndex === 'number' ? payloadCopy.chunkIndex : undefined,
-            startTime: typeof payloadCopy.startTime === 'number' ? payloadCopy.startTime : undefined,
-            endTime: typeof payloadCopy.endTime === 'number' ? payloadCopy.endTime : undefined,
-          } as any,
-        };
-      });
+      scoredPoints = await this.client.search(name, searchParams);
     } catch (err) {
-      this.collectionManager.handleQdrantError(err, name);
+      if (searchParams.filter) {
+        logger.warn({ err, name }, 'Qdrant search with filter failed, retrying search without payload filter');
+        delete searchParams.filter;
+        try {
+          scoredPoints = await this.client.search(name, searchParams);
+        } catch (fallbackErr) {
+          this.collectionManager.handleQdrantError(fallbackErr, name);
+        }
+      } else {
+        this.collectionManager.handleQdrantError(err, name);
+      }
     }
+
+    const durationMs = Date.now() - startTime;
+    logger.info({ collectionName: name, resultsCount: scoredPoints.length, durationMs }, 'Search completed');
+
+    return scoredPoints.map((point) => {
+      const payloadCopy = { ...(point.payload ?? {}) } as Record<string, unknown>;
+      const text = typeof payloadCopy.text === 'string' ? payloadCopy.text : '';
+      const id = String(point.id);
+      delete payloadCopy.text;
+
+      return {
+        score: typeof point.score === 'number' ? point.score : 0,
+        chunk: {
+          id,
+          text,
+          metadata: payloadCopy,
+          courseId: typeof payloadCopy.courseId === 'string' ? payloadCopy.courseId : undefined,
+          moduleId: typeof payloadCopy.moduleId === 'string' ? payloadCopy.moduleId : undefined,
+          lessonId: typeof payloadCopy.lessonId === 'string' ? payloadCopy.lessonId : undefined,
+          transcriptId: typeof payloadCopy.transcriptId === 'string' ? payloadCopy.transcriptId : undefined,
+          chunkIndex: typeof payloadCopy.chunkIndex === 'number' ? payloadCopy.chunkIndex : undefined,
+          startTime: typeof payloadCopy.startTime === 'number' ? payloadCopy.startTime : undefined,
+          endTime: typeof payloadCopy.endTime === 'number' ? payloadCopy.endTime : undefined,
+        } as any,
+      };
+    });
   }
 
   async deleteVectors(ids: string[], collectionName?: string): Promise<boolean> {
@@ -238,10 +258,11 @@ export class QdrantVectorStore implements VectorStore {
     }
 
     const startTime = Date.now();
+    const validIds = ids.map((id) => toValidQdrantId(id));
     try {
       await this.client.delete(name, {
         wait: true,
-        points: ids,
+        points: validIds,
       });
       const durationMs = Date.now() - startTime;
       logger.info({ collectionName: name, idsCount: ids.length, durationMs }, 'Delete vectors completed');

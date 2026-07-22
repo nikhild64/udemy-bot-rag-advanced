@@ -233,7 +233,7 @@ describe('VectorStore Layer Implementation Tests', () => {
           wait: true,
           points: [
             {
-              id: 'chk-1',
+              id: expect.any(String),
               vector: vector,
               payload: {
                 ...sampleChunk.metadata,
@@ -345,7 +345,7 @@ describe('VectorStore Layer Implementation Tests', () => {
         expect(deleted).toBe(true);
         expect(mockQdrantClient.delete).toHaveBeenCalledWith('test-collection', {
           wait: true,
-          points: ['chk-1', 'chk-2'],
+          points: [expect.any(String), expect.any(String)],
         });
       });
 

@@ -1,11 +1,34 @@
 "use client"
 
+import { useState } from 'react';
 import { Source } from '@/shared/types';
-import { useSourceStatusQuery, useDeleteSourceMutation } from '../hooks/useSources';
+import {
+  useSourceStatusQuery,
+  useDeleteSourceMutation,
+  useReindexSourceMutation,
+  useRetrySourceMutation,
+  useCancelSourceMutation,
+} from '../hooks/useSources';
 import { SourceStatusBadge } from './SourceStatusBadge';
-import { FileText, FileCode, Video, Music, Trash2, HardDrive } from 'lucide-react';
+import { SourceMetadataDrawer } from './SourceMetadataDrawer';
+import {
+  FileText,
+  FileCode,
+  Video,
+  Music,
+  Trash2,
+  HardDrive,
+  MoreVertical,
+  RefreshCw,
+  RotateCcw,
+  Ban,
+  Info,
+  Download,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { sourcesApi } from '../api/sources.api';
 
 interface SourceItemProps {
   source: Source;
@@ -13,8 +36,13 @@ interface SourceItemProps {
 }
 
 export function SourceItem({ source, notebookId }: SourceItemProps) {
+  const [metadataDrawerOpen, setMetadataDrawerOpen] = useState(false);
+
   const { data: liveStatus } = useSourceStatusQuery(source.id, source.status);
   const deleteMutation = useDeleteSourceMutation(notebookId);
+  const reindexMutation = useReindexSourceMutation(notebookId);
+  const retryMutation = useRetrySourceMutation(notebookId);
+  const cancelMutation = useCancelSourceMutation(notebookId);
 
   const currentStatus = liveStatus?.status || source.status;
   const progress = liveStatus?.progress ?? (currentStatus === 'Indexed' ? 100 : 0);
@@ -43,52 +71,128 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const handleDownload = async () => {
+    try {
+      const res = await sourcesApi.downloadSource(source.id);
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const extractVideoId = (url?: string | null) => {
+    if (!url) return null;
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
+    const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    return match ? match[1] : null;
+  };
+
+  const videoId =
+    source.metadata?.videoId ||
+    extractVideoId(source.fileUrl || (source.metadata?.url as string) || (source.metadata?.videoUrl as string));
+
   return (
-    <div className="p-3 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {getFileIcon()}
-          <div className="min-w-0">
-            <h4 className="text-xs font-medium text-foreground truncate" title={source.title}>
-              {source.displayName || source.title}
-            </h4>
-            {source.size && (
-              <p className="text-[11px] text-muted-foreground">{formatSize(source.size)}</p>
-            )}
+    <>
+      <div className="p-3 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-2 group">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {getFileIcon()}
+            <div className="min-w-0">
+              <h4 className="text-xs font-medium text-foreground truncate" title={source.title}>
+                {source.displayName || source.title}
+              </h4>
+              {source.size ? (
+                <p className="text-[11px] text-muted-foreground">{formatSize(source.size)}</p>
+              ) : (
+                videoId && <p className="text-[11px] text-blue-400 font-medium">YouTube Video</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <SourceStatusBadge status={currentStatus} progress={progress} currentStage={currentStage} />
+            <DropdownMenu
+              trigger={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                >
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </Button>
+              }
+            >
+              <DropdownMenuItem onClick={() => setMetadataDrawerOpen(true)}>
+                <Info className="w-3.5 h-3.5 mr-2 text-indigo-400" /> View Metadata
+              </DropdownMenuItem>
+
+              {(source.fileUrl || source.storagePath) && (
+                <DropdownMenuItem onClick={handleDownload}>
+                  <Download className="w-3.5 h-3.5 mr-2 text-emerald-400" /> Download File
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem onClick={() => reindexMutation.mutate(source.id)}>
+                <RefreshCw className="w-3.5 h-3.5 mr-2 text-cyan-400" /> Re-index
+              </DropdownMenuItem>
+
+              {currentStatus === 'Failed' && (
+                <DropdownMenuItem onClick={() => retryMutation.mutate(source.id)}>
+                  <RotateCcw className="w-3.5 h-3.5 mr-2 text-amber-400" /> Retry Ingestion
+                </DropdownMenuItem>
+              )}
+
+              {(currentStatus === 'Processing' || currentStatus === 'Queued') && (
+                <DropdownMenuItem onClick={() => cancelMutation.mutate(source.id)}>
+                  <Ban className="w-3.5 h-3.5 mr-2 text-amber-400" /> Cancel Processing
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem destructive onClick={() => deleteMutation.mutate(source.id)}>
+                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenu>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          <SourceStatusBadge status={currentStatus} progress={progress} currentStage={currentStage} />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-            onClick={() => deleteMutation.mutate(source.id)}
-            disabled={deleteMutation.isPending}
-            title="Delete Source"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
-        </div>
+        {/* Embedded YouTube Video Preview */}
+        {videoId && (
+          <div className="mt-2 relative rounded-lg overflow-hidden border border-border/60 bg-black/40 aspect-video shadow-xs">
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}`}
+              title={source.title}
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        )}
+
+        {/* Progress Bar for Queued / Processing */}
+        {(currentStatus === 'Processing' || currentStatus === 'Queued' || currentStatus === 'Uploaded') && (
+          <div className="space-y-1">
+            <Progress value={progress} className="h-1 bg-muted" />
+            <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+              <span>{currentStage || 'Processing...'}</span>
+              <span>{progress}%</span>
+            </div>
+          </div>
+        )}
+
+        {liveStatus?.error && (
+          <p className="text-[11px] text-destructive bg-destructive/10 p-1.5 rounded">
+            {liveStatus.error}
+          </p>
+        )}
       </div>
 
-      {/* Progress Bar for Queued / Processing */}
-      {(currentStatus === 'Processing' || currentStatus === 'Queued' || currentStatus === 'Uploaded') && (
-        <div className="space-y-1">
-          <Progress value={progress} className="h-1 bg-muted" />
-          <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-            <span>{currentStage || 'Processing...'}</span>
-            <span>{progress}%</span>
-          </div>
-        </div>
-      )}
-
-      {liveStatus?.error && (
-        <p className="text-[11px] text-destructive bg-destructive/10 p-1.5 rounded">
-          {liveStatus.error}
-        </p>
-      )}
-    </div>
+      <SourceMetadataDrawer
+        source={source}
+        isOpen={metadataDrawerOpen}
+        onClose={() => setMetadataDrawerOpen(false)}
+      />
+    </>
   );
 }

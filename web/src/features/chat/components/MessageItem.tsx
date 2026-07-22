@@ -16,7 +16,7 @@ interface MessageItemProps {
 
 export function MessageItem({ message, onRetry }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
-  const isAssistant = message.role === 'assistant';
+  const isAssistant = message.role?.toLowerCase() === 'assistant';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);

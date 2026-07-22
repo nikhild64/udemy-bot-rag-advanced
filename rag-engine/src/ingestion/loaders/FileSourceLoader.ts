@@ -24,7 +24,9 @@ export class FileSourceLoader implements ISourceLoader {
     let content: Buffer;
 
     try {
-      if (filePath && (await this.isLocalFile(filePath))) {
+      if (source.metadata && typeof (source.metadata as any).rawText === 'string') {
+        content = Buffer.from((source.metadata as any).rawText, 'utf-8');
+      } else if (filePath && (await this.isLocalFile(filePath))) {
         content = await fs.readFile(filePath);
       } else if (source.storagePath) {
         content = await this.storageService.downloadFile(source.storagePath);

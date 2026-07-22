@@ -35,6 +35,7 @@ enum SourceStatus {
   Indexed
   Failed
   Deleted
+  Cancelled
 }
 
 enum MessageRole {
@@ -44,31 +45,52 @@ enum MessageRole {
 }
 
 model User {
-  id        String     @id
-  email     String?
-  name      String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  notebooks Notebook[]
+  id          String          @id
+  email       String?
+  name        String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  notebooks   Notebook[]
+  preference  UserPreference?
 
   @@map("users")
 }
 
 model Notebook {
-  id          String    @id @default(uuid())
-  title       String
-  description String?
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  settings    Json?     @default("{}")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  sources     Source[]
-  messages    Message[]
+  id           String    @id @default(uuid())
+  title        String
+  description  String?
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isArchived   Boolean   @default(false)
+  isFavorite   Boolean   @default(false)
+  lastOpenedAt DateTime? @default(now())
+  settings     Json?     @default("{}")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sources      Source[]
+  messages     Message[]
 
   @@index([userId])
+  @@index([userId, isArchived])
+  @@index([userId, isFavorite])
   @@index([userId, createdAt(sort: Desc)])
   @@map("notebooks")
+}
+
+model UserPreference {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme             String   @default("system")
+  language          String   @default("en")
+  defaultNotebookId String?
+  timezone          String   @default("UTC")
+  notifications     Json?    @default("{\"uploadCompleted\":true,\"uploadFailed\":true,\"sourceIndexed\":true,\"processingFailed\":true,\"chatFailed\":true}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("user_preferences")
 }
 
 model Source {

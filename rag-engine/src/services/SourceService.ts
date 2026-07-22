@@ -93,6 +93,61 @@ export class SourceService {
     return this.sourceRepository.updateStatus(id, status);
   }
 
+  async reindexSource(id: string, userId: string): Promise<Source> {
+    const source = await this.getSource(id, userId);
+    logger.info({ sourceId: id, userId }, 'Triggering re-indexing for source');
+    return this.sourceRepository.update(id, userId, {
+      status: SourceStatus.Queued,
+      metadata: {
+        ...((source.metadata as Record<string, any>) || {}),
+        reindexedAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  async retrySource(id: string, userId: string): Promise<Source> {
+    const source = await this.getSource(id, userId);
+    logger.info({ sourceId: id, userId }, 'Retrying ingestion for source');
+    return this.sourceRepository.update(id, userId, {
+      status: SourceStatus.Queued,
+      metadata: {
+        ...((source.metadata as Record<string, any>) || {}),
+        retriedAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  async cancelSource(id: string, userId: string): Promise<Source> {
+    const source = await this.getSource(id, userId);
+    logger.info({ sourceId: id, userId }, 'Cancelling source processing');
+    return this.sourceRepository.update(id, userId, {
+      status: SourceStatus.Cancelled,
+      metadata: {
+        ...((source.metadata as Record<string, any>) || {}),
+        cancelledAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  async getSourceMetadata(id: string, userId: string): Promise<Record<string, any>> {
+    const source = await this.getSource(id, userId);
+    return {
+      id: source.id,
+      notebookId: source.notebookId,
+      title: source.title,
+      displayName: source.displayName,
+      type: source.type,
+      status: source.status,
+      storagePath: source.storagePath,
+      fileUrl: source.fileUrl,
+      mimeType: source.mimeType,
+      size: source.size,
+      metadata: source.metadata,
+      createdAt: source.createdAt,
+      updatedAt: source.updatedAt,
+    };
+  }
+
   async deleteSource(id: string, userId: string): Promise<boolean> {
     logger.info({ sourceId: id, userId }, 'Deleting source metadata');
     return this.sourceRepository.delete(id, userId);

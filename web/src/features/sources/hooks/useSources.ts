@@ -8,6 +8,7 @@ export function useSourcesQuery(notebookId: string | null) {
     queryKey: ['sources', notebookId],
     queryFn: () => (notebookId ? sourcesApi.listSources(notebookId) : []),
     enabled: !!notebookId,
+    refetchInterval: 3000,
   });
 }
 
@@ -49,6 +50,51 @@ export function useDeleteSourceMutation(notebookId: string | null) {
     },
     onError: (err: any) => {
       toast.error(err.message || 'Failed to delete source');
+    },
+  });
+}
+
+export function useReindexSourceMutation(notebookId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sourceId: string) => sourcesApi.reindexSource(sourceId),
+    onSuccess: () => {
+      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
+      toast.success('Source re-indexing triggered');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to re-index source');
+    },
+  });
+}
+
+export function useRetrySourceMutation(notebookId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sourceId: string) => sourcesApi.retrySource(sourceId),
+    onSuccess: () => {
+      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
+      toast.success('Retrying source ingestion');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to retry source ingestion');
+    },
+  });
+}
+
+export function useCancelSourceMutation(notebookId: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sourceId: string) => sourcesApi.cancelSource(sourceId),
+    onSuccess: () => {
+      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
+      toast.info('Source processing cancelled');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to cancel source processing');
     },
   });
 }

@@ -50,19 +50,45 @@ export class StorageService {
     }
   }
 
+  private async ensureBucketExists(): Promise<void> {
+    try {
+      const { data: buckets } = await this.supabase.storage.listBuckets();
+      const exists = buckets?.some((b) => b.name === this.bucketName);
+      if (!exists) {
+        logger.info({ bucketName: this.bucketName }, 'Bucket does not exist, creating Supabase Storage bucket');
+        await this.supabase.storage.createBucket(this.bucketName, {
+          public: true,
+          fileSizeLimit: 52428800,
+        });
+      }
+    } catch (e) {
+      logger.warn({ e, bucketName: this.bucketName }, 'Could not list or create Supabase bucket automatically');
+    }
+  }
+
   async uploadFile(storagePath: string, content: Buffer | Uint8Array, contentType?: string): Promise<StorageUploadResult> {
     const options: { upsert: boolean; contentType?: string } = { upsert: true };
     if (contentType) {
       options.contentType = contentType;
     }
 
-    const { data, error } = await this.supabase.storage
+    let { data, error } = await this.supabase.storage
       .from(this.bucketName)
       .upload(storagePath, content, options);
 
-    if (error) {
+    if (error && (error.message.toLowerCase().includes('not found') || error.message.toLowerCase().includes('bucket'))) {
+      logger.info({ bucketName: this.bucketName }, 'Attempting auto-creation of missing Supabase Storage bucket');
+      await this.ensureBucketExists();
+      const retry = await this.supabase.storage
+        .from(this.bucketName)
+        .upload(storagePath, content, options);
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error || !data) {
       logger.error({ error, path: storagePath }, 'Failed to upload file to storage');
-      throw new StorageError(`Storage upload failed: ${error.message}`);
+      throw new StorageError(`Storage upload failed: ${error?.message || 'Unknown upload error'}`);
     }
 
     const publicUrl = this.getPublicUrl(data.path);
