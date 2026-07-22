@@ -2,7 +2,8 @@ import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import { ChatPipelineFactory } from '../../chat/ChatPipelineFactory';
 import { ChatPipelineService } from '../../chat/ChatPipelineService';
-import { NotebookService, SourceService, StorageService, UploadService, VectorStoreService } from '@/services';
+import { NotebookChatOrchestrator } from '../../chat/notebook/NotebookChatOrchestrator';
+import { NotebookService, SourceService, StorageService, UploadService, VectorStoreService, MessageService } from '@/services';
 import { PrismaUserRepository, PrismaNotebookRepository, PrismaSourceRepository, PrismaMessageRepository } from '@/repositories';
 import { RetrievalOrchestrator } from '@/retrieval/notebook/RetrievalOrchestrator';
 
@@ -10,6 +11,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     chatPipelineService: ChatPipelineService;
     retrievalOrchestrator: RetrievalOrchestrator;
+    notebookChatOrchestrator: NotebookChatOrchestrator;
+    messageService: MessageService;
     notebookService: NotebookService;
     sourceService: SourceService;
     uploadService: UploadService;
@@ -41,10 +44,18 @@ export const diPlugin = fp(async (app: FastifyInstance) => {
   const notebookService = new NotebookService(notebookRepository, userRepository);
   const sourceService = new SourceService(sourceRepository, notebookRepository);
   const uploadService = new UploadService(sourceRepository, notebookRepository, storageService);
+  const messageService = new MessageService(messageRepository, notebookRepository);
+  const notebookChatOrchestrator = new NotebookChatOrchestrator(
+    notebookService,
+    messageService,
+    retrievalOrchestrator,
+  );
 
   // Decorate fastify instance
   app.decorate('chatPipelineService', chatPipelineService);
   app.decorate('retrievalOrchestrator', retrievalOrchestrator);
+  app.decorate('notebookChatOrchestrator', notebookChatOrchestrator);
+  app.decorate('messageService', messageService);
   app.decorate('userRepository', userRepository);
   app.decorate('notebookRepository', notebookRepository);
   app.decorate('sourceRepository', sourceRepository);
@@ -57,4 +68,3 @@ export const diPlugin = fp(async (app: FastifyInstance) => {
 
   app.log.info('Dependency Injection plugin registered successfully with Multi-Tenant repositories and domain services.');
 });
-
