@@ -10,6 +10,9 @@ import { chatConfig, ChatConfig } from './chat';
 import { guardrailsConfig, GuardrailsConfig } from './guardrails';
 import { authConfig, AuthConfig } from './auth';
 import { cragConfig, CRAGConfig } from './crag';
+import { databaseConfig, DatabaseConfig } from './database';
+import { supabaseConfig, SupabaseConfig } from './supabase';
+import { redisConfig, RedisConfig } from './redis';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -24,6 +27,9 @@ export interface ApplicationConfig {
   readonly guardrails: GuardrailsConfig;
   readonly auth: AuthConfig;
   readonly crag: CRAGConfig;
+  readonly database: DatabaseConfig;
+  readonly supabase: SupabaseConfig;
+  readonly redis: RedisConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -39,6 +45,9 @@ export const config: ApplicationConfig = {
   guardrails: guardrailsConfig,
   auth: authConfig,
   crag: cragConfig,
+  database: databaseConfig,
+  supabase: supabaseConfig,
+  redis: redisConfig,
 };
 
 export * from './app';
@@ -53,3 +62,6 @@ export * from './chat';
 export * from './guardrails';
 export * from './auth';
 export * from './crag';
+export * from './database';
+export * from './supabase';
+export * from './redis';

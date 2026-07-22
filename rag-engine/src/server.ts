@@ -1,9 +1,13 @@
 import { buildApp } from './app';
 import { config } from './config';
 import { logger } from './shared';
+import { InfrastructureInitializer } from './infrastructure/InfrastructureInitializer';
 
 async function startServer(): Promise<void> {
   try {
+    // Run Infrastructure Initialization
+    await InfrastructureInitializer.initialize();
+
     const app = await buildApp();
 
     const address = await app.listen({

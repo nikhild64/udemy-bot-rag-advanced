@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceType {
+  PDF
+  TEXT
+  WEBSITE
+  YOUTUBE
+  VTT
+  DOCX
+  PPTX
+  GITHUB
+  NOTION
+  CONFLUENCE
+  AUDIO
+}
+
+enum SourceStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model User {
+  id        String     @id
+  email     String?
+  name      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  notebooks Notebook[]
+
+  @@map("users")
+}
+
+model Notebook {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings    Json?     @default("{}")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sources     Source[]
+  messages    Message[]
+
+  @@index([userId])
+  @@map("notebooks")
+}
+
+model Source {
+  id          String       @id @default(uuid())
+  notebookId  String
+  notebook    Notebook     @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  title       String
+  type        SourceType
+  storagePath String?
+  fileUrl     String?
+  status      SourceStatus @default(PENDING)
+  metadata    Json?        @default("{}")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([notebookId])
+  @@map("sources")
+}
+
+model Message {
+  id         String      @id @default(uuid())
+  notebookId String
+  notebook   Notebook    @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  role       MessageRole
+  content    String      @db.Text
+  citations  Json?       @default("[]")
+  metadata   Json?       @default("{}")
+  createdAt  DateTime    @default(now())
+
+  @@index([notebookId])
+  @@map("messages")
+}
