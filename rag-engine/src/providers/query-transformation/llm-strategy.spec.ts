@@ -11,6 +11,7 @@ describe('LLMQueryTransformationStrategy', () => {
   beforeEach(() => {
     mockChatProvider = {
       generateResponse: vi.fn(),
+      streamResponse: vi.fn(),
     };
     strategy = new LLMQueryTransformationStrategy(mockChatProvider);
   });
@@ -28,13 +29,13 @@ describe('LLMQueryTransformationStrategy', () => {
     expect(result.metadata.transformed).toBe(true);
     
     expect(mockChatProvider.generateResponse).toHaveBeenCalledTimes(1);
-    const callArgs = vi.mocked(mockChatProvider.generateResponse).mock.calls[0];
-    const messages = callArgs![0];
-    const options = callArgs![1];
-    expect(messages[0].role).toBe('system');
-    expect(messages[0].content).toContain('You are a search query optimization assistant');
-    expect(messages[1].role).toBe('user');
-    expect(messages[1].content).toContain('expo routing');
+    const callArgs = vi.mocked(mockChatProvider.generateResponse).mock.calls[0]!;
+    const messages = callArgs[0]!;
+    const options = callArgs[1]!;
+    expect(messages[0]!.role).toBe('system');
+    expect(messages[0]!.content).toContain('You are a search query optimization assistant');
+    expect(messages[1]!.role).toBe('user');
+    expect(messages[1]!.content).toContain('expo routing');
     expect(options).toBeDefined();
     expect(options.task).toBe('query-transformation');
   });

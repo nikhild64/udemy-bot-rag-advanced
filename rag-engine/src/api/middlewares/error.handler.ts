@@ -1,7 +1,7 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { config } from '../../config';
 import { logger } from '../../shared';
-import { AppError, ValidationError, ProviderError, NotFoundError, InputGuardError } from '../../shared/errors';
+import { ValidationError, ProviderError, NotFoundError, InputGuardError } from '../../shared/errors';
 
 export interface ErrorResponse {
   readonly success: boolean;

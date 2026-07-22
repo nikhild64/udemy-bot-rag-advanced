@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fastify, { FastifyInstance } from 'fastify';
-import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
+import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 import { chatRoutes } from './chat.routes';
 import { globalErrorHandler } from '../middlewares/error.handler';
 import { InputGuardError } from '../../shared/errors';
 
 vi.mock('../middlewares/auth.middleware', () => ({
-  requireAuth: vi.fn((req, reply, done) => done()),
+  requireAuth: vi.fn((_req, _reply, done) => done()),
 }));
 
 describe('Chat Routes', () => {

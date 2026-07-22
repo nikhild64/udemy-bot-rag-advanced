@@ -1,5 +1,13 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    auth?: {
+      userId?: string;
+    };
+  }
+}
+
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   const auth = request.auth;
 

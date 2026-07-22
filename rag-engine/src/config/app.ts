@@ -3,9 +3,19 @@ import { z } from 'zod';
 
 dotenv.config();
 
-const appSchema = z.object({
-  PORT: z.coerce.number().int().positive(),
-  NODE_ENV: z.enum(['development', 'production', 'test']),
+export const appSchema = z.object({
+  PORT: z
+    .preprocess(
+      (val) => (val === undefined || val === '' ? 3000 : val),
+      z.coerce.number().int().positive()
+    )
+    .default(3000),
+  NODE_ENV: z
+    .preprocess(
+      (val) => (val === undefined || val === '' ? 'development' : val),
+      z.enum(['development', 'production', 'test'])
+    )
+    .default('development'),
 });
 
 export interface AppConfig {

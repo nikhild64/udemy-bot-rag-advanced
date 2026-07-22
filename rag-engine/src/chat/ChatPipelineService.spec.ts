@@ -1,12 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ChatPipelineService } from './ChatPipelineService';
 import { 
-  ChatRequest, 
-  GuardRequest, 
-  GuardDecision, 
-  ChatResponse as AIChatResponse 
+  ChatRequest
 } from '../core/models';
-import { InputGuardError, OutputGuardError, AppError } from '../shared/errors';
+import { InputGuardError, OutputGuardError } from '../shared/errors';
 
 // Mock dependencies
 const mockInputGuardService = {

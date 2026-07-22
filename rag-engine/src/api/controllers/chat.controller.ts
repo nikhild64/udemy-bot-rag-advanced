@@ -3,10 +3,10 @@ import { Readable } from 'stream';
 import { ChatRequest } from '../../core/models';
 
 export async function postChat(
-  request: FastifyRequest<{ Body: ChatRequest }>,
+  request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const chatRequest = request.body;
+  const chatRequest = request.body as ChatRequest;
   
   // Pipeline is injected on the Fastify instance via DI plugin
   const pipeline = request.server.chatPipelineService;
@@ -17,10 +17,10 @@ export async function postChat(
 }
 
 export async function postChatStream(
-  request: FastifyRequest<{ Body: ChatRequest }>,
+  request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const chatRequest = request.body;
+  const chatRequest = request.body as ChatRequest;
   const pipeline = request.server.chatPipelineService;
 
   reply.header('Content-Type', 'text/event-stream');

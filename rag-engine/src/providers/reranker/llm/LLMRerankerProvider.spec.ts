@@ -20,6 +20,7 @@ describe('LLMRerankerProvider', () => {
   beforeEach(() => {
     mockChatProvider = {
       generateResponse: vi.fn(),
+      streamResponse: vi.fn(),
     };
     reranker = new LLMRerankerProvider(mockChatProvider, { topK: 3, batchSize: 2 });
     vi.clearAllMocks();
@@ -43,15 +44,15 @@ describe('LLMRerankerProvider', () => {
       
       expect(mockChatProvider.generateResponse).toHaveBeenCalledTimes(1);
       const mockCalls = vi.mocked(mockChatProvider.generateResponse).mock.calls;
-      expect(mockCalls[0][0][0].content).toContain('Candidate Passages');
-      expect(mockCalls[0][1]).toEqual({ task: 'reranking' });
-      expect(mockCalls[0][0][0].content).toContain('idx-ref-0');
-      expect(mockCalls[0][0][0].content).toContain('Text 1');
-      expect(mockCalls[0][0][0].content).toContain('test query');
+      expect(mockCalls[0]![0]![0]!.content).toContain('Candidate Passages');
+      expect(mockCalls[0]![1]).toEqual({ task: 'reranking' });
+      expect(mockCalls[0]![0]![0]!.content).toContain('idx-ref-0');
+      expect(mockCalls[0]![0]![0]!.content).toContain('Text 1');
+      expect(mockCalls[0]![0]![0]!.content).toContain('test query');
 
       expect(result.chunks).toHaveLength(2);
-      expect(result.chunks[0].id).toBe('chunk-2'); // Score 0.9
-      expect(result.chunks[1].id).toBe('chunk-1'); // Score 0.5
+      expect(result.chunks[0]!.id).toBe('chunk-2'); // Score 0.9
+      expect(result.chunks[1]!.id).toBe('chunk-1'); // Score 0.5
     });
 
     it('processes chunks in multiple batches based on batchSize', async () => {

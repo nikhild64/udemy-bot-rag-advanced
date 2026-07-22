@@ -131,8 +131,10 @@ Candidate Passages
 
     for (let idx = 0; idx < batch.length; idx++) {
       const item = batch[idx];
-      const text = this.getChunkText(item);
-      prompt += `\nChunk ID:\nidx-ref-${idx}\n\nContent:\n${text}\n\n--------------------\n`;
+      if (item !== undefined) {
+        const text = this.getChunkText(item);
+        prompt += `\nChunk ID:\nidx-ref-${idx}\n\nContent:\n${text}\n\n--------------------\n`;
+      }
     }
 
     return prompt;
@@ -173,8 +175,8 @@ Candidate Passages
         const match = chunkId.match(/^idx-ref-(\d+)$/);
         if (match) {
           const idx = parseInt(match[1], 10);
-          if (idx >= 0 && idx < batch.length) {
-            matchedId = this.getChunkId(batch[idx]);
+          if (idx >= 0 && idx < batch.length && batch[idx] !== undefined) {
+            matchedId = this.getChunkId(batch[idx]!);
           }
         }
 
@@ -196,8 +198,8 @@ Candidate Passages
                 const key = `idx-ref-${idx}`;
                 return key.startsWith(chunkId) || chunkId.startsWith(key);
               });
-              if (foundIdxKey !== -1) {
-                matchedId = this.getChunkId(batch[foundIdxKey]);
+              if (foundIdxKey !== -1 && batch[foundIdxKey] !== undefined) {
+                matchedId = this.getChunkId(batch[foundIdxKey]!);
               }
             }
           }
