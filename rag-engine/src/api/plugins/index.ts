@@ -6,6 +6,7 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyCompress from '@fastify/compress';
 import fastifyRateLimit from '@fastify/rate-limit';
+import fastifyMultipart from '@fastify/multipart';
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
 import { diPlugin } from './di.plugin';
 import { config } from '../../config';
@@ -19,6 +20,14 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
   // Add Zod type provider compilers
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  // Multipart Form Data handling
+  await app.register(fastifyMultipart, {
+    limits: {
+      fileSize: config.upload.maxFileSize,
+    },
+    attachFieldsToBody: false,
+  });
 
   // Security Headers
   await app.register(fastifyHelmet, {

@@ -29,6 +29,7 @@ enum SourceType {
 enum SourceStatus {
   PendingUpload
   Uploading
+  Uploaded
   Queued
   Processing
   Indexed

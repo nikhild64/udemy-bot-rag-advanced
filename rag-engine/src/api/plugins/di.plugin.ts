@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
 import { ChatPipelineFactory } from '../../chat/ChatPipelineFactory';
 import { ChatPipelineService } from '../../chat/ChatPipelineService';
-import { NotebookService, SourceService, StorageService, VectorStoreService } from '@/services';
+import { NotebookService, SourceService, StorageService, UploadService, VectorStoreService } from '@/services';
 import { PrismaUserRepository, PrismaNotebookRepository, PrismaSourceRepository, PrismaMessageRepository } from '@/repositories';
 
 declare module 'fastify' {
@@ -10,6 +10,7 @@ declare module 'fastify' {
     chatPipelineService: ChatPipelineService;
     notebookService: NotebookService;
     sourceService: SourceService;
+    uploadService: UploadService;
     storageService: StorageService;
     vectorStoreService: VectorStoreService;
     userRepository: PrismaUserRepository;
@@ -36,6 +37,7 @@ export const diPlugin = fp(async (app: FastifyInstance) => {
   const vectorStoreService = new VectorStoreService();
   const notebookService = new NotebookService(notebookRepository, userRepository);
   const sourceService = new SourceService(sourceRepository, notebookRepository);
+  const uploadService = new UploadService(sourceRepository, notebookRepository, storageService);
 
   // Decorate fastify instance
   app.decorate('chatPipelineService', chatPipelineService);
@@ -44,6 +46,7 @@ export const diPlugin = fp(async (app: FastifyInstance) => {
   app.decorate('sourceRepository', sourceRepository);
   app.decorate('messageRepository', messageRepository);
   app.decorate('storageService', storageService);
+  app.decorate('uploadService', uploadService);
   app.decorate('vectorStoreService', vectorStoreService);
   app.decorate('notebookService', notebookService);
   app.decorate('sourceService', sourceService);

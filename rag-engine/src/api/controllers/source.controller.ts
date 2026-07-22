@@ -1,9 +1,11 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { SourceService } from '@/services/SourceService';
+import { UploadService } from '@/services/UploadService';
 import { createSourceSchema, updateSourceSchema, listSourcesQuerySchema } from '../schemas/source.schema';
-import { UnauthorizedError } from '@/shared/errors';
+import { UnauthorizedError, ValidationError } from '@/shared/errors';
 
 const sourceService = new SourceService();
+const defaultUploadService = new UploadService();
 
 function getUserId(request: FastifyRequest): string {
   const userId = request.auth?.userId || (request as any).userId;
@@ -85,4 +87,33 @@ export async function deleteSourceController(
   await sourceService.deleteSource(id, userId);
 
   await reply.status(200).send({ success: true, message: 'Source deleted successfully' });
+}
+
+export async function uploadSourceFileController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+
+  if (!sourceId) {
+    throw new ValidationError('Source ID is required');
+  }
+
+  const fileData = await request.file();
+  if (!fileData) {
+    throw new ValidationError('No file uploaded in multipart request');
+  }
+
+  const buffer = await fileData.toBuffer();
+  const uploadService: UploadService = request.server.uploadService || defaultUploadService;
+
+  const result = await uploadService.uploadSourceFile(userId, sourceId, {
+    filename: fileData.filename,
+    buffer,
+    mimetype: fileData.mimetype,
+  });
+
+  await reply.status(200).send(result);
 }

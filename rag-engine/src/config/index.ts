@@ -13,6 +13,7 @@ import { cragConfig, CRAGConfig } from './crag';
 import { databaseConfig, DatabaseConfig } from './database';
 import { supabaseConfig, SupabaseConfig } from './supabase';
 import { redisConfig, RedisConfig } from './redis';
+import { uploadConfig, UploadConfig } from './upload';
 
 export interface ApplicationConfig {
   readonly app: AppConfig;
@@ -30,6 +31,7 @@ export interface ApplicationConfig {
   readonly database: DatabaseConfig;
   readonly supabase: SupabaseConfig;
   readonly redis: RedisConfig;
+  readonly upload: UploadConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -48,6 +50,7 @@ export const config: ApplicationConfig = {
   database: databaseConfig,
   supabase: supabaseConfig,
   redis: redisConfig,
+  upload: uploadConfig,
 };
 
 export * from './app';
@@ -65,3 +68,4 @@ export * from './crag';
 export * from './database';
 export * from './supabase';
 export * from './redis';
+export * from './upload';
