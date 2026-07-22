@@ -67,6 +67,7 @@ model Notebook {
   messages    Message[]
 
   @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
   @@map("notebooks")
 }
 
@@ -87,6 +88,8 @@ model Source {
   updatedAt   DateTime     @updatedAt
 
   @@index([notebookId])
+  @@index([notebookId, status])
+  @@index([notebookId, createdAt(sort: Desc)])
   @@map("sources")
 }
 
@@ -101,5 +104,6 @@ model Message {
   createdAt  DateTime    @default(now())
 
   @@index([notebookId])
+  @@index([notebookId, createdAt(sort: Asc)])
   @@map("messages")
 }

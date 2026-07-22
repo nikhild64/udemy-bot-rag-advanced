@@ -1,0 +1,47 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    name: Lint, Type Check & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Enable Corepack & Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ./rag-engine
+
+      - name: Run Prisma Generate
+        run: pnpm run prisma:generate
+        working-directory: ./rag-engine
+
+      - name: Run Linter
+        run: pnpm run lint
+        working-directory: ./rag-engine
+
+      - name: Run Tests
+        run: pnpm run test
+        working-directory: ./rag-engine
+
+      - name: Build Code
+        run: pnpm run build
+        working-directory: ./rag-engine

@@ -9,17 +9,21 @@ import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyMultipart from '@fastify/multipart';
 import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fastify-type-provider-zod';
 import { diPlugin } from './di.plugin';
+import { requestLoggerPlugin } from './request-logger.plugin';
 import { config } from '../../config';
 import { clerkPlugin } from '@clerk/fastify';
 
 /**
  * Centralized plugin registration
- * Registers cross-cutting Fastify plugins (e.g. Swagger, rate limits) and DI.
+ * Registers cross-cutting Fastify plugins (e.g. Swagger, rate limits, request logging) and DI.
  */
 export async function registerPlugins(app: FastifyInstance): Promise<void> {
   // Add Zod type provider compilers
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  // Request correlation logger & latency metrics tracking
+  await app.register(requestLoggerPlugin);
 
   // Multipart Form Data handling
   await app.register(fastifyMultipart, {
@@ -93,10 +97,22 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
     global: true,
   });
 
-  // Rate Limiting
+  // Dynamic Rate Limiting per route type
   await app.register(fastifyRateLimit, {
-    max: 100, // 100 requests
-    timeWindow: '1 minute', // per minute per IP
+    global: true,
+    max: (req) => {
+      const url = req.url || '';
+      // Strict limits for chat LLM execution and file uploads
+      if (url.includes('/chat')) return 30; // 30 req/min
+      if (url.includes('/upload')) return 20; // 20 req/min
+      if (url.includes('/notebooks')) return 60; // 60 req/min
+      return 120; // 120 req/min for general API calls
+    },
+    timeWindow: '1 minute',
+    keyGenerator: (req) => {
+      const authUser = (req as unknown as { auth?: { userId?: string } }).auth?.userId;
+      return authUser ? `user:${authUser}` : req.ip;
+    },
   });
 
   // Register Swagger

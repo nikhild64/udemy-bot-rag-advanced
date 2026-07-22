@@ -5,8 +5,10 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/workers/runWorker.ts",
     "build": "tsc && tsc-alias",
     "start": "node dist/server.js",
+    "start:worker": "node dist/workers/runWorker.js",
     "discover": "tsx src/cli/discover.ts",
     "extract": "tsx src/cli/extract.ts",
     "manifest": "tsx src/cli/manifest.ts",
@@ -22,7 +24,8 @@
     "test": "vitest run",
     "format": "prettier --write \"**/*.{ts,js,json,md}\"",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "prisma:deploy": "prisma migrate deploy"
   },
   "keywords": [
     "rag",

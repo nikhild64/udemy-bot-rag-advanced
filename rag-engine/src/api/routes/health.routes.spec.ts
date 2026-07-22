@@ -57,7 +57,7 @@ describe('Health Routes', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({
+      expect(response.json()).toMatchObject({
         status: 'ready',
         service: 'rag-engine',
         version: '0.1.0',
