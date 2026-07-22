@@ -17,6 +17,7 @@ describe('QueryTransformationService', () => {
     const mockResult: QueryTransformationResult = {
       originalQuery: 'test query',
       transformedQuery: 'transformed query',
+      transformedQueries: ['transformed query'],
       strategy: 'mock',
       metadata: { key: 'value' },
     };

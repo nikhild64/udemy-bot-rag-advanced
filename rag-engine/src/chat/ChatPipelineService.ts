@@ -17,7 +17,6 @@ import { RerankerProvider } from '../core/contracts/reranker-provider.contract';
 import { PromptBuilderService } from '../prompts/services/PromptBuilderService';
 import { ChatProvider } from '../core/contracts/chat-provider.contract';
 import { OutputGuardService } from '../guardrails/output/OutputGuardService';
-import { SearchRequest } from '../retrieval/SearchRequest';
 import { RerankRequest, RerankResult } from '../core/models/rerank.model';
 import { RetrievedChunk } from '../retrieval/RetrievalResult';
 
@@ -49,12 +48,14 @@ export class ChatPipelineService implements ChatPipeline {
 
     // Step 3 & 4: Embedding Generation & Vector Retrieval
     const startRetrieval = performance.now();
-    const searchRequest: SearchRequest = {
-      query: transformationResult.transformedQuery,
-      topK: request.topK,
-      filters: request.filters,
-    };
-    const retrievalResult = await this.retrievalService.search(searchRequest);
+    const queries = transformationResult.transformedQueries && transformationResult.transformedQueries.length > 0
+      ? transformationResult.transformedQueries
+      : [transformationResult.transformedQuery];
+
+    const retrievalResult = queries.length > 1
+      ? await this.retrievalService.searchMulti(queries, { topK: request.topK, filters: request.filters })
+      : await this.retrievalService.search({ query: queries[0]!, topK: request.topK, filters: request.filters });
+
     logger.debug({ durationMs: Math.round(performance.now() - startRetrieval), count: retrievalResult.totalResults }, 'Retrieved chunks');
 
     if (retrievalResult.totalResults === 0) {
@@ -136,12 +137,13 @@ export class ChatPipelineService implements ChatPipeline {
       const transformationResult = await this.queryTransformationStrategy.transform(sanitizedRequest.query);
 
       // Step 3 & 4: Embedding Generation & Vector Retrieval
-      const searchRequest: SearchRequest = {
-        query: transformationResult.transformedQuery,
-        topK: request.topK,
-        filters: request.filters,
-      };
-      const retrievalResult = await this.retrievalService.search(searchRequest);
+      const streamQueries = transformationResult.transformedQueries && transformationResult.transformedQueries.length > 0
+        ? transformationResult.transformedQueries
+        : [transformationResult.transformedQuery];
+
+      const retrievalResult = streamQueries.length > 1
+        ? await this.retrievalService.searchMulti(streamQueries, { topK: request.topK, filters: request.filters })
+        : await this.retrievalService.search({ query: streamQueries[0]!, topK: request.topK, filters: request.filters });
 
       if (retrievalResult.totalResults === 0) {
         logger.warn('No chunks retrieved. Pipeline stopping early.');

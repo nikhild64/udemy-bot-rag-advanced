@@ -3,11 +3,14 @@ import { QueryTransformationResult } from '@/core/models/query-transformation.mo
 
 export class NoOpQueryTransformationStrategy implements QueryTransformationStrategy {
   public async transform(query: string): Promise<QueryTransformationResult> {
+    const trimmed = query.trim() || query;
     return {
       originalQuery: query,
-      transformedQuery: query.trim() || query,
+      transformedQuery: trimmed,
+      transformedQueries: [trimmed],
       strategy: 'noop',
       metadata: {},
     };
   }
 }
+

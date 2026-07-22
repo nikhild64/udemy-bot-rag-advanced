@@ -7,3 +7,5 @@ export * from './SearchRequest';
 export * from './SearchResponse';
 export * from './Citation';
 export * from './SourceReference';
+export * from './ContextMerger';
+

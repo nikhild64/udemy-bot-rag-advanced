@@ -18,6 +18,7 @@ export class QueryTransformationService {
         strategy: result.strategy,
         originalQuery: result.originalQuery,
         transformedQuery: result.transformedQuery,
+        transformedQueriesCount: result.transformedQueries?.length ?? 1,
         durationMs
       },
       'Query transformation completed'

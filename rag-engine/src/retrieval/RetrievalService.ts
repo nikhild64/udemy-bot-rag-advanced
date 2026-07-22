@@ -5,6 +5,7 @@ import { VectorStore } from '@/core/contracts/vector-store.contract';
 import { SearchRequest, SearchRequestSchema } from './SearchRequest';
 import { SearchResponse } from './SearchResponse';
 import { RetrievedChunk, RetrievalResult } from './RetrievalResult';
+import { ContextMerger } from './ContextMerger';
 import { AppError } from '@/shared/errors';
 
 export class RetrievalService {
@@ -139,4 +140,39 @@ export class RetrievalService {
 
     return result;
   }
+
+  public async searchMulti(
+    queries: string[],
+    options: Omit<SearchRequest, 'query'>
+  ): Promise<SearchResponse> {
+    if (!queries || queries.length === 0) {
+      throw new AppError('No queries provided for multi-query search', { statusCode: 400 });
+    }
+
+    const uniqueQueries = Array.from(new Set(queries.map((q) => q.trim()).filter(Boolean)));
+
+    if (uniqueQueries.length === 0) {
+      throw new AppError('No valid non-empty queries provided for multi-query search', { statusCode: 400 });
+    }
+
+    if (uniqueQueries.length === 1) {
+      return this.search({ query: uniqueQueries[0]!, ...options });
+    }
+
+    logger.info({ count: uniqueQueries.length, queries: uniqueQueries }, 'Multi-query retrieval started');
+
+    const searchPromises = uniqueQueries.map((q) =>
+      this.search({ query: q, ...options }).catch((err) => {
+        logger.warn({ query: q, err }, 'Individual query search failed in searchMulti');
+        return null;
+      })
+    );
+
+    const results = (await Promise.all(searchPromises)).filter(
+      (r): r is RetrievalResult => r !== null
+    );
+
+    return ContextMerger.mergeResults(results, uniqueQueries[0]!, options.topK);
+  }
 }
+
