@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const CRAGConfigSchema = z.object({
   enabled: z.boolean().default(true),
-  strategy: z.enum(['similarity', 'llm', 'hybrid']).default('hybrid'),
+  strategy: z.enum(['similarity', 'llm', 'hybrid', 'multi_metric']).default('hybrid'),
   similarityThreshold: z.coerce.number().default(0.7),
   maxRetries: z.coerce.number().default(2),
   retrievalLimitIncrement: z.coerce.number().default(5),

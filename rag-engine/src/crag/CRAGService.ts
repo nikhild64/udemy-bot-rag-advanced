@@ -81,6 +81,15 @@ export class CRAGService {
     const filteredResult = this.contextFilterService.filter(currentChunks);
     const retrievalLatencyMs = Math.round(performance.now() - startTime);
 
+    const confidenceScore = evalResult.confidenceScore ?? Math.round(evalResult.score * 1000) / 1000;
+    const confidenceLabel =
+      evalResult.confidenceLabel ??
+      (confidenceScore >= 0.8
+        ? `${confidenceScore.toFixed(2)} - High Confidence`
+        : confidenceScore >= 0.5
+          ? `${confidenceScore.toFixed(2)} - Medium Confidence`
+          : `${confidenceScore.toFixed(2)} - Low Confidence`);
+
     const result: CRAGResult = {
       decision: finalDecision,
       chunks: finalDecision === 'reject' ? [] : filteredResult.chunks,
@@ -88,7 +97,8 @@ export class CRAGService {
       metrics: {
         evaluationStrategy: config.crag.strategy,
         similarityScore: Math.round(evalResult.averageSimilarity * 1000) / 1000,
-        confidenceScore: Math.round(evalResult.score * 1000) / 1000,
+        confidenceScore: Math.round(confidenceScore * 1000) / 1000,
+        confidenceLabel,
         retryCount,
         finalDecision,
         retrievalLatencyMs,
@@ -101,6 +111,7 @@ export class CRAGService {
     logger.info(
       {
         finalDecision: result.decision,
+        confidenceLabel: result.metrics.confidenceLabel,
         acceptedChunks: result.chunks.length,
         retryCount: result.metrics.retryCount,
         latencyMs: result.metrics.retrievalLatencyMs,

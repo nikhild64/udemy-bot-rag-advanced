@@ -17,6 +17,8 @@ export class SimilarityScoreEvaluator implements RetrievalEvaluator {
       return {
         decision: 'reject',
         score: 0,
+        confidenceScore: 0,
+        confidenceLabel: '0.00 - Low Confidence',
         averageSimilarity: 0,
         maxSimilarity: 0,
         reasoning: 'No chunks retrieved for the query.',
@@ -43,6 +45,14 @@ export class SimilarityScoreEvaluator implements RetrievalEvaluator {
       reasoning = `Max similarity (${maxSimilarity.toFixed(3)}) is below min confidence (${this.minChunkConfidence}). Context insufficient.`;
     }
 
+    const score = Math.min(1, Math.max(0, averageSimilarity));
+    const confidenceLabel =
+      score >= 0.8
+        ? `${score.toFixed(2)} - High Confidence`
+        : score >= 0.5
+          ? `${score.toFixed(2)} - Medium Confidence`
+          : `${score.toFixed(2)} - Low Confidence`;
+
     logger.debug(
       { averageSimilarity, maxSimilarity, decision, documentsEvaluated },
       'SimilarityScoreEvaluator completed'
@@ -50,7 +60,9 @@ export class SimilarityScoreEvaluator implements RetrievalEvaluator {
 
     return {
       decision,
-      score: Math.min(1, Math.max(0, averageSimilarity)),
+      score,
+      confidenceScore: score,
+      confidenceLabel,
       averageSimilarity,
       maxSimilarity,
       reasoning,

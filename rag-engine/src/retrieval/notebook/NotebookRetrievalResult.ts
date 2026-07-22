@@ -52,11 +52,20 @@ export interface NotebookRetrievalMetadata {
   finalChunkCount: number;
   citationCount: number;
   appliedFilters: Record<string, unknown> | null;
+  confidenceScore?: number | undefined;
+  confidenceLabel?: string | undefined;
+  evaluationDecision?: 'accept' | 'correct' | 'reject' | undefined;
+  retryCount?: number | undefined;
+  queryRewrites?: string[] | undefined;
+  acceptedChunkCount?: number | undefined;
+  rejectedChunkCount?: number | undefined;
 }
 
 export interface NotebookRetrievalResult {
   context: string;
   chunks: NotebookRetrievedChunk[];
   citations: Citation[];
+  confidenceScore?: number | undefined;
+  confidenceLabel?: string | undefined;
   metadata: NotebookRetrievalMetadata;
 }

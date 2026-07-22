@@ -35,6 +35,15 @@ export interface UploadMetrics {
   averageUploadDurationMs: number;
 }
 
+export interface CragMetricsSummary {
+  totalEvaluations: number;
+  acceptedCount: number;
+  correctedCount: number;
+  rejectedCount: number;
+  totalRetries: number;
+  averageConfidenceScore: number;
+}
+
 export interface SystemMetrics {
   uptimeSeconds: number;
   memoryUsage: NodeJS.MemoryUsage;
@@ -44,6 +53,7 @@ export interface SystemMetrics {
   llm: LlmMetrics;
   vector: VectorMetrics;
   upload: UploadMetrics;
+  crag: CragMetricsSummary;
 }
 
 export class MetricsCollector {
@@ -91,6 +101,16 @@ export class MetricsCollector {
     averageUploadDurationMs: 0,
   };
   private totalUploadDurationMs: number = 0;
+
+  private cragMetrics: CragMetricsSummary = {
+    totalEvaluations: 0,
+    acceptedCount: 0,
+    correctedCount: 0,
+    rejectedCount: 0,
+    totalRetries: 0,
+    averageConfidenceScore: 0,
+  };
+  private totalCragConfidenceSum: number = 0;
 
   private constructor() {}
 
@@ -146,6 +166,16 @@ export class MetricsCollector {
       averageUploadDurationMs: 0,
     };
     this.totalUploadDurationMs = 0;
+
+    this.cragMetrics = {
+      totalEvaluations: 0,
+      acceptedCount: 0,
+      correctedCount: 0,
+      rejectedCount: 0,
+      totalRetries: 0,
+      averageConfidenceScore: 0,
+    };
+    this.totalCragConfidenceSum = 0;
   }
 
   // --- API Request Metrics ---
@@ -231,6 +261,19 @@ export class MetricsCollector {
     );
   }
 
+  // --- CRAG Metrics ---
+  public recordCragEvaluation(decision: string, confidenceScore: number, retries: number): void {
+    this.cragMetrics.totalEvaluations += 1;
+    if (decision === 'accept') this.cragMetrics.acceptedCount += 1;
+    else if (decision === 'correct') this.cragMetrics.correctedCount += 1;
+    else if (decision === 'reject') this.cragMetrics.rejectedCount += 1;
+
+    this.cragMetrics.totalRetries += retries;
+    this.totalCragConfidenceSum += confidenceScore;
+    this.cragMetrics.averageConfidenceScore =
+      Math.round((this.totalCragConfidenceSum / this.cragMetrics.totalEvaluations) * 1000) / 1000;
+  }
+
   // --- System Metrics Export ---
   public getMetrics(): SystemMetrics {
     return {
@@ -242,6 +285,7 @@ export class MetricsCollector {
       llm: { ...this.llmMetrics },
       vector: { ...this.vectorMetrics },
       upload: { ...this.uploadMetrics },
+      crag: { ...this.cragMetrics },
     };
   }
 }

@@ -3,6 +3,7 @@ import { ChatProvider } from '../../core/contracts/chat-provider.contract';
 import { SimilarityScoreEvaluator } from './SimilarityScoreEvaluator';
 import { LLMEvaluator } from './LLMEvaluator';
 import { HybridEvaluator } from './HybridEvaluator';
+import { MultiMetricEvaluator } from './MultiMetricEvaluator';
 import { config } from '../../config';
 
 export class CRAGEvaluatorFactory {
@@ -17,6 +18,9 @@ export class CRAGEvaluatorFactory {
     switch (selectedStrategy) {
       case 'similarity':
         return new SimilarityScoreEvaluator(similarityThreshold, minConfidence);
+
+      case 'multi_metric':
+        return new MultiMetricEvaluator(similarityThreshold, minConfidence);
 
       case 'llm':
         if (!chatProvider) {

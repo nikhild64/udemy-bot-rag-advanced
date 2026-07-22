@@ -69,13 +69,21 @@ Respond ONLY with valid JSON in the following format (no markdown code fences, n
         : 'correct';
 
       const score = typeof parsed.confidence === 'number' ? Math.min(1, Math.max(0, parsed.confidence)) : averageSimilarity;
+      const confidenceLabel =
+        score >= 0.8
+          ? `${score.toFixed(2)} - High Confidence`
+          : score >= 0.5
+            ? `${score.toFixed(2)} - Medium Confidence`
+            : `${score.toFixed(2)} - Low Confidence`;
       const reasoning = parsed.reasoning || `LLM evaluated retrieval quality as '${decision}'.`;
 
-      logger.debug({ decision, score, reasoning, documentsEvaluated }, 'LLMEvaluator completed');
+      logger.debug({ decision, score, confidenceLabel, reasoning, documentsEvaluated }, 'LLMEvaluator completed');
 
       return {
         decision,
         score,
+        confidenceScore: score,
+        confidenceLabel,
         averageSimilarity,
         maxSimilarity,
         reasoning,

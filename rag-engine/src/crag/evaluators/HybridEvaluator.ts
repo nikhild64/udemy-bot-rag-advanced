@@ -33,13 +33,16 @@ export class HybridEvaluator implements RetrievalEvaluator {
 
     // Fast-path 1: High similarity average -> Automatic Accept
     if (averageSimilarity >= this.highSimilarityThreshold) {
+      const score = Math.min(1, averageSimilarity);
       logger.debug(
         { averageSimilarity, highThreshold: this.highSimilarityThreshold },
         'HybridEvaluator: High average similarity fast-path accepted'
       );
       return {
         decision: 'accept',
-        score: Math.min(1, averageSimilarity),
+        score,
+        confidenceScore: score,
+        confidenceLabel: `${score.toFixed(2)} - High Confidence`,
         averageSimilarity,
         maxSimilarity,
         reasoning: `High average similarity (${averageSimilarity.toFixed(3)}) fast-path accepted without LLM.`,
@@ -49,13 +52,16 @@ export class HybridEvaluator implements RetrievalEvaluator {
 
     // Fast-path 2: Low max similarity -> Automatic Reject
     if (maxSimilarity < this.minChunkConfidence) {
+      const score = Math.max(0, averageSimilarity);
       logger.debug(
         { maxSimilarity, minConfidence: this.minChunkConfidence },
         'HybridEvaluator: Low max similarity fast-path rejected'
       );
       return {
         decision: 'reject',
-        score: Math.max(0, averageSimilarity),
+        score,
+        confidenceScore: score,
+        confidenceLabel: `${score.toFixed(2)} - Low Confidence`,
         averageSimilarity,
         maxSimilarity,
         reasoning: `Max similarity (${maxSimilarity.toFixed(3)}) below min confidence (${this.minChunkConfidence}). Fast-path rejected without LLM.`,
