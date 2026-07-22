@@ -3,5 +3,6 @@ import { getHealthStatus, getReadyStatus } from '../controllers/health.controlle
 
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
   app.get('/health', getHealthStatus);
+  app.get('/status', getHealthStatus);
   app.get('/ready', getReadyStatus);
 }

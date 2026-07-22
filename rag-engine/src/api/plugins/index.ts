@@ -74,9 +74,34 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
   // Register Dependency Injection
   await app.register(diPlugin);
 
-  // Register Clerk Authentication
-  await app.register(clerkPlugin, {
-    publishableKey: config.auth.publishableKey,
-    secretKey: config.auth.secretKey,
+  const PUBLIC_PATHS = ['/health', '/status', '/ready', '/docs'];
+  const isPublicPath = (url: string | undefined): boolean => {
+    if (!url) return false;
+    const path = url.split('?')[0];
+    if (!path) return false;
+    return PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + '/'));
+  };
+
+  // Register Clerk Authentication (bypassing public endpoints like /health, /status, /ready, /docs)
+  await app.register(async (scopedApp) => {
+    const originalAddHook = scopedApp.addHook.bind(scopedApp);
+    scopedApp.addHook = function (name: any, hook: any) {
+      if (name === 'preHandler') {
+        const wrappedHook = async (request: any, reply: any) => {
+          const url = request.raw?.url || request.url;
+          if (isPublicPath(url)) {
+            return; // Skip Clerk authentication middleware on public routes
+          }
+          return hook(request, reply);
+        };
+        return originalAddHook(name, wrappedHook);
+      }
+      return originalAddHook(name, hook);
+    };
+
+    await scopedApp.register(clerkPlugin, {
+      publishableKey: config.auth.publishableKey,
+      secretKey: config.auth.secretKey,
+    });
   });
 }

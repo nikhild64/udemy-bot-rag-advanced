@@ -30,6 +30,22 @@ describe('Health Routes', () => {
     });
   });
 
+  describe('GET /status', () => {
+    it('should return 200 and ok status', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/status',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        status: 'ok',
+        service: 'rag-engine',
+        version: '0.1.0',
+      });
+    });
+  });
+
   describe('GET /ready', () => {
     it('should return 200 when pipeline is initialized', async () => {
       // Decorate mock pipeline service
