@@ -23,18 +23,59 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
   // Security Headers
   await app.register(fastifyHelmet, {
     global: true,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   });
 
   // CORS Configuration
+  const frontendOriginsEnv = process.env.FRONTEND_ORIGIN;
   await app.register(fastifyCors, {
-    origin: process.env.FRONTEND_ORIGIN || (config.app.env === 'development' ? [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001'
-    ] : false),
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    origin: (origin, cb) => {
+      // Allow requests with no origin header (like server-to-server, curl, mobile apps)
+      if (!origin) {
+        return cb(null, true);
+      }
+
+      const cleanOrigin = origin.replace(/\/$/, '');
+
+      // Allow if FRONTEND_ORIGIN is set to '*' or 'true'
+      if (frontendOriginsEnv === '*' || frontendOriginsEnv === 'true') {
+        return cb(null, true);
+      }
+
+      // Check explicit comma-separated origins from FRONTEND_ORIGIN env variable
+      if (frontendOriginsEnv) {
+        const allowedOrigins = frontendOriginsEnv
+          .split(',')
+          .map((o) => o.trim().replace(/\/$/, ''));
+        if (allowedOrigins.includes(cleanOrigin) || allowedOrigins.includes('*')) {
+          return cb(null, true);
+        }
+      }
+
+      // Allow known deployment domains (.vercel.app), explicit chaicodeudemy.vercel.app, and local dev origins
+      if (
+        config.app.env === 'development' ||
+        cleanOrigin.includes('localhost') ||
+        cleanOrigin.includes('127.0.0.1') ||
+        cleanOrigin.endsWith('.vercel.app') ||
+        cleanOrigin === 'https://chaicodeudemy.vercel.app'
+      ) {
+        return cb(null, true);
+      }
+
+      // Reject origin cleanly without server 500 error
+      cb(null, false);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+      'Clerk-Session-Id',
+    ],
     credentials: true,
   });
 
