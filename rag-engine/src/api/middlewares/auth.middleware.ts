@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { getAuth } from '@clerk/fastify';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -9,7 +10,14 @@ declare module 'fastify' {
 }
 
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
-  const auth = request.auth;
+  let auth = (request as any).auth;
+  if (!auth) {
+    try {
+      auth = getAuth(request);
+    } catch {
+      // clerkPlugin may not be registered in isolated unit test environments
+    }
+  }
 
   if (!auth || !auth.userId) {
     return reply.status(401).send({

@@ -19,6 +19,8 @@ import { ChatProvider } from '../core/contracts/chat-provider.contract';
 import { OutputGuardService } from '../guardrails/output/OutputGuardService';
 import { RerankRequest, RerankResult } from '../core/models/rerank.model';
 import { RetrievedChunk } from '../retrieval/RetrievalResult';
+import { CRAGService } from '../crag/CRAGService';
+import { config } from '../config';
 
 export class ChatPipelineService implements ChatPipeline {
   constructor(
@@ -28,7 +30,8 @@ export class ChatPipelineService implements ChatPipeline {
     private readonly rerankerProvider: RerankerProvider,
     private readonly promptBuilderService: PromptBuilderService,
     private readonly chatProvider: ChatProvider,
-    private readonly outputGuardService: OutputGuardService
+    private readonly outputGuardService: OutputGuardService,
+    private readonly cragService?: CRAGService
   ) {}
 
   public async chat(request: ChatRequest): Promise<ChatPipelineResponse> {
@@ -52,7 +55,7 @@ export class ChatPipelineService implements ChatPipeline {
       ? transformationResult.transformedQueries
       : [transformationResult.transformedQuery];
 
-    const retrievalResult = queries.length > 1
+    let retrievalResult = queries.length > 1
       ? await this.retrievalService.searchMulti(queries, { topK: request.topK, filters: request.filters })
       : await this.retrievalService.search({ query: queries[0]!, topK: request.topK, filters: request.filters });
 
@@ -70,11 +73,44 @@ export class ChatPipelineService implements ChatPipeline {
         };
     }
 
+    // Step 4b: Corrective Retrieval (CRAG)
+    let chunksToRerank = retrievalResult.retrievedChunks;
+    let cragMetrics: Record<string, unknown> | undefined;
+
+    if (config.crag.enabled && this.cragService) {
+      const startCRAG = performance.now();
+      const cragResult = await this.cragService.process(retrievalResult, {
+        query: sanitizedRequest.query,
+        topK: request.topK,
+        filters: request.filters,
+      });
+
+      cragMetrics = { ...cragResult.metrics };
+      logger.debug({ durationMs: Math.round(performance.now() - startCRAG), decision: cragResult.decision }, 'CRAG completed');
+
+      if (cragResult.decision === 'reject') {
+        logger.warn('CRAG quality gate rejected retrieved context. Stopping early without generation.');
+        return {
+          answer: 'I am unable to find sufficient relevant information in the knowledge base to answer your query confidently.',
+          citations: [],
+          retrievedChunks: [],
+          metadata: {
+            totalDurationMs: Math.round(performance.now() - startTotal),
+            transformationStrategy: transformationResult.strategy,
+            crag: cragMetrics,
+          },
+        };
+      }
+
+      chunksToRerank = cragResult.chunks;
+      retrievalResult.citations = cragResult.citations;
+    }
+
     // Step 5: Reranking
     const startReranking = performance.now();
     const rerankRequest: RerankRequest<RetrievedChunk> = {
       query: transformationResult.transformedQuery,
-      chunks: retrievalResult.retrievedChunks,
+      chunks: chunksToRerank,
     };
     const rerankResult = await this.rerankerProvider.rerank(rerankRequest) as RerankResult<RetrievedChunk>;
     logger.debug({ durationMs: Math.round(performance.now() - startReranking) }, 'Reranking completed');
@@ -82,7 +118,7 @@ export class ChatPipelineService implements ChatPipeline {
     // Step 6: Prompt Construction
     const startPrompt = performance.now();
     const promptBuildRequest = {
-      query: sanitizedRequest.query, // Original user query (sanitized) is often better for prompt
+      query: sanitizedRequest.query,
       chunks: rerankResult.chunks,
     };
     const promptResult = this.promptBuilderService.buildPrompt(promptBuildRequest);
@@ -92,14 +128,14 @@ export class ChatPipelineService implements ChatPipeline {
     const startChat = performance.now();
     const messages: ChatMessage[] = [
         { role: ChatRole.SYSTEM, content: promptResult.systemPrompt },
-        { role: ChatRole.USER, content: promptResult.combinedPrompt } // the combined prompt contains context and user query
+        { role: ChatRole.USER, content: promptResult.combinedPrompt }
     ];
     let aiResponse: AIChatResponse;
     try {
         aiResponse = await this.chatProvider.generateResponse(messages, { task: 'chat' });
     } catch (error) {
         logger.error({ err: error }, 'Chat provider failed');
-        throw error; // Let AppErrors or specific errors propagate
+        throw error;
     }
     logger.debug({ durationMs: Math.round(performance.now() - startChat) }, 'Chat completed');
 
@@ -117,6 +153,7 @@ export class ChatPipelineService implements ChatPipeline {
       metadata: {
         totalDurationMs,
         transformationStrategy: transformationResult.strategy,
+        ...(cragMetrics ? { crag: cragMetrics } : {}),
       },
     };
 
@@ -152,10 +189,32 @@ export class ChatPipelineService implements ChatPipeline {
         return;
       }
 
+      // Step 4b: CRAG Check
+      let chunksToRerank = retrievalResult.retrievedChunks;
+      if (config.crag.enabled && this.cragService) {
+        const cragResult = await this.cragService.process(retrievalResult, {
+          query: sanitizedRequest.query,
+          topK: request.topK,
+          filters: request.filters,
+        });
+
+        if (cragResult.decision === 'reject') {
+          logger.warn('CRAG quality gate rejected retrieved context. Stopping streaming early.');
+          yield {
+            type: 'token',
+            data: 'I am unable to find sufficient relevant information in the knowledge base to answer your query confidently.',
+          };
+          yield { type: 'done' };
+          return;
+        }
+
+        chunksToRerank = cragResult.chunks;
+      }
+
       // Step 5: Reranking
       const rerankRequest: RerankRequest<RetrievedChunk> = {
         query: transformationResult.transformedQuery,
-        chunks: retrievalResult.retrievedChunks,
+        chunks: chunksToRerank,
       };
       const rerankResult = await this.rerankerProvider.rerank(rerankRequest) as RerankResult<RetrievedChunk>;
 

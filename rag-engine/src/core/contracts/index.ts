@@ -9,3 +9,4 @@ export * from './query-transformation-strategy.contract';
 export * from './reranker-provider.contract';
 export * from './input-guard.contract';
 export * from './output-guard.contract';
+export * from './crag-evaluator.contract';

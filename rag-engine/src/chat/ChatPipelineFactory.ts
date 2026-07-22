@@ -9,6 +9,13 @@ import { RerankerProviderFactory } from '../reranking';
 import { PromptBuilderService } from '../prompts';
 import { ChatProviderFactory } from '../providers/chat/ChatProviderFactory';
 import { OutputGuardService } from '../guardrails/output/OutputGuardService';
+import { 
+  CRAGEvaluatorFactory, 
+  CRAGRetryPolicy, 
+  CorrectiveRetrievalService, 
+  ContextFilterService, 
+  CRAGService 
+} from '../crag';
 
 export class ChatPipelineFactory {
   /**
@@ -39,6 +46,22 @@ export class ChatPipelineFactory {
     // 7. Initialize Output Guardrails
     const outputGuardService = new OutputGuardService(config.guardrails);
 
+    // 8. Initialize CRAG (Corrective Retrieval-Augmented Generation) Service
+    const evaluator = CRAGEvaluatorFactory.create(config.crag.strategy, chatProvider);
+    const retryPolicy = new CRAGRetryPolicy(config.crag);
+    const correctiveRetrievalService = new CorrectiveRetrievalService(
+      retrievalService,
+      queryTransformationStrategy,
+      retryPolicy
+    );
+    const contextFilterService = new ContextFilterService(config.crag.minChunkConfidence);
+    const cragService = new CRAGService(
+      evaluator,
+      correctiveRetrievalService,
+      contextFilterService,
+      retryPolicy
+    );
+
     // Construct and return the pipeline
     return new ChatPipelineService(
       inputGuardService,
@@ -47,7 +70,8 @@ export class ChatPipelineFactory {
       rerankerProvider,
       promptBuilderService,
       chatProvider,
-      outputGuardService
+      outputGuardService,
+      cragService
     );
   }
 }

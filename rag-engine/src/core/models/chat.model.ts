@@ -4,7 +4,7 @@ import { SearchResult } from './search.model';
 /**
  * Defines the specific task context for the Chat Provider request.
  */
-export type ChatTask = 'query-transformation' | 'reranking' | 'chat';
+export type ChatTask = 'query-transformation' | 'reranking' | 'chat' | 'crag-evaluation';
 
 /**
  * Represents an individual message in a chat conversation.
