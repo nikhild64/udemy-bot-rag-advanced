@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NotebookService } from '@/services/NotebookService';
 import { SourceService } from '@/services/SourceService';
-import { SourceType } from '@prisma/client';
+import { SourceType, SourceStatus } from '@prisma/client';
 
 describe('Domain Services Unit Tests', () => {
   describe('NotebookService', () => {
@@ -13,6 +13,7 @@ describe('Domain Services Unit Tests', () => {
         create: vi.fn(),
         findById: vi.fn(),
         findByUserId: vi.fn(),
+        findMany: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
       };
@@ -36,57 +37,67 @@ describe('Domain Services Unit Tests', () => {
         settings: null,
       });
     });
+
+    it('should throw ValidationError if title is empty', async () => {
+      const service = new NotebookService(mockNotebookRepo, mockUserRepo);
+      await expect(service.createNotebook('user_1', '')).rejects.toThrow('Notebook title is required');
+    });
   });
 
   describe('SourceService', () => {
     let mockSourceRepo: any;
     let mockNotebookRepo: any;
-    let mockStorageService: any;
 
     beforeEach(() => {
       mockSourceRepo = {
         create: vi.fn(),
         findById: vi.fn(),
         findByNotebookId: vi.fn(),
+        findMany: vi.fn(),
+        update: vi.fn(),
         updateStatus: vi.fn(),
         delete: vi.fn(),
       };
       mockNotebookRepo = {
         findById: vi.fn(),
       };
-      mockStorageService = {
-        uploadFile: vi.fn(),
-        deleteFile: vi.fn(),
-      };
     });
 
-    it('should throw NotFoundError if notebook is missing', async () => {
-      const service = new SourceService(mockSourceRepo, mockNotebookRepo, mockStorageService);
+    it('should throw NotFoundError if notebook is missing or not owned by user', async () => {
+      const service = new SourceService(mockSourceRepo, mockNotebookRepo);
       mockNotebookRepo.findById.mockResolvedValue(null);
 
       await expect(
         service.createSource('user_1', { notebookId: 'nb_99', title: 'Doc', type: SourceType.PDF }),
-      ).rejects.toThrow();
+      ).rejects.toThrow("Notebook 'nb_99' not found for user");
     });
 
-    it('should upload file buffer to storage if provided and save source record', async () => {
-      const service = new SourceService(mockSourceRepo, mockNotebookRepo, mockStorageService);
+    it('should create source metadata with default PendingUpload status', async () => {
+      const service = new SourceService(mockSourceRepo, mockNotebookRepo);
       mockNotebookRepo.findById.mockResolvedValue({ id: 'nb_1', userId: 'user_1' });
-      mockStorageService.uploadFile.mockResolvedValue({ path: 'path/file.pdf', publicUrl: 'http://storage/file.pdf' });
-      mockSourceRepo.create.mockResolvedValue({ id: 'src_1', title: 'Doc.pdf', fileUrl: 'http://storage/file.pdf' });
-
-      const buffer = Buffer.from('hello pdf');
-      const source = await service.createSource('user_1', {
+      mockSourceRepo.create.mockResolvedValue({
+        id: 'src_1',
         notebookId: 'nb_1',
-        title: 'Doc.pdf',
+        displayName: 'Doc.pdf',
         type: SourceType.PDF,
-        fileBuffer: buffer,
-        fileName: 'Doc.pdf',
+        status: SourceStatus.PendingUpload,
       });
 
-      expect(mockStorageService.uploadFile).toHaveBeenCalled();
-      expect(mockSourceRepo.create).toHaveBeenCalled();
-      expect(source).toEqual({ id: 'src_1', title: 'Doc.pdf', fileUrl: 'http://storage/file.pdf' });
+      const source = await service.createSource('user_1', {
+        notebookId: 'nb_1',
+        displayName: 'Doc.pdf',
+        type: SourceType.PDF,
+      });
+
+      expect(mockSourceRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notebookId: 'nb_1',
+          displayName: 'Doc.pdf',
+          type: SourceType.PDF,
+          status: SourceStatus.PendingUpload,
+        }),
+      );
+      expect(source.status).toBe(SourceStatus.PendingUpload);
     });
   });
 });

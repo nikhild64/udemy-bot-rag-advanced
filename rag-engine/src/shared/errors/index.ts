@@ -11,4 +11,5 @@ export * from './ingestion.error';
 export * from './parsing.error';
 export * from './chunking.error';
 export * from './guardrail.error';
+export * from './unauthorized.error';
 

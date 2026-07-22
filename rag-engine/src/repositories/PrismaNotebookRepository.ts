@@ -1,5 +1,5 @@
 import { Notebook, PrismaClient } from '@prisma/client';
-import { INotebookRepository, CreateNotebookInput, UpdateNotebookInput } from './interfaces';
+import { INotebookRepository, CreateNotebookInput, UpdateNotebookInput, ListNotebooksQuery, PaginatedResult } from './interfaces';
 import { prisma as defaultPrisma } from '@/shared/database/prisma';
 import { NotFoundError } from '@/shared/errors';
 
@@ -40,6 +40,43 @@ export class PrismaNotebookRepository implements INotebookRepository {
         },
       },
     });
+  }
+
+  async findMany(query: ListNotebooksQuery): Promise<PaginatedResult<Notebook>> {
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.max(1, Math.min(100, query.limit ?? 20));
+    const skip = (page - 1) * limit;
+    const sortBy = query.sortBy ?? 'updatedAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+
+    const where = { userId: query.userId };
+
+    const [data, total] = await Promise.all([
+      this.prisma.notebook.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          _count: {
+            select: { sources: true, messages: true },
+          },
+        },
+      }),
+      this.prisma.notebook.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
   }
 
   async update(id: string, userId: string, data: UpdateNotebookInput): Promise<Notebook> {

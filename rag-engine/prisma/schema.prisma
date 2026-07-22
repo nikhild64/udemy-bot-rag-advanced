@@ -12,9 +12,9 @@ datasource db {
 
 enum SourceType {
   PDF
-  TEXT
   WEBSITE
   YOUTUBE
+  TEXT
   VTT
   DOCX
   PPTX
@@ -22,13 +22,18 @@ enum SourceType {
   NOTION
   CONFLUENCE
   AUDIO
+  MARKDOWN
+  GOOGLE_DRIVE
 }
 
 enum SourceStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
+  PendingUpload
+  Uploading
+  Queued
+  Processing
+  Indexed
+  Failed
+  Deleted
 }
 
 enum MessageRole {
@@ -68,11 +73,14 @@ model Source {
   id          String       @id @default(uuid())
   notebookId  String
   notebook    Notebook     @relation(fields: [notebookId], references: [id], onDelete: Cascade)
-  title       String
   type        SourceType
+  displayName String?
+  title       String
+  status      SourceStatus @default(PendingUpload)
   storagePath String?
   fileUrl     String?
-  status      SourceStatus @default(PENDING)
+  mimeType    String?
+  size        Int?
   metadata    Json?        @default("{}")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt

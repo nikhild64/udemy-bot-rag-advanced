@@ -7,40 +7,87 @@ export interface IUserRepository {
 
 export interface CreateNotebookInput {
   title: string;
-  description?: string | null;
+  description?: string | null | undefined;
   userId: string;
-  settings?: Record<string, any> | null;
+  settings?: Record<string, any> | null | undefined;
 }
 
 export interface UpdateNotebookInput {
-  title?: string;
-  description?: string | null;
-  settings?: Record<string, any> | null;
+  title?: string | undefined;
+  description?: string | null | undefined;
+  settings?: Record<string, any> | null | undefined;
+}
+
+export interface ListNotebooksQuery {
+  userId: string;
+  page?: number | undefined;
+  limit?: number | undefined;
+  sortBy?: 'createdAt' | 'updatedAt' | 'title' | undefined;
+  sortOrder?: 'asc' | 'desc' | undefined;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface INotebookRepository {
   create(data: CreateNotebookInput): Promise<Notebook>;
   findById(id: string, userId?: string): Promise<Notebook | null>;
   findByUserId(userId: string): Promise<Notebook[]>;
+  findMany(query: ListNotebooksQuery): Promise<PaginatedResult<Notebook>>;
   update(id: string, userId: string, data: UpdateNotebookInput): Promise<Notebook>;
   delete(id: string, userId: string): Promise<boolean>;
 }
 
 export interface CreateSourceInput {
   notebookId: string;
-  title: string;
   type: SourceType;
-  storagePath?: string | null;
-  fileUrl?: string | null;
-  metadata?: Record<string, any> | null;
+  displayName?: string | null | undefined;
+  title?: string | undefined;
+  storagePath?: string | null | undefined;
+  fileUrl?: string | null | undefined;
+  mimeType?: string | null | undefined;
+  size?: number | null | undefined;
+  metadata?: Record<string, any> | null | undefined;
+  status?: SourceStatus | undefined;
+}
+
+export interface UpdateSourceInput {
+  displayName?: string | null | undefined;
+  title?: string | undefined;
+  status?: SourceStatus | undefined;
+  storagePath?: string | null | undefined;
+  fileUrl?: string | null | undefined;
+  mimeType?: string | null | undefined;
+  size?: number | null | undefined;
+  metadata?: Record<string, any> | null | undefined;
+}
+
+export interface ListSourcesQuery {
+  notebookId: string;
+  userId?: string | undefined;
+  type?: SourceType | undefined;
+  status?: SourceStatus | undefined;
+  page?: number | undefined;
+  limit?: number | undefined;
+  sortBy?: 'createdAt' | 'updatedAt' | 'displayName' | 'title' | undefined;
+  sortOrder?: 'asc' | 'desc' | undefined;
 }
 
 export interface ISourceRepository {
   create(data: CreateSourceInput): Promise<Source>;
-  findById(id: string): Promise<Source | null>;
+  findById(id: string, userId?: string): Promise<Source | null>;
   findByNotebookId(notebookId: string): Promise<Source[]>;
+  findMany(query: ListSourcesQuery): Promise<PaginatedResult<Source>>;
+  update(id: string, userId: string, data: UpdateSourceInput): Promise<Source>;
   updateStatus(id: string, status: SourceStatus): Promise<Source>;
-  delete(id: string): Promise<boolean>;
+  delete(id: string, userId?: string): Promise<boolean>;
 }
 
 export interface CreateMessageInput {
@@ -48,7 +95,7 @@ export interface CreateMessageInput {
   role: MessageRole;
   content: string;
   citations?: any;
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, any> | null | undefined;
 }
 
 export interface IMessageRepository {

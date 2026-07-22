@@ -1,27 +1,29 @@
 import { Source, SourceType, SourceStatus } from '@prisma/client';
-import { ISourceRepository, INotebookRepository } from '@/repositories/interfaces';
+import { ISourceRepository, INotebookRepository, UpdateSourceInput, ListSourcesQuery, PaginatedResult } from '@/repositories/interfaces';
 import { PrismaSourceRepository } from '@/repositories/PrismaSourceRepository';
 import { PrismaNotebookRepository } from '@/repositories/PrismaNotebookRepository';
-import { StorageService } from './StorageService';
-import { NotFoundError } from '@/shared/errors';
+import { NotFoundError, ValidationError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 
 export class SourceService {
   constructor(
     private readonly sourceRepository: ISourceRepository = new PrismaSourceRepository(),
     private readonly notebookRepository: INotebookRepository = new PrismaNotebookRepository(),
-    private readonly storageService: StorageService = new StorageService(),
   ) {}
 
   async createSource(
     userId: string,
     input: {
       notebookId: string;
-      title: string;
       type: SourceType;
-      fileBuffer?: Buffer;
-      fileName?: string;
-      metadata?: Record<string, any>;
+      displayName?: string | undefined;
+      title?: string | undefined;
+      storagePath?: string | undefined;
+      fileUrl?: string | undefined;
+      mimeType?: string | undefined;
+      size?: number | undefined;
+      metadata?: Record<string, any> | undefined;
+      status?: SourceStatus | undefined;
     },
   ): Promise<Source> {
     const notebook = await this.notebookRepository.findById(input.notebookId, userId);
@@ -29,50 +31,70 @@ export class SourceService {
       throw new NotFoundError(`Notebook '${input.notebookId}' not found for user`);
     }
 
-    let storagePath: string | null = null;
-    let fileUrl: string | null = null;
-
-    if (input.fileBuffer && input.fileName) {
-      storagePath = `notebooks/${input.notebookId}/${Date.now()}_${input.fileName}`;
-      const uploadRes = await this.storageService.uploadFile(storagePath, input.fileBuffer);
-      fileUrl = uploadRes.publicUrl ?? null;
+    if (!input.type) {
+      throw new ValidationError('Source type is required');
     }
+
+    const displayName = input.displayName ?? input.title ?? 'Untitled Source';
 
     const source = await this.sourceRepository.create({
       notebookId: input.notebookId,
-      title: input.title,
       type: input.type,
-      storagePath,
-      fileUrl,
+      displayName,
+      title: displayName,
+      storagePath: input.storagePath ?? null,
+      fileUrl: input.fileUrl ?? null,
+      mimeType: input.mimeType ?? null,
+      size: input.size ?? null,
       metadata: input.metadata ?? null,
+      status: input.status ?? SourceStatus.PendingUpload,
     });
 
-    logger.info({ sourceId: source.id, notebookId: input.notebookId }, 'Created source entity');
+    logger.info({ sourceId: source.id, notebookId: input.notebookId }, 'Created source metadata');
     return source;
   }
 
-  async getSource(id: string): Promise<Source | null> {
-    return this.sourceRepository.findById(id);
+  async getSource(id: string, userId: string): Promise<Source> {
+    const source = await this.sourceRepository.findById(id, userId);
+    if (!source) {
+      throw new NotFoundError(`Source '${id}' not found for user`);
+    }
+    return source;
   }
 
-  async listSources(notebookId: string): Promise<Source[]> {
-    return this.sourceRepository.findByNotebookId(notebookId);
+  async listSources(
+    notebookId: string,
+    userId: string,
+    options?: Partial<ListSourcesQuery> | undefined,
+  ): Promise<PaginatedResult<Source>> {
+    const notebook = await this.notebookRepository.findById(notebookId, userId);
+    if (!notebook) {
+      throw new NotFoundError(`Notebook '${notebookId}' not found for user`);
+    }
+
+    return this.sourceRepository.findMany({
+      notebookId,
+      userId,
+      type: options?.type,
+      status: options?.status,
+      page: options?.page,
+      limit: options?.limit,
+      sortBy: options?.sortBy,
+      sortOrder: options?.sortOrder,
+    });
+  }
+
+  async updateSource(id: string, userId: string, data: UpdateSourceInput): Promise<Source> {
+    logger.info({ sourceId: id, userId }, 'Updating source metadata');
+    return this.sourceRepository.update(id, userId, data);
   }
 
   async updateSourceStatus(id: string, status: SourceStatus): Promise<Source> {
     return this.sourceRepository.updateStatus(id, status);
   }
 
-  async deleteSource(id: string): Promise<boolean> {
-    const source = await this.sourceRepository.findById(id);
-    if (!source) {
-      throw new NotFoundError(`Source '${id}' not found`);
-    }
-
-    if (source.storagePath) {
-      await this.storageService.deleteFile(source.storagePath);
-    }
-
-    return this.sourceRepository.delete(id);
+  async deleteSource(id: string, userId: string): Promise<boolean> {
+    logger.info({ sourceId: id, userId }, 'Deleting source metadata');
+    return this.sourceRepository.delete(id, userId);
   }
 }

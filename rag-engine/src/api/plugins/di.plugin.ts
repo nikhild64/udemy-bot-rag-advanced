@@ -35,7 +35,7 @@ export const diPlugin = fp(async (app: FastifyInstance) => {
   const storageService = new StorageService();
   const vectorStoreService = new VectorStoreService();
   const notebookService = new NotebookService(notebookRepository, userRepository);
-  const sourceService = new SourceService(sourceRepository, notebookRepository, storageService);
+  const sourceService = new SourceService(sourceRepository, notebookRepository);
 
   // Decorate fastify instance
   app.decorate('chatPipelineService', chatPipelineService);

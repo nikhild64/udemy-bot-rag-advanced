@@ -18,13 +18,16 @@ describe('Repository Layer Unit Tests', () => {
         create: vi.fn(),
         findFirst: vi.fn(),
         findMany: vi.fn(),
+        count: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
       },
       source: {
         create: vi.fn(),
+        findFirst: vi.fn(),
         findUnique: vi.fn(),
         findMany: vi.fn(),
+        count: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
       },
@@ -70,24 +73,34 @@ describe('Repository Layer Unit Tests', () => {
       });
     });
 
-    it('should find notebooks by userId', async () => {
+    it('should find notebooks with pagination', async () => {
       const repo = new PrismaNotebookRepository(mockPrisma);
-      mockPrisma.notebook.findMany.mockResolvedValue([{ id: 'nb_1', title: 'My Notebook', userId: 'user_123' }]);
+      const mockList = [{ id: 'nb_1', title: 'My Notebook', userId: 'user_123' }];
+      mockPrisma.notebook.findMany.mockResolvedValue(mockList);
+      mockPrisma.notebook.count.mockResolvedValue(1);
 
-      const result = await repo.findByUserId('user_123');
-      expect(result).toHaveLength(1);
-      expect(mockPrisma.notebook.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user_123' },
-        orderBy: { updatedAt: 'desc' },
-        include: { _count: { select: { sources: true, messages: true } } },
+      const result = await repo.findMany({ userId: 'user_123', page: 1, limit: 10 });
+      expect(result.data).toHaveLength(1);
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
       });
     });
   });
 
   describe('PrismaSourceRepository', () => {
-    it('should create a source record', async () => {
+    it('should create a source record with PendingUpload status by default', async () => {
       const repo = new PrismaSourceRepository(mockPrisma);
-      const mockSource = { id: 'src_1', notebookId: 'nb_1', title: 'Doc.pdf', type: SourceType.PDF, status: SourceStatus.PENDING };
+      const mockSource = {
+        id: 'src_1',
+        notebookId: 'nb_1',
+        title: 'Doc.pdf',
+        displayName: 'Doc.pdf',
+        type: SourceType.PDF,
+        status: SourceStatus.PendingUpload,
+      };
       mockPrisma.source.create.mockResolvedValue(mockSource);
 
       const result = await repo.create({ notebookId: 'nb_1', title: 'Doc.pdf', type: SourceType.PDF });
@@ -96,11 +109,11 @@ describe('Repository Layer Unit Tests', () => {
 
     it('should update source status', async () => {
       const repo = new PrismaSourceRepository(mockPrisma);
-      mockPrisma.source.findUnique.mockResolvedValue({ id: 'src_1', status: SourceStatus.PENDING });
-      mockPrisma.source.update.mockResolvedValue({ id: 'src_1', status: SourceStatus.COMPLETED });
+      mockPrisma.source.findFirst.mockResolvedValue({ id: 'src_1', status: SourceStatus.PendingUpload });
+      mockPrisma.source.update.mockResolvedValue({ id: 'src_1', status: SourceStatus.Indexed });
 
-      const updated = await repo.updateStatus('src_1', SourceStatus.COMPLETED);
-      expect(updated.status).toBe(SourceStatus.COMPLETED);
+      const updated = await repo.updateStatus('src_1', SourceStatus.Indexed);
+      expect(updated.status).toBe(SourceStatus.Indexed);
     });
   });
 
