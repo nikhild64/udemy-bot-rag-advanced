@@ -1,8 +1,8 @@
 /**
  * Ingestion layer
- * Responsible for processing documents (ZIP discovery, extraction, parsing, chunking, and embedding generation).
- * Future implementation phases will add document pipelines here.
+ * Responsible for processing documents (loaders, extraction, parsing, chunking, and embedding generation).
  */
+export * from './loaders';
 export * from './discovery';
 export * from './extraction';
 export * from './manifest';
@@ -11,5 +11,3 @@ export * from './chunking';
 export * from './embeddings';
 export * from './indexing';
 export * from './orchestrator';
-
-

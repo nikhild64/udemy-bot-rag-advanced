@@ -1,11 +1,9 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import os from 'node:os';
 import { SourceStatus } from '@prisma/client';
 import { ISourceRepository, INotebookRepository } from '@/repositories/interfaces';
 import { PrismaSourceRepository } from '@/repositories/PrismaSourceRepository';
 import { PrismaNotebookRepository } from '@/repositories/PrismaNotebookRepository';
 import { StorageService } from '@/services/StorageService';
+import { SourceLoaderFactory } from '../loaders/SourceLoaderFactory';
 import { ExtractorFactory } from '../extraction/extractors/ExtractorFactory';
 import { DocumentNormalizer } from '../normalization/DocumentNormalizer';
 import { SourceChunker } from '../chunking/SourceChunker';
@@ -54,8 +52,6 @@ export class SourceIngestionOrchestrator {
     logger.info({ jobId: currentJobId, sourceId, notebookId, userId }, 'Starting Source Ingestion Orchestration workflow');
     ingestionEvents.publish('Job Started', { jobId: currentJobId, sourceId, notebookId, stage: 'Job Started' });
 
-    let tempFilePath: string | null = null;
-
     try {
       // 1. Validation & Security Checks
       await this.updateProgress(sourceId, 'Queued', 5, 'Processing', currentJobId, notebookId);
@@ -78,45 +74,55 @@ export class SourceIngestionOrchestrator {
         throw new UnauthorizedError(`User '${userId}' does not own notebook '${notebookId}'`);
       }
 
-      if (!source.storagePath) {
-        throw new ValidationError(`Source '${sourceId}' does not have a storagePath`);
+      if (!source.storagePath && !source.fileUrl && (!source.metadata || !(source.metadata as any).url)) {
+        throw new ValidationError(`Source '${sourceId}' does not have a storagePath or fileUrl`);
       }
 
       // Update Source status in DB to Processing
       await this.sourceRepository.updateStatus(sourceId, SourceStatus.Processing);
 
-      // 2. Download Stage
+      // 2. Download / Load Stage via SourceLoaderFactory
       await this.updateProgress(sourceId, 'Downloading', 15, 'Processing', currentJobId, notebookId);
       ingestionEvents.publish('Download Started', { jobId: currentJobId, sourceId, notebookId, stage: 'Downloading' });
 
-      const fileBuffer = await this.storageService.downloadFile(source.storagePath);
-      if (!fileBuffer || fileBuffer.length === 0) {
-        throw new IngestionError(`Downloaded file buffer for storage path '${source.storagePath}' is empty`);
-      }
+      const loader = SourceLoaderFactory.getLoader(source.type, source, this.storageService);
+      const rawContent = await loader.load(source);
 
-      // Save to temp file
-      const tempDir = path.join(os.tmpdir(), 'rag_ingestion_sources');
-      await fs.mkdir(tempDir, { recursive: true });
-      const filename = path.basename(source.storagePath);
-      tempFilePath = path.join(tempDir, `${sourceId}_${filename}`);
-      await fs.writeFile(tempFilePath, fileBuffer);
+      const rawLength = Buffer.isBuffer(rawContent.content)
+        ? rawContent.content.length
+        : Buffer.byteLength(rawContent.content, 'utf-8');
 
-      logger.info({ sourceId, storagePath: source.storagePath, fileSize: fileBuffer.length, tempFilePath }, 'Downloaded source file successfully');
+      logger.info(
+        { sourceId, loader: loader.constructor.name, rawLength, mimeType: rawContent.mimeType },
+        'Loaded source content successfully via SourceLoader',
+      );
 
-      // 3. Extraction Stage
+      // 3. Extraction Stage via ExtractorFactory
       await this.updateProgress(sourceId, 'Extracting', 30, 'Processing', currentJobId, notebookId);
 
-      const extractor = ExtractorFactory.getExtractor(source.type, source.mimeType || undefined, source.storagePath);
-      const extractedDoc = await extractor.extract(fileBuffer, source.mimeType || undefined, source.storagePath);
-      logger.info({ sourceId, extractedLength: extractedDoc.text.length }, 'Extracted content successfully');
-      ingestionEvents.publish('Extraction Completed', { jobId: currentJobId, sourceId, notebookId, stage: 'Extracting', details: { extractedLength: extractedDoc.text.length } });
+      const extractor = ExtractorFactory.getExtractor(rawContent);
+      const extractedDoc = await extractor.extract(rawContent);
+
+      const extractedText = extractedDoc.content || extractedDoc.text || '';
+      logger.info(
+        { sourceId, extractor: extractor.constructor.name, extractedLength: extractedText.length, docTitle: extractedDoc.title },
+        'Extracted content successfully via Extractor',
+      );
+      ingestionEvents.publish('Extraction Completed', {
+        jobId: currentJobId,
+        sourceId,
+        notebookId,
+        stage: 'Extracting',
+        details: { extractedLength: extractedText.length, title: extractedDoc.title },
+      });
 
       // 4. Normalization Stage
       await this.updateProgress(sourceId, 'Normalizing', 45, 'Processing', currentJobId, notebookId);
 
-      const normalizedText = DocumentNormalizer.normalize(extractedDoc.text);
+      const normalizedText = DocumentNormalizer.normalize(extractedText);
       logger.info({ sourceId, normalizedLength: normalizedText.length }, 'Normalized content successfully');
       ingestionEvents.publish('Normalization Completed', { jobId: currentJobId, sourceId, notebookId, stage: 'Normalizing', details: { normalizedLength: normalizedText.length } });
+
 
       // 5. Chunking Stage
       await this.updateProgress(sourceId, 'Chunking', 60, 'Processing', currentJobId, notebookId);
@@ -305,15 +311,6 @@ export class SourceIngestionOrchestrator {
         success: false,
         error: errorMessage,
       };
-    } finally {
-      // Cleanup local temp file
-      if (tempFilePath) {
-        try {
-          await fs.unlink(tempFilePath);
-        } catch (unlinkErr) {
-          // ignore unlink error
-        }
-      }
     }
   }
 

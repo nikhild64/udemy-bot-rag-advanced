@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TxtExtractor } from '@/ingestion/extraction/extractors/TxtExtractor';
 import { VttExtractor } from '@/ingestion/extraction/extractors/VttExtractor';
 import { PdfExtractor } from '@/ingestion/extraction/extractors/PdfExtractor';
+import { HtmlExtractor } from '@/ingestion/extraction/extractors/HtmlExtractor';
 import { ExtractorFactory } from '@/ingestion/extraction/extractors/ExtractorFactory';
 import { SourceType } from '@prisma/client';
 
@@ -13,6 +14,7 @@ describe('Document Extractors', () => {
       const res = await extractor.extract(buffer, 'text/plain', 'sample.txt');
 
       expect(res.text).toBe('Hello world plain text');
+      expect(res.content).toBe('Hello world plain text');
       expect(res.metadata?.fileName).toBe('sample.txt');
     });
   });
@@ -48,16 +50,39 @@ Today we will learn about RAG architectures.
     });
   });
 
+  describe('HtmlExtractor', () => {
+    it('should extract text and title from HTML content', async () => {
+      const htmlBuffer = Buffer.from('<html><head><title>Test Title</title></head><body><p>Hello HTML World</p></body></html>', 'utf-8');
+      const extractor = new HtmlExtractor();
+      const res = await extractor.extract(htmlBuffer, 'text/html', 'page.html');
+
+      expect(res.title).toBe('Test Title');
+      expect(res.content).toContain('Hello HTML World');
+    });
+  });
+
   describe('ExtractorFactory', () => {
-    it('should return correct extractor based on type or extension', () => {
+    it('should return correct extractor based on type, mimeType, extension, or RawContent', () => {
       const pdfExt = ExtractorFactory.getExtractor(SourceType.PDF, 'application/pdf', 'file.pdf');
       expect(pdfExt).toBeInstanceOf(PdfExtractor);
 
       const vttExt = ExtractorFactory.getExtractor(SourceType.VTT, 'text/vtt', 'file.vtt');
       expect(vttExt).toBeInstanceOf(VttExtractor);
 
+      const htmlExt = ExtractorFactory.getExtractor(SourceType.WEBSITE, 'text/html', 'index.html');
+      expect(htmlExt).toBeInstanceOf(HtmlExtractor);
+
       const txtExt = ExtractorFactory.getExtractor(SourceType.TEXT, 'text/plain', 'file.txt');
       expect(txtExt).toBeInstanceOf(TxtExtractor);
+
+      const rawContentExt = ExtractorFactory.getExtractor({
+        sourceId: '1',
+        sourceType: 'WEBSITE',
+        mimeType: 'text/html',
+        content: '<html></html>',
+        metadata: {},
+      });
+      expect(rawContentExt).toBeInstanceOf(HtmlExtractor);
     });
   });
 });

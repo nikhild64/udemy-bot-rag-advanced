@@ -1,7 +1,32 @@
-import { IDocumentExtractor, ExtractedDocument } from './IDocumentExtractor';
+import { IExtractor } from './IExtractor';
+import { RawContent } from '../../loaders/RawContent';
+import { NormalizedDocument } from '../NormalizedDocument';
+import { ExtractedDocument } from './IDocumentExtractor';
+import { ExtractionError } from '@/shared/errors';
 
-export class PdfExtractor implements IDocumentExtractor {
-  async extract(fileBuffer: Buffer, _mimeType?: string, fileName?: string): Promise<ExtractedDocument> {
+export class PdfExtractor implements IExtractor {
+  async extract(
+    input: RawContent | Buffer | string,
+    mimeType?: string,
+    fileName?: string,
+  ): Promise<NormalizedDocument & ExtractedDocument> {
+    let fileBuffer: Buffer;
+    let title = fileName || 'Untitled PDF';
+    let sourceMeta: Record<string, any> = {};
+
+    if (typeof input === 'object' && 'content' in input && 'sourceId' in input) {
+      const raw = input as RawContent;
+      fileBuffer = Buffer.isBuffer(raw.content) ? raw.content : Buffer.from(raw.content);
+      title = raw.metadata?.title || fileName || 'Untitled PDF';
+      sourceMeta = raw.metadata || {};
+    } else if (Buffer.isBuffer(input)) {
+      fileBuffer = input;
+    } else if (typeof input === 'string') {
+      fileBuffer = Buffer.from(input);
+    } else {
+      throw new ExtractionError('Invalid PDF extractor input: expected RawContent, Buffer, or string');
+    }
+
     const contentStr = fileBuffer.toString('utf-8');
     const binaryStr = fileBuffer.toString('latin1');
     const textPieces: string[] = [];
@@ -29,10 +54,9 @@ export class PdfExtractor implements IDocumentExtractor {
       }
     }
 
-    // 2. If PDF stream text operators weren't matched (e.g. compressed streams or plain text), fallback to clean text scan
+    // 2. Fallback scan if stream text operators weren't matched
     let extractedText = textPieces.join(' ').trim();
     if (!extractedText || extractedText.length < 10) {
-      // Clean readable ascii text sequence fallback
       const cleanAscii = binaryStr.replace(/[^\x20-\x7E\n\r\t]/g, ' ');
       const words = cleanAscii.match(/[A-Za-z0-9.,!?'"()\-\s]{4,}/g) || [];
       extractedText = words
@@ -41,12 +65,18 @@ export class PdfExtractor implements IDocumentExtractor {
         .join(' ');
     }
 
+    const metadata: Record<string, any> = {
+      ...sourceMeta,
+      fileName,
+      mimeType: mimeType || 'application/pdf',
+      charCount: extractedText.length,
+    };
+
     return {
+      title,
+      content: extractedText,
       text: extractedText,
-      metadata: {
-        fileName,
-        charCount: extractedText.length,
-      },
+      metadata,
     };
   }
 }
