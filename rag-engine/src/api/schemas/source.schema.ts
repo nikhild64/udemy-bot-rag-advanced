@@ -44,3 +44,9 @@ export const listSourcesQuerySchema = z.object({
 export type CreateSourceDto = z.infer<typeof createSourceSchema>;
 export type UpdateSourceDto = z.infer<typeof updateSourceSchema>;
 export type ListSourcesQueryDto = z.infer<typeof listSourcesQuerySchema>;
+
+export const batchCreateSourcesSchema = z.object({
+  urls: z.array(z.string().url('Must be a valid URL')).min(1, 'At least one URL is required'),
+});
+
+export type BatchCreateSourcesDto = z.infer<typeof batchCreateSourcesSchema>;

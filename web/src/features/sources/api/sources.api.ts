@@ -24,6 +24,13 @@ export const sourcesApi = {
     return apiClient.post<Source>(`/api/notebooks/${notebookId}/sources`, data);
   },
 
+  batchCreateSources: async (
+    notebookId: string,
+    urls: string[]
+  ): Promise<{ sources: Source[] }> => {
+    return apiClient.post<{ sources: Source[] }>(`/api/notebooks/${notebookId}/sources/batch`, { urls });
+  },
+
   getSourceStatus: async (sourceId: string): Promise<SourceStatusResponse> => {
     return apiClient.get<SourceStatusResponse>(`/api/sources/${sourceId}/status`);
   },

@@ -133,7 +133,7 @@ export function DashboardView({
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto animate-in fade-in duration-300">
+    <div className="p-6 space-y-8 max-w-7xl mx-auto h-full w-full overflow-y-auto animate-in fade-in duration-300">
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>

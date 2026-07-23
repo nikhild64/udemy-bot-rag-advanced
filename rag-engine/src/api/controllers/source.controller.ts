@@ -2,8 +2,9 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { SourceService } from '@/services/SourceService';
 import { SourceViewerService } from '@/services/SourceViewerService';
 import { UploadService } from '@/services/UploadService';
-import { createSourceSchema, updateSourceSchema, listSourcesQuerySchema } from '../schemas/source.schema';
+import { createSourceSchema, updateSourceSchema, listSourcesQuerySchema, batchCreateSourcesSchema } from '../schemas/source.schema';
 import { UnauthorizedError, ValidationError } from '@/shared/errors';
+import { Innertube } from 'youtubei.js';
 
 import { IngestionQueue } from '@/infrastructure/queue/IngestionQueue';
 
@@ -297,3 +298,103 @@ export async function viewSourceController(
   await reply.status(200).send(viewData);
 }
 
+export async function batchCreateSourcesController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const { id: notebookId } = request.params as { id: string };
+  const body = batchCreateSourcesSchema.parse(request.body);
+
+  const createdSources = [];
+
+  for (const rawUrl of body.urls) {
+    let urlsToProcess: { url: string; title?: string }[] = [];
+
+    // Check if it's a playlist
+    if (rawUrl.includes('list=')) {
+      try {
+        const playlistIdMatch = rawUrl.match(/[&?]list=([^&]+)/i);
+        const playlistId = playlistIdMatch ? playlistIdMatch[1] : null;
+
+        if (playlistId) {
+          const yt = await Innertube.create();
+          const playlist = await yt.getPlaylist(playlistId); 
+          const items = playlist.items.slice(0, 50); // Cap at 50 videos per playlist to prevent overload
+          
+          for (const item of items) {
+            const videoId = (item as any).content_id || (item as any).id;
+            if (videoId) {
+               const url = `https://www.youtube.com/watch?v=${videoId}`;
+               const title = (item as any).metadata?.title?.text || (item as any).title?.text || 'YouTube Video';
+               urlsToProcess.push({ url, title });
+            }
+          }
+          if (urlsToProcess.length === 0) {
+            urlsToProcess.push({ url: rawUrl });
+          }
+        } else {
+          urlsToProcess.push({ url: rawUrl });
+        }
+      } catch (err) {
+        request.log.warn({ rawUrl, err }, 'Failed to parse YouTube playlist, falling back to single video');
+        urlsToProcess.push({ url: rawUrl });
+      }
+    } else {
+      urlsToProcess.push({ url: rawUrl });
+    }
+
+    for (const item of urlsToProcess) {
+      let finalTitle = item.title;
+      let sourceType = item.url.includes('youtube.com') || item.url.includes('youtu.be') ? 'YOUTUBE' : 'WEBSITE';
+
+      // If no title from ytpl, try to fetch it
+      if (!finalTitle) {
+        if (sourceType === 'YOUTUBE') {
+          try {
+            const response = await fetch(item.url, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36' },
+            });
+            if (response.ok) {
+              const html = await response.text();
+              const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+              if (titleMatch && titleMatch[1]) {
+                finalTitle = titleMatch[1].replace('- YouTube', '').trim();
+              }
+            }
+          } catch (e) {
+            // Ignore fetch errors, fallback to default
+          }
+        }
+      }
+
+      if (!finalTitle) {
+        finalTitle = sourceType === 'YOUTUBE' ? 'YouTube Video' : 'Web Source';
+      }
+
+      // Create Source
+      const source = await sourceService.createSource(userId, {
+        notebookId,
+        type: sourceType,
+        displayName: finalTitle,
+        title: finalTitle,
+        fileUrl: item.url,
+        status: 'Queued',
+      });
+
+      try {
+        await ingestionQueue.enqueueJob({
+          sourceId: source.id,
+          notebookId,
+          userId,
+        });
+      } catch (queueErr) {
+        request.log.warn({ queueErr, sourceId: source.id }, 'Failed to enqueue ingestion job for batch');
+      }
+
+      createdSources.push(source);
+    }
+  }
+
+  await reply.status(201).send({ sources: createdSources });
+}

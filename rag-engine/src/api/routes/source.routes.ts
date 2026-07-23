@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import {
   createSourceController,
+  batchCreateSourcesController,
   listSourcesController,
   getSourceByIdController,
   updateSourceController,
@@ -17,6 +18,7 @@ import {
 import { requireAuth } from '../middlewares/auth.middleware';
 
 export async function sourceRoutes(app: FastifyInstance): Promise<void> {
+  app.post('/api/notebooks/:id/sources/batch', { preHandler: [requireAuth] }, batchCreateSourcesController);
   app.post('/api/notebooks/:id/sources', { preHandler: [requireAuth] }, createSourceController);
   app.get('/api/notebooks/:id/sources', { preHandler: [requireAuth] }, listSourcesController);
   app.get('/api/sources/:sourceId/status', { preHandler: [requireAuth] }, getSourceStatusController);

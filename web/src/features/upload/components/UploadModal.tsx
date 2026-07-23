@@ -28,7 +28,6 @@ export function UploadModal() {
 
   // URL state
   const [urlInput, setUrlInput] = useState('');
-  const [urlTitle, setUrlTitle] = useState('');
 
   // Text state
   const [textTitle, setTextTitle] = useState('');
@@ -39,36 +38,10 @@ export function UploadModal() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
-
-  useEffect(() => {
-    if (mode === 'url' && urlInput) {
-      const isYoutube = urlInput.includes('youtube.com') || urlInput.includes('youtu.be');
-      if (isYoutube) {
-        const fetchTitle = async () => {
-          try {
-            setIsFetchingTitle(true);
-            const data = await apiClient.get<any>(`/api/sources/youtube/metadata?url=${encodeURIComponent(urlInput)}`);
-            if (data.title && !urlTitle) {
-              setUrlTitle(data.title);
-            }
-          } catch (err) {
-            console.error('Failed to fetch youtube title', err);
-          } finally {
-            setIsFetchingTitle(false);
-          }
-        };
-
-        const timeoutId = setTimeout(fetchTitle, 500);
-        return () => clearTimeout(timeoutId);
-      }
-    }
-  }, [urlInput, mode]);
 
   const resetState = () => {
     setSelectedFile(null);
     setUrlInput('');
-    setUrlTitle('');
     setTextTitle('');
     setTextContent('');
     setStep('idle');
@@ -124,23 +97,18 @@ export function UploadModal() {
 
         await sourcesApi.uploadSourceFile(source.id, selectedFile);
       } else if (mode === 'url') {
-        if (!urlInput.trim()) {
-          setErrorMessage('Please enter a valid Web or YouTube URL');
+        const urls = urlInput
+          .split(/[\n,]+/)
+          .map((u) => u.trim())
+          .filter((u) => u.length > 0 && (u.startsWith('http://') || u.startsWith('https://')));
+
+        if (urls.length === 0) {
+          setErrorMessage('Please enter at least one valid Web or YouTube URL');
           setStep('idle');
           return;
         }
 
-        const isYoutube = urlInput.includes('youtube.com') || urlInput.includes('youtu.be');
-        const sourceType = isYoutube ? 'YOUTUBE' : 'WEBSITE';
-        const displayTitle = urlTitle.trim() || (isYoutube ? 'YouTube Video' : 'Web Source');
-
-        await sourcesApi.createSource(activeNotebookId, {
-          type: sourceType,
-          title: displayTitle,
-          displayName: displayTitle,
-          fileUrl: urlInput.trim(),
-          status: 'Queued',
-        });
+        await sourcesApi.batchCreateSources(activeNotebookId, urls);
       } else if (mode === 'text') {
         if (!textContent.trim()) {
           setErrorMessage('Please enter text content for the note');
@@ -304,28 +272,16 @@ export function UploadModal() {
         {mode === 'url' && (
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1 block">Web or YouTube URL *</label>
-              <input
-                type="url"
+              <label className="text-xs font-semibold text-slate-300 mb-1 block">Web, YouTube, or Playlist URLs *</label>
+              <textarea
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://www.youtube.com/watch?v=... or https://example.com/article"
-                className="w-full rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                rows={4}
+                placeholder="https://www.youtube.com/watch?v=...\nhttps://example.com/article\n(Enter multiple URLs separated by commas or new lines)"
+                className="w-full rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none resize-none font-mono"
               />
             </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1 block">
-                Source Display Title (Optional) 
-                {isFetchingTitle && <Loader2 className="inline w-3 h-3 ml-2 animate-spin text-slate-400" />}
-              </label>
-              <input
-                type="text"
-                value={urlTitle}
-                onChange={(e) => setUrlTitle(e.target.value)}
-                placeholder="e.g. Next.js 15 Documentation"
-                className="w-full rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
+            <p className="text-[11px] text-slate-500 italic">Titles will be fetched automatically in the background.</p>
           </div>
         )}
 
