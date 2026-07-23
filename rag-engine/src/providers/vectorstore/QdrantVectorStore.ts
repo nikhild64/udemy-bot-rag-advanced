@@ -278,11 +278,11 @@ export class QdrantVectorStore implements VectorStore {
     let copiedCount = 0;
     
     try {
-      let offset: string | number | undefined = undefined;
+      let offset: any = undefined;
       const batchSize = 100;
 
       while (true) {
-        const scrollRes = await this.client.scroll(name, {
+        const scrollOptions: any = {
           filter: {
             must: [
               {
@@ -292,10 +292,12 @@ export class QdrantVectorStore implements VectorStore {
             ],
           },
           limit: batchSize,
-          offset,
           with_payload: true,
           with_vector: true,
-        });
+        };
+        if (offset !== undefined) scrollOptions.offset = offset;
+
+        const scrollRes = await this.client.scroll(name, scrollOptions);
 
         const points = scrollRes.points;
         if (!points || points.length === 0) {

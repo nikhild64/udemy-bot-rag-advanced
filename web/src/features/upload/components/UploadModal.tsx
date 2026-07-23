@@ -55,7 +55,7 @@ export function UploadModal() {
   };
 
   const handleFileSelect = (file: File) => {
-    const allowed = ['.pdf', '.txt', '.md', '.markdown', '.docx', '.json', '.mp3', '.mp4', '.wav', '.m4a'];
+    const allowed = ['.pdf', '.txt', '.md', '.markdown', '.docx', '.json', '.mp3', '.mp4', '.wav', '.m4a', '.zip'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowed.includes(ext)) {
       setErrorMessage(`Unsupported file format "${ext}". Supported: ${allowed.join(', ')}`);
@@ -84,7 +84,7 @@ export function UploadModal() {
         if (!selectedFile) return;
 
         const source = await sourcesApi.createSource(activeNotebookId, {
-          type: selectedFile.type.includes('pdf') ? 'PDF' : 'DOCX',
+          type: selectedFile.type.includes('pdf') ? 'PDF' : selectedFile.name.toLowerCase().endsWith('.zip') ? 'VTT' : 'DOCX',
           title: selectedFile.name,
           displayName: selectedFile.name,
           size: selectedFile.size,
@@ -226,7 +226,7 @@ export function UploadModal() {
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
-                  input.accept = '.pdf,.txt,.md,.markdown,.docx,.json,.mp3,.mp4,.wav,.m4a';
+                  input.accept = '.pdf,.txt,.md,.markdown,.docx,.json,.mp3,.mp4,.wav,.m4a,.zip';
                   input.onchange = (e: any) => {
                     if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
                   };

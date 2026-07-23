@@ -10,8 +10,10 @@ const DEFAULT_ALLOWED_MIME_TYPES = [
   'text/vtt',
   'application/x-subrip',
   'application/octet-stream',
+  'application/zip',
+  'application/x-zip-compressed',
 ];
-const DEFAULT_ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.vtt'];
+const DEFAULT_ALLOWED_EXTENSIONS = ['.pdf', '.txt', '.vtt', '.srt', '.zip'];
 
 const uploadSchema = z.object({
   UPLOAD_MAX_FILE_SIZE: z

@@ -346,7 +346,7 @@ export async function batchCreateSourcesController(
 
     for (const item of urlsToProcess) {
       let finalTitle = item.title;
-      let sourceType = item.url.includes('youtube.com') || item.url.includes('youtu.be') ? 'YOUTUBE' : 'WEBSITE';
+      let sourceType: any = item.url.includes('youtube.com') || item.url.includes('youtu.be') ? 'YOUTUBE' : 'WEBSITE';
 
       // If no title from ytpl, try to fetch it
       if (!finalTitle) {
