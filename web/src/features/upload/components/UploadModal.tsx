@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useUIStore } from '@/shared/lib/store';
 import { sourcesApi } from '@/features/sources/api/sources.api';
+import { apiClient } from '@/shared/api/client';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -38,6 +39,31 @@ export function UploadModal() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
+
+  useEffect(() => {
+    if (mode === 'url' && urlInput) {
+      const isYoutube = urlInput.includes('youtube.com') || urlInput.includes('youtu.be');
+      if (isYoutube) {
+        const fetchTitle = async () => {
+          try {
+            setIsFetchingTitle(true);
+            const data = await apiClient.get<any>(`/api/sources/youtube/metadata?url=${encodeURIComponent(urlInput)}`);
+            if (data.title && !urlTitle) {
+              setUrlTitle(data.title);
+            }
+          } catch (err) {
+            console.error('Failed to fetch youtube title', err);
+          } finally {
+            setIsFetchingTitle(false);
+          }
+        };
+
+        const timeoutId = setTimeout(fetchTitle, 500);
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [urlInput, mode]);
 
   const resetState = () => {
     setSelectedFile(null);
@@ -288,7 +314,10 @@ export function UploadModal() {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1 block">Source Display Title (Optional)</label>
+              <label className="text-xs font-semibold text-slate-300 mb-1 block">
+                Source Display Title (Optional) 
+                {isFetchingTitle && <Loader2 className="inline w-3 h-3 ml-2 animate-spin text-slate-400" />}
+              </label>
               <input
                 type="text"
                 value={urlTitle}

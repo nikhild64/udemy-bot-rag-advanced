@@ -84,6 +84,16 @@ export class PrismaSourceRepository implements ISourceRepository {
     };
   }
 
+  async findExistingReadySourceByUrl(url: string): Promise<Source | null> {
+    return this.prisma.source.findFirst({
+      where: {
+        fileUrl: url,
+        status: 'Ready',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async update(id: string, userId: string, data: UpdateSourceInput): Promise<Source> {
     const existing = await this.findById(id, userId);
     if (!existing) {

@@ -178,7 +178,8 @@ export class RetrievalOrchestrator {
     }
 
     // 7. Context Refinement & Token Trimming
-    const topK = currentTopK;
+    // Cap final output to the initially requested topK (or 5 default), regardless of how many CRAG retrieved.
+    const finalTopK = options.topK && options.topK > 0 ? options.topK : 5;
     let includedChunks: NotebookRetrievedChunk[] = [];
     let context = '';
     let citations: any[] = [];
@@ -195,7 +196,7 @@ export class RetrievalOrchestrator {
       const validChunks = currentChunks.filter((c) => (c.score || 0) >= minConfidence);
       rejectedChunkCount = currentChunks.length - validChunks.length;
 
-      const topKChunks = validChunks.slice(0, topK);
+      const topKChunks = validChunks.slice(0, finalTopK);
       const maxTokens = options.maxContextTokens ?? 4000;
       const built = ContextBuilder.buildContext(topKChunks, maxTokens);
       context = built.context;

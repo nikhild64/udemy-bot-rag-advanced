@@ -112,6 +112,7 @@ export interface ISourceRepository {
   findById(id: string, userId?: string): Promise<Source | null>;
   findByNotebookId(notebookId: string): Promise<Source[]>;
   findMany(query: ListSourcesQuery): Promise<PaginatedResult<Source>>;
+  findExistingReadySourceByUrl?(url: string): Promise<Source | null>;
   update(id: string, userId: string, data: UpdateSourceInput): Promise<Source>;
   updateStatus(id: string, status: SourceStatus): Promise<Source>;
   delete(id: string, userId?: string): Promise<boolean>;

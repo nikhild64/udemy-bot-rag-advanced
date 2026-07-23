@@ -7,24 +7,26 @@ import { Loader2, AlertCircle, ExternalLink, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface SourceViewerProps {
-  citation: Citation;
+  citation?: Citation;
+  sourceId?: string;
 }
 
-export function SourceViewer({ citation }: SourceViewerProps) {
+export function SourceViewer({ citation, sourceId }: SourceViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewData, setViewData] = useState<any>(null);
 
   useEffect(() => {
     async function loadData() {
-      if (!citation.sourceId) {
-        setError("No source ID available for this citation.");
+      const targetId = sourceId || citation?.sourceId;
+      if (!targetId) {
+        setError("No source ID available.");
         setLoading(false);
         return;
       }
       try {
         setLoading(true);
-        const data = await sourcesApi.viewSource(citation.sourceId);
+        const data = await sourcesApi.viewSource(targetId);
         setViewData(data);
       } catch (err: any) {
         setError(err.message || "Failed to load source viewer data.");
@@ -33,7 +35,7 @@ export function SourceViewer({ citation }: SourceViewerProps) {
       }
     }
     loadData();
-  }, [citation.sourceId]);
+  }, [sourceId, citation?.sourceId]);
 
   if (loading) {
     return (
@@ -64,7 +66,7 @@ export function SourceViewer({ citation }: SourceViewerProps) {
 
   const videoId = metadata?.videoId || extractVideoId(url || metadata?.url || metadata?.videoUrl);
 
-  const timestamp = citation.timestamp; // like '00:15:30'
+  const timestamp = citation?.timestamp; // like '00:15:30'
   const getSeconds = (ts?: string) => {
     if (!ts) return 0;
     const parts = ts.split(':').map(Number);
@@ -82,7 +84,7 @@ export function SourceViewer({ citation }: SourceViewerProps) {
       <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between shrink-0 bg-muted/10">
         <div className="flex flex-col gap-0.5">
           <h3 className="font-semibold text-sm line-clamp-1">{viewData.displayName}</h3>
-          {citation.page !== undefined && <span className="text-xs text-muted-foreground">Page {citation.page}</span>}
+          {citation?.page !== undefined && <span className="text-xs text-muted-foreground">Page {citation.page}</span>}
           {timestamp && <span className="text-xs text-muted-foreground">Timestamp: {timestamp}</span>}
         </div>
         
@@ -110,7 +112,7 @@ export function SourceViewer({ citation }: SourceViewerProps) {
           <div className="h-full w-full">
             {/* simple iframe for PDF, appending #page=X if page is available */}
             <iframe 
-              src={`${url}${citation.page ? `#page=${citation.page}` : ''}`} 
+              src={`${url}${citation?.page ? `#page=${citation.page}` : ''}`} 
               className="w-full h-full border-0 bg-white"
               title="PDF Viewer"
             />
@@ -143,7 +145,7 @@ export function SourceViewer({ citation }: SourceViewerProps) {
       </div>
 
       {/* Snippet Highlight (if available and not playing video) */}
-      {citation.excerpt && !videoId && (
+      {citation?.excerpt && !videoId && (
         <div className="border-t border-border/60 bg-muted/20 p-4 shrink-0 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.1)] z-10">
           <p className="text-xs font-semibold mb-2 text-primary uppercase tracking-wider">Cited Excerpt</p>
           <div className="text-[13px] text-muted-foreground font-mono bg-background border border-border p-3 rounded-md max-h-32 overflow-y-auto">

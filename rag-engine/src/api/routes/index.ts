@@ -10,12 +10,14 @@ import { searchRoutes } from './search.routes';
 import { dashboardRoutes } from './dashboard.routes';
 import { preferenceRoutes } from './preferences.routes';
 import { cleanupRoutes } from './cleanup.routes';
+import { youtubeRoutes } from './youtube.routes';
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes);
   await app.register(metricsRoutes);
   await app.register(chatRoutes);
   await app.register(notebookRoutes);
+  await app.register(youtubeRoutes); // Register before sourceRoutes to avoid :id conflict
   await app.register(sourceRoutes);
   await app.register(retrievalRoutes);
   await app.register(notebookChatRoutes);

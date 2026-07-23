@@ -81,6 +81,60 @@ export class SourceIngestionOrchestrator {
       // Update Source status in DB to Downloading
       await this.sourceRepository.updateStatus(sourceId, 'Downloading' as any);
 
+      // --- Deduplication for YOUTUBE (and potentially others in the future) ---
+      if (source.type === 'YOUTUBE' && source.fileUrl && this.sourceRepository.findExistingReadySourceByUrl) {
+        const existingSource = await this.sourceRepository.findExistingReadySourceByUrl(source.fileUrl);
+        
+        if (existingSource && this.vectorStore.copyVectorsBySource) {
+          logger.info({ sourceId, existingSourceId: existingSource.id }, 'Found existing Ready source for URL, deduplicating embeddings');
+          
+          await this.updateProgress(sourceId, 'Embedding', 75, 'Processing', currentJobId, notebookId);
+          await this.sourceRepository.updateStatus(sourceId, 'Embedding' as any);
+
+          const copiedCount = await this.vectorStore.copyVectorsBySource(
+            existingSource.id,
+            source.id,
+            notebookId,
+            source.title,
+            config.vectorStore.userKnowledgeCollection
+          );
+
+          if (copiedCount > 0) {
+            const updatedMetadata = {
+              ...((source.metadata as Record<string, any>) || {}),
+              indexedAt: new Date().toISOString(),
+              chunksCount: (existingSource.metadata as any)?.chunksCount || copiedCount,
+              embeddingsCount: copiedCount,
+              error: null,
+              deduplicatedFrom: existingSource.id
+            };
+
+            await this.sourceRepository.update(sourceId, userId, {
+              status: 'Ready' as any,
+              metadata: updatedMetadata,
+            });
+
+            await this.updateProgress(sourceId, 'Completed', 100, 'Indexed', currentJobId, notebookId);
+            ingestionEvents.publish('Job Finished', { jobId: currentJobId, sourceId, notebookId, stage: 'Completed', details: { durationMs: Date.now() - startTime } });
+
+            const durationMs = Date.now() - startTime;
+            logger.info({ jobId: currentJobId, sourceId, durationMs, copiedCount }, 'Source Ingestion Orchestration completed instantly via deduplication');
+
+            this.updateNotebookStats(notebookId, userId).catch(e => logger.warn({ err: e }, 'Failed to update notebook stats async'));
+
+            return {
+              sourceId,
+              notebookId,
+              status: 'Ready' as any,
+              chunksCount: updatedMetadata.chunksCount,
+              embeddingsCount: copiedCount,
+              durationMs,
+              success: true,
+            };
+          }
+        }
+      }
+
       // 2. Download / Load Stage via SourceLoaderFactory
       await this.updateProgress(sourceId, 'Downloading', 15, 'Processing', currentJobId, notebookId);
       ingestionEvents.publish('Download Started', { jobId: currentJobId, sourceId, notebookId, stage: 'Downloading' });

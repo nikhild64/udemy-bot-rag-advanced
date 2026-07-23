@@ -9,9 +9,10 @@ interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  contentClassName?: string
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, contentClassName }: DialogProps) {
   if (!open) return null
 
   return (
@@ -20,7 +21,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={() => onOpenChange(false)}
       />
-      <div className="z-50 w-full max-w-lg p-6 bg-card border border-border rounded-xl shadow-2xl animate-in zoom-in-95 duration-200">
+      <div className={cn("z-50 w-full max-w-lg p-6 bg-card border border-border rounded-xl shadow-2xl animate-in zoom-in-95 duration-200", contentClassName)}>
         {children}
       </div>
     </div>

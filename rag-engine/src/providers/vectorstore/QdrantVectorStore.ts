@@ -271,4 +271,80 @@ export class QdrantVectorStore implements VectorStore {
       this.collectionManager.handleQdrantError(err, name);
     }
   }
+
+  async copyVectorsBySource(sourceId: string, newSourceId: string, newNotebookId: string, newTitle: string, collectionName?: string): Promise<number> {
+    const name = collectionName ?? this.collectionName;
+    const startTime = Date.now();
+    let copiedCount = 0;
+    
+    try {
+      let offset: string | number | undefined = undefined;
+      const batchSize = 100;
+
+      while (true) {
+        const scrollRes = await this.client.scroll(name, {
+          filter: {
+            must: [
+              {
+                key: 'lessonId',
+                match: { value: sourceId },
+              },
+            ],
+          },
+          limit: batchSize,
+          offset,
+          with_payload: true,
+          with_vector: true,
+        });
+
+        const points = scrollRes.points;
+        if (!points || points.length === 0) {
+          break;
+        }
+
+        const newPoints = points.map((p) => {
+          const oldPayload = p.payload || {};
+          const chunkId = crypto.randomUUID();
+          
+          const newPayload = {
+            ...oldPayload,
+            courseId: newNotebookId,
+            courseTitle: newTitle,
+            moduleId: newNotebookId,
+            moduleTitle: newTitle,
+            lessonId: newSourceId,
+            lessonTitle: newTitle,
+            notebookId: newNotebookId,
+            sourceId: newSourceId,
+            chunkId,
+          };
+
+          return {
+            id: toValidQdrantId(chunkId),
+            vector: p.vector as any,
+            payload: newPayload,
+          };
+        });
+
+        await this.client.upsert(name, {
+          wait: true,
+          points: newPoints,
+        });
+
+        copiedCount += newPoints.length;
+        
+        if (scrollRes.next_page_offset === undefined || scrollRes.next_page_offset === null) {
+          break;
+        }
+        offset = scrollRes.next_page_offset;
+      }
+
+      const durationMs = Date.now() - startTime;
+      logger.info({ collectionName: name, copiedCount, durationMs }, 'Copied vectors by source');
+      return copiedCount;
+    } catch (err) {
+      this.collectionManager.handleQdrantError(err, name);
+      return 0;
+    }
+  }
 }

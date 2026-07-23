@@ -19,9 +19,22 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
 
   const title = citation.sourceTitle || citation.title || `Source ${index + 1}`;
-  const excerpt = citation.excerpt || citation.content || '';
+  let rawExcerpt = citation.excerpt || citation.content || citation.snippet || '';
   const page = citation.pageNumber || citation.page;
-  const timestamp = citation.timestamp;
+  
+  // Extract timestamp like [14:32] or [01:14:32] from snippet if present
+  let extractedTimestamp = citation.timestamp;
+  if (!extractedTimestamp && rawExcerpt) {
+    const tsMatch = rawExcerpt.match(/\[(\d{2}:\d{2}(?::\d{2})?)\]/);
+    if (tsMatch && tsMatch[1]) {
+      extractedTimestamp = tsMatch[1];
+      // Optionally remove it from the displayed excerpt for cleanliness
+      rawExcerpt = rawExcerpt.replace(tsMatch[0], '').trim();
+    }
+  }
+
+  const excerpt = rawExcerpt;
+  const timestamp = extractedTimestamp;
 
   const scorePercentage = citation.score !== undefined ? Math.round(citation.score * 100) : null;
 
@@ -94,7 +107,7 @@ export function CitationCard({ citation, index }: CitationCardProps) {
               </Button>
             </div>
             <div className="p-0 overflow-hidden">
-              <SourceViewer citation={citation} />
+              <SourceViewer citation={{ ...citation, timestamp, excerpt }} />
             </div>
           </Dialog>
         </div>

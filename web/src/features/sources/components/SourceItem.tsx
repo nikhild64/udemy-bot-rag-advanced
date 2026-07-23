@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Source } from '@/shared/types';
+import { cn } from '@/lib/utils';
 import {
   useSourceStatusQuery,
   useDeleteSourceMutation,
@@ -33,9 +34,10 @@ import { sourcesApi } from '../api/sources.api';
 interface SourceItemProps {
   source: Source;
   notebookId: string;
+  onOpenViewer?: (sourceId: string) => void;
 }
 
-export function SourceItem({ source, notebookId }: SourceItemProps) {
+export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps) {
   const [metadataDrawerOpen, setMetadataDrawerOpen] = useState(false);
 
   const { data: liveStatus } = useSourceStatusQuery(source.id, source.status);
@@ -98,7 +100,13 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
 
   return (
     <>
-      <div className="p-3 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-2 group">
+      <div 
+        className={cn(
+          "p-3 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-2 group",
+          onOpenViewer && "cursor-pointer hover:border-primary/50"
+        )}
+        onClick={() => onOpenViewer && onOpenViewer(source.id)}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {getFileIcon()}
@@ -116,17 +124,18 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
 
           <div className="flex items-center gap-1 shrink-0">
             <SourceStatusBadge status={currentStatus} progress={progress} currentStage={currentStage} />
-            <DropdownMenu
-              trigger={
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                >
-                  <MoreVertical className="w-3.5 h-3.5" />
-                </Button>
-              }
-            >
+            <div onClick={(e) => e.stopPropagation()}>
+              <DropdownMenu
+                trigger={
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </Button>
+                }
+              >
               <DropdownMenuItem onClick={() => setMetadataDrawerOpen(true)}>
                 <Info className="w-3.5 h-3.5 mr-2 text-indigo-400" /> View Metadata
               </DropdownMenuItem>
@@ -157,21 +166,11 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
                 <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
               </DropdownMenuItem>
             </DropdownMenu>
+            </div>
           </div>
         </div>
 
-        {/* Embedded YouTube Video Preview */}
-        {videoId && (
-          <div className="mt-2 relative rounded-lg overflow-hidden border border-border/60 bg-black/40 aspect-video shadow-xs">
-            <iframe
-              src={`https://www.youtube.com/embed/${videoId}`}
-              title={source.title}
-              className="w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        )}
+        {/* Embedded YouTube Video Preview Removed to use SourceViewerDialog instead */}
 
         {/* Progress Bar for Queued / Processing */}
         {(isQueuedOrProcessing || currentStatus === 'Deleting') && (

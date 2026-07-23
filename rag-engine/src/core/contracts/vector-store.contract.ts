@@ -68,4 +68,14 @@ export interface VectorStore {
    * @param collectionName Optional collection name to target (defaults to configured collection).
    */
   deleteVectors(ids: string[], collectionName?: string): Promise<boolean>;
+
+  /**
+   * Duplicates all vectors associated with a specific source.
+   * @param sourceId The original source ID to copy vectors from.
+   * @param newSourceId The new source ID for the copied vectors.
+   * @param newNotebookId The notebook ID the new vectors belong to.
+   * @param newTitle The new source title.
+   * @param collectionName Optional collection name to target (defaults to configured collection).
+   */
+  copyVectorsBySource?(sourceId: string, newSourceId: string, newNotebookId: string, newTitle: string, collectionName?: string): Promise<number>;
 }

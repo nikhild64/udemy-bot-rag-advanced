@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from 'react';
 import { useSourcesQuery } from '../hooks/useSources';
 import { useUIStore } from '@/shared/lib/store';
 import { SourceItem } from './SourceItem';
+import { SourceViewerDialog } from './SourceViewerDialog';
 import { Upload, FilePlus, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +13,15 @@ export function SourceList() {
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const setUploadModalOpen = useUIStore((s) => s.setUploadModalOpen);
 
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedSourceId, setSelectedSourceId] = useState('');
+
   const { data: sources, isLoading, isError, error } = useSourcesQuery(activeNotebookId);
+
+  const handleOpenViewer = (sourceId: string) => {
+    setSelectedSourceId(sourceId);
+    setViewerOpen(true);
+  };
 
   if (!activeNotebookId) {
     return (
@@ -55,7 +65,12 @@ export function SourceList() {
           </div>
         ) : sources && sources.length > 0 ? (
           sources.map((source) => (
-            <SourceItem key={source.id} source={source} notebookId={activeNotebookId} />
+            <SourceItem 
+              key={source.id} 
+              source={source} 
+              notebookId={activeNotebookId} 
+              onOpenViewer={handleOpenViewer}
+            />
           ))
         ) : (
           <div className="flex flex-col items-center justify-center p-8 border border-dashed border-border rounded-xl text-center space-y-3 bg-muted/20">
@@ -73,6 +88,16 @@ export function SourceList() {
           </div>
         )}
       </div>
+
+      {/* Source Viewer Dialog for Notebook Sources */}
+      {sources && (
+        <SourceViewerDialog
+          isOpen={viewerOpen}
+          onClose={() => setViewerOpen(false)}
+          sources={sources}
+          initialSourceId={selectedSourceId}
+        />
+      )}
     </div>
   );
 }

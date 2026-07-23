@@ -136,8 +136,19 @@ export class YouTubeLoader implements ISourceLoader {
   private async fetchTranscriptViaPackage(videoId: string, defaultTitle?: string | null): Promise<string | null> {
     const title = defaultTitle || `YouTube Video ${videoId}`;
 
-    const buildResult = (items: { text: string }[], lang: string): string | null => {
-      const text = items.map((item) => item.text.trim()).filter((t) => t.length > 0).join(' ');
+    const buildResult = (items: { text: string; offset?: number }[], lang: string): string | null => {
+      const text = items.map((item) => {
+        let prefix = '';
+        if (typeof item.offset === 'number') {
+          const totalSeconds = Math.floor(item.offset / 1000);
+          const hh = Math.floor(totalSeconds / 3600);
+          const mm = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+          const ss = (totalSeconds % 60).toString().padStart(2, '0');
+          prefix = hh > 0 ? `[${hh}:${mm}:${ss}] ` : `[${mm}:${ss}] `;
+        }
+        return `${prefix}${item.text.trim()}`;
+      }).filter((t) => t.length > 7).join('\n');
+      
       if (text.length === 0) return null;
       logger.info({ videoId, lang, segments: items.length, transcriptLength: text.length }, 'Fetched YouTube transcript via youtube-transcript package');
       return `YouTube Video Transcript\nTitle: ${title}\nVideo ID: ${videoId}\n\nTranscript:\n${text}`;
