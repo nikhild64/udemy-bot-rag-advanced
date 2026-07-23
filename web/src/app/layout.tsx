@@ -13,7 +13,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "AI Notebook Knowledge Engine",
+  title: "ChaibookLM",
   description: "AI-powered notebook and knowledge assistant with grounded citations",
 };
 

@@ -115,7 +115,7 @@ export function Header() {
         ) : (
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">AI Notebook Platform</span>
+            <span className="text-sm font-semibold text-foreground">ChaibookLM</span>
           </div>
         )}
       </div>

@@ -36,38 +36,55 @@ export function useChat(notebookId: string | null) {
       const citations: Citation[] = [];
 
       try {
-        await chatApi.streamChat(
-          notebookId,
-          query,
-          (token) => {
-            accumulatedText += token;
-            setStreamingContent(accumulatedText);
-          },
-          (citation) => {
-            citations.push(citation);
-            setStreamingCitations([...citations]);
-          },
-          (_doneData) => {
-            const assistantMsg: Message = {
-              id: assistantMessageId,
-              notebookId,
-              role: 'assistant',
-              content: accumulatedText,
-              citations: citations,
-              createdAt: new Date().toISOString(),
-            };
+        const useStreaming = process.env.NEXT_PUBLIC_USE_STREAMING === 'true';
 
-            queryClient.setQueryData<Message[]>(['messages', notebookId], (old = []) => [...old, assistantMsg]);
-            setIsStreaming(false);
-            setStreamingContent('');
-            setStreamingCitations([]);
-            queryClient.invalidateQueries({ queryKey: ['messages', notebookId] });
-          },
-          (err) => {
-            setIsStreaming(false);
-            toast.error(err.message || 'Error receiving AI response');
-          }
-        );
+        if (useStreaming) {
+          await chatApi.streamChat(
+            notebookId,
+            query,
+            (token) => {
+              accumulatedText += token;
+              setStreamingContent(accumulatedText);
+            },
+            (citation) => {
+              citations.push(citation);
+              setStreamingCitations([...citations]);
+            },
+            (_doneData) => {
+              const assistantMsg: Message = {
+                id: assistantMessageId,
+                notebookId,
+                role: 'assistant',
+                content: accumulatedText,
+                citations: citations,
+                createdAt: new Date().toISOString(),
+              };
+
+              queryClient.setQueryData<Message[]>(['messages', notebookId], (old = []) => [...old, assistantMsg]);
+              setIsStreaming(false);
+              setStreamingContent('');
+              setStreamingCitations([]);
+              queryClient.invalidateQueries({ queryKey: ['messages', notebookId] });
+            },
+            (err) => {
+              setIsStreaming(false);
+              toast.error(err.message || 'Error receiving AI response');
+            }
+          );
+        } else {
+          const response = await chatApi.chat(notebookId, query);
+          const assistantMsg = {
+            ...response.message,
+            notebookId,
+            role: 'assistant' as const,
+            content: response.message?.content || '',
+            citations: response.citations || response.message?.citations || [],
+          };
+
+          queryClient.setQueryData<Message[]>(['messages', notebookId], (old = []) => [...old, assistantMsg]);
+          setIsStreaming(false);
+          queryClient.invalidateQueries({ queryKey: ['messages', notebookId] });
+        }
       } catch (err: any) {
         setIsStreaming(false);
         toast.error(err.message || 'Failed to initiate chat stream');

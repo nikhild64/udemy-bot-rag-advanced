@@ -30,7 +30,7 @@ export function useSourceStatusQuery(sourceId: string, currentStatus: SourceStat
     enabled: !!sourceId && shouldPoll,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data?.status === 'Indexed' || data?.status === 'Failed') {
+      if (data?.status === 'Ready' || data?.status === 'Failed') {
         return false;
       }
       return 2000;

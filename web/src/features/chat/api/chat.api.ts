@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/api/client';
-import { Message, ListMessagesResponse, Citation } from '@/shared/types';
+import { Message, ListMessagesResponse, Citation, ChatRequestOptions } from '@/shared/types';
 
 export const chatApi = {
   getMessages: async (notebookId: string): Promise<Message[]> => {
@@ -9,6 +9,16 @@ export const chatApi = {
       ...msg,
       role: (msg.role ? String(msg.role).toLowerCase() : 'assistant') as 'user' | 'assistant' | 'system',
     }));
+  },
+
+  chat: async (notebookId: string, query: string): Promise<{
+    message: Message;
+    citations: Citation[];
+  }> => {
+    return apiClient.post<{ message: Message; citations: Citation[] }>(
+      `/api/notebooks/${notebookId}/chat`,
+      { query } as ChatRequestOptions,
+    );
   },
 
   streamChat: async (
