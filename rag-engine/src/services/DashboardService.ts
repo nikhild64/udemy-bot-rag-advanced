@@ -48,7 +48,7 @@ export class DashboardService {
         take: 5,
         include: {
           _count: {
-            select: { sources: true, messages: true },
+            select: { sources: { where: { status: { in: ['Queued', 'Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'] as any } } }, messages: true },
           },
         },
       }),
@@ -74,7 +74,8 @@ export class DashboardService {
 
     sources.forEach((s) => {
       if (s.size) totalStorageBytes += s.size;
-      if (s.status === SourceStatus.Processing || s.status === SourceStatus.Queued || s.status === SourceStatus.Uploading) {
+      const isProcessing = ['Queued', 'Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(s.status);
+      if (isProcessing || s.status === 'Uploading') {
         activeJobsCount++;
       }
       if (s.status === SourceStatus.Failed) {

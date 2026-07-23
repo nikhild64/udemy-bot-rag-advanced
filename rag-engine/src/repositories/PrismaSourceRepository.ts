@@ -21,7 +21,7 @@ export class PrismaSourceRepository implements ISourceRepository {
         mimeType: data.mimeType ?? null,
         size: data.size ?? null,
         metadata: data.metadata ?? {},
-        status: data.status ?? SourceStatus.PendingUpload,
+        status: 'Uploading' as any,
       },
     });
   }

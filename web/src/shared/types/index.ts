@@ -1,4 +1,4 @@
-export type SourceStatus = 'Uploaded' | 'Queued' | 'Processing' | 'Indexed' | 'Failed' | 'Cancelled' | 'PendingUpload';
+export type SourceStatus = 'Uploading' | 'Uploaded' | 'Queued' | 'Downloading' | 'Extracting' | 'Normalizing' | 'Chunking' | 'Embedding' | 'Indexing' | 'Ready' | 'Deleting' | 'Deleted' | 'Failed';
 
 export interface Notebook {
   id: string;
@@ -15,6 +15,7 @@ export interface Notebook {
     sources: number;
     messages: number;
   };
+  stats?: Record<string, any> | null;
 }
 
 export interface ListNotebooksResponse {

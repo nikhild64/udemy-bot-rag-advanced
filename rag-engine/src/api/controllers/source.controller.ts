@@ -1,5 +1,6 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { SourceService } from '@/services/SourceService';
+import { SourceViewerService } from '@/services/SourceViewerService';
 import { UploadService } from '@/services/UploadService';
 import { createSourceSchema, updateSourceSchema, listSourcesQuerySchema } from '../schemas/source.schema';
 import { UnauthorizedError, ValidationError } from '@/shared/errors';
@@ -7,6 +8,7 @@ import { UnauthorizedError, ValidationError } from '@/shared/errors';
 import { IngestionQueue } from '@/infrastructure/queue/IngestionQueue';
 
 const sourceService = new SourceService();
+const sourceViewerService = new SourceViewerService();
 const defaultUploadService = new UploadService();
 const ingestionQueue = new IngestionQueue();
 
@@ -156,6 +158,17 @@ export async function getSourceStatusController(
   // 2. Fetch live job status from IngestionQueue
   const jobProgress = await ingestionQueue.getJobStatus(sourceId);
 
+  if (source.status === 'Ready') {
+    return reply.status(200).send({
+      sourceId: source.id,
+      status: 'Ready',
+      progress: 100,
+      currentStage: 'Completed',
+      error: null,
+      updatedAt: source.updatedAt.toISOString(),
+    });
+  }
+
   if (jobProgress) {
     await reply.status(200).send({
       sourceId: source.id,
@@ -173,15 +186,15 @@ export async function getSourceStatusController(
   let progress = 0;
   let currentStage = 'Queued';
 
-  if (source.status === 'Indexed') {
+  if ((source.status as string) === 'Ready') {
     progress = 100;
     currentStage = 'Completed';
   } else if (source.status === 'Failed') {
     progress = 0;
     currentStage = 'Failed';
-  } else if (source.status === 'Processing') {
+  } else if (['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(source.status)) {
     progress = 50;
-    currentStage = 'Processing';
+    currentStage = source.status;
   } else if (source.status === 'Queued' || source.status === 'Uploaded') {
     progress = 0;
     currentStage = 'Queued';
@@ -269,5 +282,18 @@ export async function downloadSourceFileController(
     mimeType: source.mimeType,
     size: source.size,
   });
+}
+
+export async function viewSourceController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = getUserId(request);
+  const params = request.params as { sourceId?: string; id?: string };
+  const sourceId = params.sourceId || params.id;
+  if (!sourceId) throw new ValidationError('Source ID is required');
+
+  const viewData = await sourceViewerService.getSourceForViewing(sourceId, userId);
+  await reply.status(200).send(viewData);
 }
 

@@ -27,15 +27,19 @@ enum SourceType {
 }
 
 enum SourceStatus {
-  PendingUpload
   Uploading
   Uploaded
   Queued
-  Processing
-  Indexed
-  Failed
+  Downloading
+  Extracting
+  Normalizing
+  Chunking
+  Embedding
+  Indexing
+  Ready
+  Deleting
   Deleted
-  Cancelled
+  Failed
 }
 
 enum MessageRole {
@@ -45,13 +49,13 @@ enum MessageRole {
 }
 
 model User {
-  id          String          @id
-  email       String?
-  name        String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  notebooks   Notebook[]
-  preference  UserPreference?
+  id         String          @id
+  email      String?
+  name       String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  notebooks  Notebook[]
+  preference UserPreference?
 
   @@map("users")
 }
@@ -66,6 +70,7 @@ model Notebook {
   isFavorite   Boolean   @default(false)
   lastOpenedAt DateTime? @default(now())
   settings     Json?     @default("{}")
+  stats        Json?     @default("{\"totalSources\":0,\"indexedSources\":0,\"failedSources\":0,\"totalChunks\":0,\"totalVectors\":0,\"storageUsage\":0}")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sources      Source[]
@@ -100,7 +105,7 @@ model Source {
   type        SourceType
   displayName String?
   title       String
-  status      SourceStatus @default(PendingUpload)
+  status      SourceStatus @default(Queued)
   storagePath String?
   fileUrl     String?
   mimeType    String?

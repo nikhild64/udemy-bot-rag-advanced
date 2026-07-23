@@ -78,8 +78,8 @@ export class SourceIngestionOrchestrator {
         throw new ValidationError(`Source '${sourceId}' does not have a storagePath, fileUrl, or rawText`);
       }
 
-      // Update Source status in DB to Processing
-      await this.sourceRepository.updateStatus(sourceId, SourceStatus.Processing);
+      // Update Source status in DB to Downloading
+      await this.sourceRepository.updateStatus(sourceId, 'Downloading' as any);
 
       // 2. Download / Load Stage via SourceLoaderFactory
       await this.updateProgress(sourceId, 'Downloading', 15, 'Processing', currentJobId, notebookId);
@@ -99,6 +99,7 @@ export class SourceIngestionOrchestrator {
 
       // 3. Extraction Stage via ExtractorFactory
       await this.updateProgress(sourceId, 'Extracting', 30, 'Processing', currentJobId, notebookId);
+      await this.sourceRepository.updateStatus(sourceId, 'Extracting' as any);
 
       const extractor = ExtractorFactory.getExtractor(rawContent);
       const extractedDoc = await extractor.extract(rawContent);
@@ -118,6 +119,7 @@ export class SourceIngestionOrchestrator {
 
       // 4. Normalization Stage
       await this.updateProgress(sourceId, 'Normalizing', 45, 'Processing', currentJobId, notebookId);
+      await this.sourceRepository.updateStatus(sourceId, 'Normalizing' as any);
 
       const normalizedText = DocumentNormalizer.normalize(extractedText);
       logger.info({ sourceId, normalizedLength: normalizedText.length }, 'Normalized content successfully');
@@ -126,6 +128,7 @@ export class SourceIngestionOrchestrator {
 
       // 5. Chunking Stage
       await this.updateProgress(sourceId, 'Chunking', 60, 'Processing', currentJobId, notebookId);
+      await this.sourceRepository.updateStatus(sourceId, 'Chunking' as any);
 
       const chunks = SourceChunker.chunk(normalizedText, sourceId, notebookId, {
         chunkSize: config.ingestion.chunkSize,
@@ -147,6 +150,7 @@ export class SourceIngestionOrchestrator {
 
       // 6. Embedding Stage
       await this.updateProgress(sourceId, 'Embedding', 75, 'Processing', currentJobId, notebookId);
+      await this.sourceRepository.updateStatus(sourceId, 'Embedding' as any);
 
       // Convert SourceChunk models to Chunk models expected by EmbeddingService
       const domainChunks: Chunk[] = chunks.map((c) => ({
@@ -192,6 +196,7 @@ export class SourceIngestionOrchestrator {
 
       // 7. Indexing Stage & Idempotency
       await this.updateProgress(sourceId, 'Indexing', 90, 'Processing', currentJobId, notebookId);
+      await this.sourceRepository.updateStatus(sourceId, 'Indexing' as any);
 
       const collectionName = config.vectorStore.userKnowledgeCollection;
 
@@ -265,7 +270,7 @@ export class SourceIngestionOrchestrator {
       };
 
       await this.sourceRepository.update(sourceId, userId, {
-        status: SourceStatus.Indexed,
+        status: 'Ready' as any,
         metadata: updatedMetadata,
       });
 
@@ -275,10 +280,13 @@ export class SourceIngestionOrchestrator {
       const durationMs = Date.now() - startTime;
       logger.info({ jobId: currentJobId, sourceId, durationMs }, 'Source Ingestion Orchestration completed successfully');
 
+      // Update Notebook Stats
+      this.updateNotebookStats(notebookId, userId).catch(e => logger.warn({ err: e }, 'Failed to update notebook stats async'));
+
       return {
         sourceId,
         notebookId,
-        status: SourceStatus.Indexed,
+        status: 'Ready' as any,
         chunksCount: chunks.length,
         embeddingsCount: embeddingResult.embeddedChunks.length,
         durationMs,
@@ -334,5 +342,37 @@ export class SourceIngestionOrchestrator {
     error?: string,
   ): Promise<void> {
     await this.queue.updateProgress(sourceId, stage, percent, statusOverride, error);
+  }
+
+  private async updateNotebookStats(notebookId: string, userId: string): Promise<void> {
+    const sources = await this.sourceRepository.findMany({ notebookId, userId, limit: 10000 });
+    let totalSources = 0;
+    let indexedSources = 0;
+    let failedSources = 0;
+    let totalChunks = 0;
+    let totalVectors = 0;
+    let storageUsage = 0;
+
+    for (const s of sources.data) {
+      totalSources++;
+      if (s.status === 'Ready') indexedSources++;
+      if (s.status === 'Failed') failedSources++;
+      
+      const meta = (s.metadata as any) || {};
+      totalChunks += (meta.chunksCount || 0);
+      totalVectors += (meta.embeddingsCount || 0);
+      storageUsage += (s.size || 0);
+    }
+
+    const stats = {
+      totalSources,
+      indexedSources,
+      failedSources,
+      totalChunks,
+      totalVectors,
+      storageUsage,
+    };
+
+    await this.notebookRepository.update(notebookId, userId, { stats } as any);
   }
 }

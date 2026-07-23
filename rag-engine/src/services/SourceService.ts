@@ -4,11 +4,15 @@ import { PrismaSourceRepository } from '@/repositories/PrismaSourceRepository';
 import { PrismaNotebookRepository } from '@/repositories/PrismaNotebookRepository';
 import { NotFoundError, ValidationError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
+import { SourceDeletionOrchestrator } from '../ingestion/orchestrator/SourceDeletionOrchestrator';
+import { ReIndexOrchestrator } from '../ingestion/orchestrator/ReIndexOrchestrator';
 
 export class SourceService {
   constructor(
     private readonly sourceRepository: ISourceRepository = new PrismaSourceRepository(),
     private readonly notebookRepository: INotebookRepository = new PrismaNotebookRepository(),
+    private readonly deletionOrchestrator: SourceDeletionOrchestrator = new SourceDeletionOrchestrator(),
+    private readonly reindexOrchestrator: ReIndexOrchestrator = new ReIndexOrchestrator(),
   ) {}
 
   async createSource(
@@ -47,7 +51,7 @@ export class SourceService {
       mimeType: input.mimeType ?? null,
       size: input.size ?? null,
       metadata: input.metadata ?? null,
-      status: input.status ?? SourceStatus.PendingUpload,
+      status: input.status ?? 'Queued',
     });
 
     logger.info({ sourceId: source.id, notebookId: input.notebookId }, 'Created source metadata');
@@ -94,15 +98,7 @@ export class SourceService {
   }
 
   async reindexSource(id: string, userId: string): Promise<Source> {
-    const source = await this.getSource(id, userId);
-    logger.info({ sourceId: id, userId }, 'Triggering re-indexing for source');
-    return this.sourceRepository.update(id, userId, {
-      status: SourceStatus.Queued,
-      metadata: {
-        ...((source.metadata as Record<string, any>) || {}),
-        reindexedAt: new Date().toISOString(),
-      },
-    });
+    return this.reindexOrchestrator.reindexSource(id, userId);
   }
 
   async retrySource(id: string, userId: string): Promise<Source> {
@@ -121,7 +117,7 @@ export class SourceService {
     const source = await this.getSource(id, userId);
     logger.info({ sourceId: id, userId }, 'Cancelling source processing');
     return this.sourceRepository.update(id, userId, {
-      status: SourceStatus.Cancelled,
+      status: 'Failed',
       metadata: {
         ...((source.metadata as Record<string, any>) || {}),
         cancelledAt: new Date().toISOString(),
@@ -149,7 +145,6 @@ export class SourceService {
   }
 
   async deleteSource(id: string, userId: string): Promise<boolean> {
-    logger.info({ sourceId: id, userId }, 'Deleting source metadata');
-    return this.sourceRepository.delete(id, userId);
+    return this.deletionOrchestrator.deleteSource(id, userId);
   }
 }

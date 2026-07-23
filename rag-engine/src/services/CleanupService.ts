@@ -29,7 +29,7 @@ export class CleanupService {
       const res = await this.prisma.source.deleteMany({
         where: {
           notebook: { userId },
-          status: { in: [SourceStatus.Failed, SourceStatus.Cancelled] },
+          status: { in: ['Failed', 'Deleted'] as any },
         },
       });
       deletedSourcesCount = res.count;
@@ -39,7 +39,7 @@ export class CleanupService {
       const res = await this.prisma.source.deleteMany({
         where: {
           notebook: { userId },
-          status: SourceStatus.PendingUpload,
+          status: 'Failed',
         },
       });
       clearedUploadsCount = res.count;
@@ -49,7 +49,7 @@ export class CleanupService {
       const res = await this.prisma.source.updateMany({
         where: {
           notebook: { userId },
-          status: SourceStatus.Failed,
+          status: 'Failed',
         },
         data: {
           status: SourceStatus.Queued,

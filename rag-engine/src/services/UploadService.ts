@@ -66,9 +66,9 @@ export class UploadService {
 
     // 3. Validate Source Status
     const allowedStatuses: SourceStatus[] = [
-      SourceStatus.PendingUpload,
-      SourceStatus.Uploading,
-      SourceStatus.Failed,
+      'Queued' as any,
+      'Uploading' as any,
+      'Failed' as any,
     ];
 
     if (!allowedStatuses.includes(source.status)) {

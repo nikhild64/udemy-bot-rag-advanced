@@ -45,8 +45,11 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
   const cancelMutation = useCancelSourceMutation(notebookId);
 
   const currentStatus = liveStatus?.status || source.status;
-  const progress = liveStatus?.progress ?? (currentStatus === 'Indexed' ? 100 : 0);
-  const currentStage = liveStatus?.currentStage || (currentStatus === 'Processing' ? 'Embedding' : '');
+  const progress = liveStatus?.progress ?? (currentStatus === 'Ready' ? 100 : 0);
+  const currentStage = liveStatus?.currentStage || '';
+
+  const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(currentStatus);
+  const isQueuedOrProcessing = isProcessing || currentStatus === 'Queued' || currentStatus === 'Uploading' || currentStatus === 'Uploaded';
 
   const getFileIcon = () => {
     const mime = source.mimeType?.toLowerCase() || '';
@@ -144,7 +147,7 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
                 </DropdownMenuItem>
               )}
 
-              {(currentStatus === 'Processing' || currentStatus === 'Queued') && (
+              {(isQueuedOrProcessing) && (
                 <DropdownMenuItem onClick={() => cancelMutation.mutate(source.id)}>
                   <Ban className="w-3.5 h-3.5 mr-2 text-amber-400" /> Cancel Processing
                 </DropdownMenuItem>
@@ -171,11 +174,11 @@ export function SourceItem({ source, notebookId }: SourceItemProps) {
         )}
 
         {/* Progress Bar for Queued / Processing */}
-        {(currentStatus === 'Processing' || currentStatus === 'Queued' || currentStatus === 'Uploaded') && (
+        {(isQueuedOrProcessing || currentStatus === 'Deleting') && (
           <div className="space-y-1">
             <Progress value={progress} className="h-1 bg-muted" />
             <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-              <span>{currentStage || 'Processing...'}</span>
+              <span>{currentStage || currentStatus}</span>
               <span>{progress}%</span>
             </div>
           </div>

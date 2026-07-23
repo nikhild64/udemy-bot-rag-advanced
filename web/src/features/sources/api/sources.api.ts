@@ -55,4 +55,8 @@ export const sourcesApi = {
   downloadSource: async (sourceId: string): Promise<{ downloadUrl: string; filename: string; mimeType?: string; size?: number }> => {
     return apiClient.get<{ downloadUrl: string; filename: string; mimeType?: string; size?: number }>(`/api/sources/${sourceId}/download`);
   },
+
+  viewSource: async (sourceId: string): Promise<any> => {
+    return apiClient.get<any>(`/api/sources/${sourceId}/view`);
+  },
 };

@@ -14,14 +14,15 @@ export function useSourcesQuery(notebookId: string | null) {
 
 export function useSourceStatusQuery(sourceId: string, currentStatus: SourceStatus) {
   const queryClient = useQueryClient();
-  const shouldPoll = currentStatus === 'Queued' || currentStatus === 'Processing' || currentStatus === 'Uploaded';
+  const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(currentStatus);
+  const shouldPoll = currentStatus === 'Queued' || isProcessing || currentStatus === 'Uploading';
 
   return useQuery({
     queryKey: ['sourceStatus', sourceId],
     queryFn: async () => {
       const statusData = await sourcesApi.getSourceStatus(sourceId);
       // Invalidate sources list when completion/failure reached
-      if (statusData.status === 'Indexed' || statusData.status === 'Failed') {
+      if (statusData.status === 'Ready' || statusData.status === 'Failed') {
         queryClient.invalidateQueries({ queryKey: ['sources'] });
       }
       return statusData;

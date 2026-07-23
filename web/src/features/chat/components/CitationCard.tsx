@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { Citation } from '@/shared/types';
-import { FileText, ChevronDown, ChevronUp, BookOpen, Clock, Layers } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, BookOpen, Clock, Layers, ExternalLink, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogTitle } from '@/components/ui/dialog';
+import { SourceViewer } from '../../sources/components/SourceViewer';
+import { Button } from '@/components/ui/button';
 
 interface CitationCardProps {
   citation: Citation;
@@ -13,6 +16,7 @@ interface CitationCardProps {
 
 export function CitationCard({ citation, index }: CitationCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const title = citation.sourceTitle || citation.title || `Source ${index + 1}`;
   const excerpt = citation.excerpt || citation.content || '';
@@ -22,7 +26,7 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   const scorePercentage = citation.score !== undefined ? Math.round(citation.score * 100) : null;
 
   return (
-    <div className="p-2.5 bg-card/80 border border-border/80 rounded-xl hover:border-primary/40 transition-all text-xs space-y-1.5 shadow-2xs">
+    <div className="p-2.5 bg-card/80 border border-border/80 rounded-xl hover:border-primary/40 transition-all text-xs space-y-2 shadow-2xs">
       <div
         className="flex items-center justify-between cursor-pointer gap-2"
         onClick={() => setExpanded(!expanded)}
@@ -72,6 +76,27 @@ export function CitationCard({ citation, index }: CitationCardProps) {
           )}
         >
           "{excerpt}"
+        </div>
+      )}
+
+      {/* View Original Source Button */}
+      {expanded && citation.sourceId && (
+        <div className="pt-1 flex justify-end">
+          <Button variant="secondary" size="sm" className="h-7 text-[10px] gap-1 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary" onClick={() => setViewerOpen(true)}>
+            <ExternalLink className="w-3 h-3" />
+            View Original Source
+          </Button>
+          <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+            <div className="flex justify-between items-center px-4 py-2 border-b border-border/40">
+              <DialogTitle className="text-sm">Source Viewer</DialogTitle>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setViewerOpen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="p-0 overflow-hidden">
+              <SourceViewer citation={citation} />
+            </div>
+          </Dialog>
         </div>
       )}
     </div>
