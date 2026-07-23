@@ -15,7 +15,6 @@ interface SettingsModalProps {
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { language, setLanguage, t } = useTranslation();
-  const [theme, setTheme] = useState<'system' | 'dark' | 'light'>('system');
   const [timezone, setTimezone] = useState('UTC');
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +23,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       apiClient.get<any>('/api/user/preferences')
         .then((pref) => {
           if (pref) {
-            if (pref.theme) setTheme(pref.theme);
             if (pref.timezone) setTimezone(pref.timezone);
           }
         })
@@ -38,7 +36,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setLoading(true);
     try {
       await apiClient.put('/api/user/preferences', {
-        theme,
         language,
         timezone,
       });
@@ -74,29 +71,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="space-y-4">
-          {/* Theme selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Moon className="h-4 w-4 text-primary" /> {t('settings.theme', 'Appearance Theme')}
-            </label>
-            <div className="grid grid-cols-3 gap-3">
-              {(['system', 'dark', 'light'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setTheme(mode)}
-                  className={`p-3 rounded-xl border text-xs font-medium capitalize flex items-center justify-center space-x-2 transition ${
-                    theme === mode
-                      ? 'border-primary bg-primary/10 text-primary font-semibold'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                  }`}
-                >
-                  {mode === 'dark' ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-                  <span>{mode}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Language selection */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">

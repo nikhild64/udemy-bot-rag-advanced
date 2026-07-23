@@ -4,14 +4,17 @@ import React, { useState } from 'react';
 import { AppLayout } from '@/shared/components/layout/AppLayout';
 import { ChatContainer } from '@/features/chat/components/ChatContainer';
 import { DashboardView } from '@/features/dashboard/components/DashboardView';
+import { LandingPage } from '@/features/landing/components/LandingPage';
 import { GlobalSearchModal } from '@/shared/components/GlobalSearchModal';
 import { KeyboardShortcutsModal } from '@/shared/components/KeyboardShortcutsModal';
 import { SettingsModal } from '@/features/settings/components/SettingsModal';
 import { I18nProvider } from '@/shared/lib/i18n-context';
 import { useUIStore } from '@/shared/lib/store';
 import { useKeyboardShortcuts } from '@/shared/hooks/useKeyboardShortcuts';
+import { useAuth } from '@clerk/nextjs';
 
 export default function Home() {
+  const { isLoaded, isSignedIn } = useAuth();
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const setCreateNotebookModalOpen = useUIStore((s) => s.setCreateNotebookModalOpen);
   const setUploadModalOpen = useUIStore((s) => s.setUploadModalOpen);
@@ -32,6 +35,10 @@ export default function Home() {
     },
     onToggleShortcutsHelp: () => setShortcutsModalOpen((prev) => !prev),
   });
+
+  if (isLoaded && !isSignedIn) {
+    return <LandingPage />;
+  }
 
   return (
     <I18nProvider>
