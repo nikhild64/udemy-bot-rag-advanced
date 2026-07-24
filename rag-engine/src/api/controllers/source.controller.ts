@@ -159,10 +159,10 @@ export async function getSourceStatusController(
   // 2. Fetch live job status from IngestionQueue
   const jobProgress = await ingestionQueue.getJobStatus(sourceId);
 
-  if (source.status === 'Ready') {
+  if (source.status === 'Ready' || (source.status as string) === 'Indexed') {
     return reply.status(200).send({
       sourceId: source.id,
-      status: 'Ready',
+      status: source.status,
       progress: 100,
       currentStage: 'Completed',
       error: null,
@@ -187,7 +187,7 @@ export async function getSourceStatusController(
   let progress = 0;
   let currentStage = 'Queued';
 
-  if ((source.status as string) === 'Ready') {
+  if ((source.status as string) === 'Ready' || (source.status as string) === 'Indexed') {
     progress = 100;
     currentStage = 'Completed';
   } else if (source.status === 'Failed') {

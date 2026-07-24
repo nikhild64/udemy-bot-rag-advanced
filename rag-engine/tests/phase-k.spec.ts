@@ -36,7 +36,7 @@ describe('Phase K — Platform Maturity & UX Services', () => {
 
     mockSourceRepo = {
       create: vi.fn().mockImplementation((data) => Promise.resolve({ id: 'src-123', status: SourceStatus.PendingUpload, ...data })),
-      findById: vi.fn().mockImplementation((id) => Promise.resolve({ id, notebookId: 'nb-123', title: 'Test PDF', displayName: 'Test PDF', type: 'PDF', status: SourceStatus.Indexed, metadata: {} })),
+      findById: vi.fn().mockImplementation((id) => Promise.resolve({ id, notebookId: 'nb-123', title: 'Test PDF', displayName: 'Test PDF', type: 'PDF', status: SourceStatus.Indexed, fileUrl: 'https://example.com/test.pdf', metadata: {} })),
       findMany: vi.fn().mockResolvedValue({ data: [], pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } }),
       update: vi.fn().mockImplementation((id, userId, data) => Promise.resolve({ id, ...data })),
       updateStatus: vi.fn().mockImplementation((id, status) => Promise.resolve({ id, status })),

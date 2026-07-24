@@ -8,12 +8,18 @@ import { SourceDeletionOrchestrator } from '../ingestion/orchestrator/SourceDele
 import { ReIndexOrchestrator } from '../ingestion/orchestrator/ReIndexOrchestrator';
 
 export class SourceService {
+  private readonly deletionOrchestrator: SourceDeletionOrchestrator;
+  private readonly reindexOrchestrator: ReIndexOrchestrator;
+
   constructor(
     private readonly sourceRepository: ISourceRepository = new PrismaSourceRepository(),
     private readonly notebookRepository: INotebookRepository = new PrismaNotebookRepository(),
-    private readonly deletionOrchestrator: SourceDeletionOrchestrator = new SourceDeletionOrchestrator(),
-    private readonly reindexOrchestrator: ReIndexOrchestrator = new ReIndexOrchestrator(),
-  ) {}
+    deletionOrchestrator?: SourceDeletionOrchestrator,
+    reindexOrchestrator?: ReIndexOrchestrator,
+  ) {
+    this.deletionOrchestrator = deletionOrchestrator ?? new SourceDeletionOrchestrator(this.sourceRepository, this.notebookRepository);
+    this.reindexOrchestrator = reindexOrchestrator ?? new ReIndexOrchestrator(this.sourceRepository, this.notebookRepository);
+  }
 
   async createSource(
     userId: string,
@@ -51,7 +57,7 @@ export class SourceService {
       mimeType: input.mimeType ?? null,
       size: input.size ?? null,
       metadata: input.metadata ?? null,
-      status: input.status ?? 'Queued',
+      status: input.status ?? SourceStatus.PendingUpload,
     });
 
     logger.info({ sourceId: source.id, notebookId: input.notebookId }, 'Created source metadata');

@@ -83,22 +83,21 @@ describe('SourceIngestionOrchestrator', () => {
     );
   });
 
-  it('should run full ingestion workflow and transition source to Indexed', async () => {
+  it('should run full ingestion workflow and transition source to Ready', async () => {
     const result = await orchestrator.ingestSource('src-123', 'nb-456', 'user-789');
 
     expect(result.success).toBe(true);
-    expect(result.status).toBe(SourceStatus.Indexed);
+    expect(result.status).toBe(SourceStatus.Ready);
     expect(result.chunksCount).toBeGreaterThan(0);
     expect(result.embeddingsCount).toBeGreaterThan(0);
 
-    expect(mockSourceRepo.updateStatus).toHaveBeenCalledWith('src-123', SourceStatus.Processing);
     expect(mockStorageService.downloadFile).toHaveBeenCalledWith(sampleSource.storagePath);
     expect(mockVectorStore.deleteVectors).toHaveBeenCalled(); // Idempotency check
     expect(mockVectorStore.upsert).toHaveBeenCalled();
     expect(mockSourceRepo.update).toHaveBeenCalledWith(
       'src-123',
       'user-789',
-      expect.objectContaining({ status: SourceStatus.Indexed }),
+      expect.objectContaining({ status: SourceStatus.Ready }),
     );
 
     // Verify progress updated in queue

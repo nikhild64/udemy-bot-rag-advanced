@@ -1,4 +1,4 @@
-export type SourceStatus = 'Uploading' | 'Uploaded' | 'Queued' | 'Downloading' | 'Extracting' | 'Normalizing' | 'Chunking' | 'Embedding' | 'Indexing' | 'Ready' | 'Deleting' | 'Deleted' | 'Failed';
+export type SourceStatus = 'PendingUpload' | 'Uploading' | 'Uploaded' | 'Queued' | 'Downloading' | 'Extracting' | 'Normalizing' | 'Chunking' | 'Embedding' | 'Indexing' | 'Ready' | 'Deleting' | 'Deleted' | 'Failed';
 
 export interface Notebook {
   id: string;
