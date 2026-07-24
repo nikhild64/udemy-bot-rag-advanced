@@ -51,6 +51,16 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const navigateTo = (path: string) => {
@@ -63,8 +73,12 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
       className="fixed inset-0 z-50 flex items-start justify-center pt-4 sm:pt-16 bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200"
       role="search"
       aria-label="Global Workspace Search"
+      onClick={onClose}
     >
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-3 sm:p-4 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[80vh]">
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-border bg-card p-3 sm:p-4 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Search Header */}
         <div className="flex items-center space-x-3 border-b border-border pb-3 px-2">
           <Search className="h-5 w-5 text-primary shrink-0" />
@@ -78,13 +92,29 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
           />
           {loading ? (
             <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
-          ) : (
-            query && (
-              <button onClick={() => setQuery('')} className="p-1 text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            )
-          )}
+          ) : query ? (
+            <button
+              onClick={() => setQuery('')}
+              className="p-1 text-muted-foreground hover:text-foreground rounded-md transition"
+              title="Clear search text"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+
+          <div className="flex items-center gap-2 border-l border-border pl-2 shrink-0">
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground bg-muted border border-border rounded">
+              ESC
+            </kbd>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition cursor-pointer"
+              title="Close Search Modal (Esc)"
+              aria-label="Close search"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
         </div>
 
         {/* Search Results Body */}
