@@ -9,10 +9,18 @@ import { Download, Radio, Play, Pause, ChevronDown, ChevronUp, Mic, Volume2, Spa
 // Types
 // ─────────────────────────────────────────────────────────────
 
+export interface PodcastLine {
+  speaker: 'Alex' | 'Jamie';
+  text: string;
+  startTime?: number;
+  endTime?: number;
+}
+
 export interface PodcastScript {
   title: string;
   synopsis: string;
-  lines: { speaker: 'Alex' | 'Jamie'; text: string }[];
+  lines: PodcastLine[];
+  audioUrl?: string;
 }
 
 interface PodcastScriptDialogProps {
@@ -23,6 +31,13 @@ interface PodcastScriptDialogProps {
 }
 
 const SPEED_OPTIONS = [1, 1.25, 1.5, 2];
+
+function formatTime(seconds: number): string {
+  if (isNaN(seconds) || seconds < 0) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
 
 // ─────────────────────────────────────────────────────────────
 // Silky-Smooth Liquid Bezier Canvas Dual Moving Waveform
@@ -246,6 +261,8 @@ export function PodcastScriptDialog({
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
 
   const [voices, setVoices] = useState<{ alexVoice: SpeechSynthesisVoice | null; jamieVoice: SpeechSynthesisVoice | null }>({
     alexVoice: null,
@@ -253,6 +270,18 @@ export function PodcastScriptDialog({
   });
 
   const activeLineRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Manage HTML5 Audio playback when script.audioUrl is provided
+  useEffect(() => {
+    if (!script?.audioUrl || !audioRef.current) return;
+    audioRef.current.playbackRate = playbackRate;
+    if (isPlaying) {
+      audioRef.current.play().catch((err) => console.warn('Audio playback error:', err));
+    } else {
+      audioRef.current.pause();
+    }
+  }, [isPlaying, playbackRate, script?.audioUrl]);
 
   // Cycle playback speed without pausing audio
   const handleCycleSpeed = (e?: React.MouseEvent) => {
@@ -261,8 +290,9 @@ export function PodcastScriptDialog({
     const nextRate = SPEED_OPTIONS[(currentIndex + 1) % SPEED_OPTIONS.length];
     setPlaybackRate(nextRate);
 
-    // Seamlessly update current active utterance rate if currently playing
-    if (isPlaying && script && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (script?.audioUrl && audioRef.current) {
+      audioRef.current.playbackRate = nextRate;
+    } else if (isPlaying && script && typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const currentLine = script.lines[activeLineIndex];
       if (currentLine) {
@@ -320,8 +350,10 @@ export function PodcastScriptDialog({
     }
   }, []);
 
-  // Handle Speech Synthesis Playback loop
+  // Handle Speech Synthesis Playback loop (ONLY when script.audioUrl is NOT present)
   useEffect(() => {
+    if (script?.audioUrl) return; // Skip Web Speech synthesis when cloud MP3 audio URL is available
+
     if (!isPlaying || !script || activeLineIndex >= script.lines.length) {
       if (activeLineIndex >= (script?.lines.length ?? 0)) {
         setIsPlaying(false);
@@ -372,6 +404,10 @@ export function PodcastScriptDialog({
     if (!isOpen) {
       setIsPlaying(false);
       setIsMinimized(false);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
@@ -388,7 +424,9 @@ export function PodcastScriptDialog({
   const togglePlay = () => {
     if (!script) return;
     if (isPlaying) {
-      window.speechSynthesis?.cancel();
+      if (!script.audioUrl && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
       setIsPlaying(false);
     } else {
       setIsPlaying(true);
@@ -398,6 +436,25 @@ export function PodcastScriptDialog({
   const handleLineClick = (idx: number) => {
     setActiveLineIndex(idx);
     setIsPlaying(true);
+
+    if (script?.audioUrl && audioRef.current) {
+      const targetLine = script.lines[idx];
+      let targetTime = 0;
+
+      if (
+        targetLine &&
+        targetLine.startTime !== undefined &&
+        typeof targetLine.startTime === 'number' &&
+        !isNaN(targetLine.startTime)
+      ) {
+        targetTime = targetLine.startTime;
+      } else if (audioRef.current.duration && !isNaN(audioRef.current.duration) && audioRef.current.duration > 0) {
+        targetTime = (idx / script.lines.length) * audioRef.current.duration;
+      }
+
+      audioRef.current.currentTime = targetTime;
+      audioRef.current.play().catch((err) => console.warn('Audio seek error:', err));
+    }
   };
 
   const handleDownload = () => {
@@ -416,79 +473,131 @@ export function PodcastScriptDialog({
 
   const currentSpeaker = script?.lines[activeLineIndex]?.speaker || 'Alex';
 
+  const audioElement = script?.audioUrl ? (
+    <audio
+      ref={audioRef}
+      src={script.audioUrl}
+      preload="auto"
+      onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+      onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
+      onTimeUpdate={(e) => {
+        const audio = e.currentTarget;
+        const currTime = audio.currentTime;
+        setCurrentTime(currTime);
+        if (audio.duration) setDuration(audio.duration);
+        if (!script?.lines?.length) return;
+
+        let matchIdx = -1;
+        const hasTimestamps = script.lines.some((l) => l.startTime !== undefined);
+
+        if (hasTimestamps) {
+          for (let i = 0; i < script.lines.length; i++) {
+            const currentLineStart = script.lines[i]?.startTime ?? 0;
+            const nextLineStart = script.lines[i + 1]?.startTime;
+
+            if (nextLineStart !== undefined) {
+              if (currTime >= currentLineStart && currTime < nextLineStart) {
+                matchIdx = i;
+                break;
+              }
+            } else {
+              if (currTime >= currentLineStart) {
+                matchIdx = i;
+                break;
+              }
+            }
+          }
+        }
+
+        if (matchIdx !== -1) {
+          setActiveLineIndex(matchIdx);
+        } else if (audio.duration && !isNaN(audio.duration) && audio.duration > 0) {
+          const ratioIdx = Math.min(
+            script.lines.length - 1,
+            Math.floor((currTime / audio.duration) * script.lines.length)
+          );
+          setActiveLineIndex(ratioIdx);
+        }
+      }}
+      onEnded={() => {
+        setIsPlaying(false);
+        setActiveLineIndex(0);
+        setCurrentTime(0);
+      }}
+    />
+  ) : null;
+
   if (!isOpen) return null;
 
-  // ── Floating Mini-Player Widget (Bottom Right Background Mode) ──
-  if (isMinimized && script) {
-    return (
-      <div className="fixed bottom-6 right-6 z-[100] bg-[#141414]/95 backdrop-blur-md border border-[#2B2B2B] shadow-2xl rounded-2xl p-3.5 flex items-center gap-3.5 text-white max-w-md w-full animate-in slide-in-from-bottom-5 duration-300">
-        <button
-          onClick={togglePlay}
-          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 shadow-md ${
-            isPlaying
-              ? currentSpeaker === 'Alex'
-                ? 'bg-blue-600 text-white hover:bg-blue-500'
-                : 'bg-amber-500 text-black hover:bg-amber-400'
-              : 'bg-blue-600 text-white hover:bg-blue-500'
-          }`}
-        >
-          {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-        </button>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold text-white truncate">{script.title}</p>
-            {isPlaying && (
-              <span
-                className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold shrink-0 ${
-                  currentSpeaker === 'Alex' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
-                }`}
-              >
-                {currentSpeaker}
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-[#A9A9A9] truncate italic mt-0.5">
-            &ldquo;{script.lines[activeLineIndex]?.text || ''}&rdquo;
-          </p>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={handleCycleSpeed}
-            className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-[10px] font-mono text-amber-400"
-          >
-            {playbackRate}x
-          </button>
-          <button
-            onClick={() => setIsMinimized(false)}
-            className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-white"
-            title="Expand Studio"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setIsMinimized(false);
-              onClose();
-            }}
-            className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-white"
-            title="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => !open && onClose()}
-      contentClassName="max-w-2xl w-full bg-[#121212] border border-[#262626] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col"
-    >
+    <>
+      {audioElement}
+      {isMinimized && script ? (
+        <div className="fixed bottom-6 right-6 z-[100] bg-[#141414]/95 backdrop-blur-md border border-[#2B2B2B] shadow-2xl rounded-2xl p-3.5 flex items-center gap-3.5 text-white max-w-md w-full animate-in slide-in-from-bottom-5 duration-300">
+          <button
+            onClick={togglePlay}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 shadow-md ${
+              isPlaying
+                ? currentSpeaker === 'Alex'
+                  ? 'bg-blue-600 text-white hover:bg-blue-500'
+                  : 'bg-amber-500 text-black hover:bg-amber-400'
+                : 'bg-blue-600 text-white hover:bg-blue-500'
+            }`}
+          >
+            {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold text-white truncate">{script.title}</p>
+              {isPlaying && (
+                <span
+                  className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold shrink-0 ${
+                    currentSpeaker === 'Alex' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
+                  }`}
+                >
+                  {currentSpeaker}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[#A9A9A9] truncate italic mt-0.5">
+              &ldquo;{script.lines[activeLineIndex]?.text || ''}&rdquo;
+            </p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={handleCycleSpeed}
+              className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-[10px] font-mono text-amber-400"
+            >
+              {playbackRate}x
+            </button>
+            <button
+              onClick={() => setIsMinimized(false)}
+              className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-white"
+              title="Expand Studio"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                setIsMinimized(false);
+                onClose();
+              }}
+              className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-white"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <Dialog
+          open={isOpen}
+          onOpenChange={(open) => !open && onClose()}
+          contentClassName="max-w-2xl w-full bg-[#121212] border border-[#262626] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col"
+        >
       {/* ── Header ── */}
       <DialogHeader className="px-6 pt-5 pb-4 border-b border-[#262626] shrink-0">
         <div className="flex items-center justify-between">
@@ -525,10 +634,10 @@ export function PodcastScriptDialog({
                   size="sm"
                   variant="outline"
                   onClick={handleDownload}
-                  className="h-8 text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50"
+                  className="h-8 w-8 p-0 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50"
+                  title="Download Transcript (.txt)"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  Download
                 </Button>
               </>
             )}
@@ -547,19 +656,69 @@ export function PodcastScriptDialog({
           onCycleSpeed={handleCycleSpeed}
         />
 
+        {/* Audio Seek Bar Slider & Timestamp Counters */}
+        {script?.audioUrl && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 rounded-xl border border-white/10 shadow-inner">
+            <span className="text-xs font-mono font-medium text-amber-400/90 w-10 text-right shrink-0">
+              {formatTime(currentTime)}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              step={0.1}
+              value={currentTime}
+              onChange={(e) => {
+                const newTime = parseFloat(e.target.value);
+                setCurrentTime(newTime);
+                if (audioRef.current) {
+                  audioRef.current.currentTime = newTime;
+                }
+              }}
+              className="flex-1 h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300 transition-all"
+            />
+            <span className="text-xs font-mono font-medium text-[#A9A9A9] w-10 shrink-0">
+              {formatTime(duration)}
+            </span>
+          </div>
+        )}
+
+
+
         {/* ── Transcript Accordion ── */}
         {script && (
           <div className="border border-white/10 rounded-2xl overflow-hidden bg-black/30">
-            <button
-              onClick={() => setIsAccordionOpen(!isAccordionOpen)}
-              className="w-full flex items-center justify-between px-5 py-3 text-xs font-semibold text-[#A9A9A9] hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
-            >
-              <div className="flex items-center gap-2">
+            <div className="w-full flex items-center justify-between px-5 py-3 text-xs font-semibold text-[#A9A9A9] bg-white/5 hover:bg-white/10 transition-colors">
+              <button
+                type="button"
+                onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+                className="flex items-center gap-2 flex-1 text-left"
+              >
                 <Mic className="w-3.5 h-3.5 text-amber-400" />
                 <span>Full Podcast Transcript</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload();
+                  }}
+                  className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-amber-400 transition-colors"
+                  title="Download Transcript (.txt)"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+                  className="p-0.5 text-[#A9A9A9] hover:text-white"
+                >
+                  {isAccordionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
               </div>
-              {isAccordionOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
+            </div>
 
             {/* Accordion Content with Fixed Height & Scrollbar */}
             {isAccordionOpen && (
@@ -597,5 +756,7 @@ export function PodcastScriptDialog({
         )}
       </div>
     </Dialog>
-  );
+  )}
+</>
+);
 }

@@ -3,8 +3,11 @@ import { ChatProviderFactory } from '@/providers/chat/ChatProviderFactory';
 import { ChatRole } from '@/types';
 import { NotebookService } from '@/services/NotebookService';
 import { SourceService } from '@/services/SourceService';
+import { audioStorageService } from '@/services/audio-storage.service';
+import { TTSServiceFactory } from '@/services/tts.service';
 import { UnauthorizedError, ValidationError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
+import fs from 'fs';
 
 // ─────────────────────────────────────────────
 // Shared helpers
@@ -51,11 +54,39 @@ export async function getNotebookArtifactsController(
   const settings = (notebook.settings as Record<string, any>) || {};
   const podcast = settings.podcast || { status: 'IDLE', data: null, error: null };
   const learningPath = settings.learningPath || { status: 'IDLE', data: null, error: null };
+  const ttsProvider = (process.env.TTS_PROVIDER || 'web_speech').toLowerCase();
 
   return reply.status(200).send({
+    ttsProvider,
     podcast,
     learningPath,
   });
+}
+
+// ─────────────────────────────────────────────
+// Stream Stored Local Podcast Audio MP3
+// ─────────────────────────────────────────────
+
+export async function getPodcastAudioStreamController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { notebookId } = request.params as { notebookId: string };
+  if (!notebookId) throw new ValidationError('Notebook ID is required');
+
+  const localAudioPath = audioStorageService.getLocalAudioPath(notebookId);
+  if (!localAudioPath || !fs.existsSync(localAudioPath)) {
+    return reply.status(404).send({ error: 'Audio file not found' });
+  }
+
+  const stat = fs.statSync(localAudioPath);
+  const stream = fs.createReadStream(localAudioPath);
+
+  reply
+    .header('Content-Type', 'audio/mpeg')
+    .header('Content-Length', stat.size)
+    .header('Accept-Ranges', 'bytes')
+    .send(stream);
 }
 
 // ─────────────────────────────────────────────
@@ -125,6 +156,11 @@ export async function generatePodcastController(
     return reply.status(200).send({ status: 'GENERATING' });
   }
 
+  // If force=true (Refresh), delete old podcast MP3 file from storage
+  if (force) {
+    await audioStorageService.deletePodcastAudio(notebookId);
+  }
+
   // Update DB status to GENERATING
   const updatedSettings = {
     ...settings,
@@ -157,6 +193,29 @@ export async function generatePodcastController(
       const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       const podcastData = JSON.parse(cleaned);
 
+      // Synthesize audio MP3 if cloud TTS provider is configured — wait for completion before READY
+      const ttsProvider = (process.env.TTS_PROVIDER || 'web_speech').toLowerCase();
+      if (ttsProvider !== 'web_speech') {
+        try {
+          const ttsService = TTSServiceFactory.create();
+          logger.info({ notebookId, ttsProvider }, '[Generate] Starting audio synthesis — READY will be set after MP3 is complete');
+          const ttsResult = await ttsService.generateFullPodcastAudio(podcastData.lines);
+          if (ttsResult) {
+            const audioUrl = await audioStorageService.uploadPodcastAudio(notebookId, ttsResult.audioBuffer);
+            podcastData.audioUrl = audioUrl;
+            podcastData.lines = ttsResult.lines;
+            logger.info(
+              { notebookId, audioUrl, lineCount: ttsResult.lines.length },
+              '[Generate] Audio synthesis complete — MP3 & line timestamps stored',
+            );
+          } else {
+            logger.warn({ notebookId }, '[Generate] TTS returned null buffer — no audioUrl set, Web Speech fallback will be used');
+          }
+        } catch (ttsErr: any) {
+          logger.warn({ error: ttsErr.message }, '[Generate] Audio synthesis failed — READY saved without audioUrl, Web Speech fallback');
+        }
+      }
+
       const latestNotebook = await notebookService.getNotebook(notebookId, userId);
       const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
       await notebookService.updateNotebook(notebookId, userId, {
@@ -170,7 +229,7 @@ export async function generatePodcastController(
           },
         },
       });
-      logger.info({ notebookId }, '[Generate] Background podcast script generation completed successfully');
+      logger.info({ notebookId, hasAudio: !!podcastData.audioUrl }, '[Generate] Podcast saved as READY');
     } catch (err: any) {
       logger.error({ err, notebookId }, '[Generate] Background podcast script generation failed');
       try {

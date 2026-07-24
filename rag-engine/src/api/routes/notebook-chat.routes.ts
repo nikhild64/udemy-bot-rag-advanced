@@ -9,6 +9,7 @@ import {
   generatePodcastController,
   generateLearningPathController,
   getNotebookArtifactsController,
+  getPodcastAudioStreamController,
 } from '../controllers/generate.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 
@@ -77,5 +78,11 @@ export async function notebookChatRoutes(app: FastifyInstance): Promise<void> {
     '/api/notebooks/:notebookId/generate/learning-path',
     { preHandler: [requireAuth] },
     generateLearningPathController,
+  );
+
+  // Stream stored local podcast audio MP3
+  app.get(
+    '/api/notebooks/:notebookId/podcast/audio.mp3',
+    getPodcastAudioStreamController,
   );
 }
