@@ -43,7 +43,7 @@ export class AudioStorageService {
 
           if (data?.publicUrl) {
             logger.info({ notebookId, publicUrl: data.publicUrl }, '[AudioStorage] Uploaded MP3 to Supabase Storage');
-            return data.publicUrl;
+            return `${data.publicUrl}?t=${Date.now()}`;
           }
         } else {
           logger.warn({ error: error.message }, '[AudioStorage] Supabase upload failed, falling back to local disk');
@@ -58,9 +58,9 @@ export class AudioStorageService {
     await fs.promises.writeFile(localFilePath, audioBuffer);
     logger.info({ notebookId, localFilePath }, '[AudioStorage] Saved podcast MP3 to local disk');
 
-    // Return backend stream endpoint URL
+    // Return backend stream endpoint URL with cache-busting query param
     const backendUrl = process.env.FRONTEND_ORIGIN || 'http://localhost:5000';
-    return `${backendUrl}/api/notebooks/${notebookId}/podcast/audio.mp3`;
+    return `${backendUrl}/api/notebooks/${notebookId}/podcast/audio.mp3?t=${Date.now()}`;
   }
 
   /**

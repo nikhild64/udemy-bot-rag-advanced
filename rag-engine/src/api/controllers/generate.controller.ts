@@ -141,7 +141,7 @@ Hosts:
 
 Episode Structure & Flow:
 1. **Engaging Hook & Real-World Framing (Opening)**:
-   - Start with a warm, inviting welcome from Alex: "Welcome to the ChaibookLM Podcast! I'm Alex, and with me is Jamie..."
+   - Start with a warm, inviting welcome from Alex: "Welcome to today's Podcast! I'm Alex, and with me is Jamie..."
    - Alex should follow up by asking an engaging question like: "So Jamie, what are we diving into today?" or "What's in this notebook?" (Make the copy natural and exciting).
    - Jamie introduces the core topic with a mind-boggling fact, surprising stat, or relatable real-life scenario from the material.
 2. **Progressive Difficulty Curve (Step-by-Step Escalation)**:

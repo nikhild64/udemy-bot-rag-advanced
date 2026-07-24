@@ -120,6 +120,7 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
             <SourceViewer
               sourceId={activeSourceId}
               timestamp={activeSourceId === initialSourceId ? activeTimestamp : undefined}
+              className="h-full max-h-none"
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">

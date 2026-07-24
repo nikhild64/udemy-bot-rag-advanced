@@ -11,6 +11,7 @@ interface SourceViewerProps {
   citation?: Citation;
   sourceId?: string;
   timestamp?: string | number;
+  className?: string;
 }
 
 export function parseTimestampToSeconds(ts?: string | number | null): number {
@@ -58,7 +59,7 @@ export function parseTimestampToSeconds(ts?: string | number | null): number {
   return 0;
 }
 
-export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProps) {
+export function SourceViewer({ citation, sourceId, timestamp, className }: SourceViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewData, setViewData] = useState<any>(null);
@@ -162,6 +163,8 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
       : String(rawTimestamp)
   ) : null;
 
+  const hasCitationExcerpt = !!(citation?.excerpt || citation?.content || citation?.snippet);
+
   const getDomainName = (rawUrl?: string) => {
     if (!rawUrl) return 'Website';
     try {
@@ -178,7 +181,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
   };
 
   return (
-    <div className="flex flex-col h-[70vh] max-h-[800px] bg-background">
+    <div className={cn("flex flex-col h-[70vh] max-h-[800px] bg-background", className)}>
       {/* Header bar */}
       <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between shrink-0 bg-muted/10 gap-2">
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
@@ -248,7 +251,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
             />
           </div>
         ) : activeMode === 'media' && isPdf && url ? (
-          <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className={cn("grid h-full min-h-0 grid-cols-1", hasCitationExcerpt ? "lg:grid-cols-[minmax(0,1fr)_320px]" : "lg:grid-cols-1")}>
             <div className="min-h-[360px] bg-muted/10 p-2 lg:min-h-0">
               <iframe
                 src={`${url}${pageNumber ? `#page=${pageNumber}` : ''}`}
@@ -256,26 +259,28 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
                 title={`PDF viewer${pageNumber ? ` — page ${pageNumber}` : ''}`}
               />
             </div>
-            <div className="overflow-y-auto border-t border-border/60 bg-card p-4 lg:border-l lg:border-t-0">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Cited passage</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {pageNumber ? `Located on page ${pageNumber}` : 'Matched in the extracted document text'}
-                  </p>
+            {hasCitationExcerpt && (
+              <div className="overflow-y-auto border-t border-border/60 bg-card p-4 lg:border-l lg:border-t-0">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Cited passage</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {pageNumber ? `Located on page ${pageNumber}` : 'Matched in the extracted document text'}
+                    </p>
+                  </div>
+                  <FileText className="h-4 w-4 text-primary/70" />
                 </div>
-                <FileText className="h-4 w-4 text-primary/70" />
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-[13px] leading-6 text-foreground shadow-inner">
+                  {highlightExcerpt(citation?.excerpt || citation?.content || citation?.snippet || '', rawText || '')}
+                </div>
+                <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                  The PDF is positioned to the cited page. The highlighted passage is the extracted text used for this answer.
+                </p>
               </div>
-              <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-[13px] leading-6 text-foreground shadow-inner">
-                {highlightExcerpt(citation?.excerpt || citation?.content || citation?.snippet || '', rawText || '')}
-              </div>
-              <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-                The PDF is positioned to the cited page. The highlighted passage is the extracted text used for this answer.
-              </p>
-            </div>
+            )}
           </div>
         ) : rawText ? (
-          <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className={cn("grid min-h-full grid-cols-1", hasCitationExcerpt ? "lg:grid-cols-[minmax(0,1fr)_320px]" : "lg:grid-cols-1")}>
             <div className="min-w-0 bg-background p-6 sm:p-8">
               <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
@@ -284,21 +289,23 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
                 <span className="text-xs text-muted-foreground">{rawText.split(/\s+/).length} words</span>
               </div>
               <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground selection:bg-primary/20">
-                {highlightFullText(citation?.excerpt || citation?.content || citation?.snippet || '', rawText)}
+                {hasCitationExcerpt ? highlightFullText(citation?.excerpt || citation?.content || citation?.snippet || '', rawText) : rawText}
               </div>
             </div>
-            <aside className="border-t border-border/60 bg-card p-4 lg:sticky lg:top-0 lg:h-fit lg:max-h-[70vh] lg:overflow-y-auto lg:border-l lg:border-t-0">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Cited excerpt</p>
-                  <p className="mt-1 text-xs text-muted-foreground">The passage used for this answer</p>
+            {hasCitationExcerpt && (
+              <aside className="border-t border-border/60 bg-card p-4 lg:sticky lg:top-0 lg:h-fit lg:max-h-[70vh] lg:overflow-y-auto lg:border-l lg:border-t-0">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Cited excerpt</p>
+                    <p className="mt-1 text-xs text-muted-foreground">The passage used for this answer</p>
+                  </div>
+                  <FileText className="h-4 w-4 text-primary/70" />
                 </div>
-                <FileText className="h-4 w-4 text-primary/70" />
-              </div>
-              <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 font-mono text-[12px] leading-6 text-foreground shadow-inner">
-                {citation?.excerpt || citation?.content || citation?.snippet || 'No excerpt was returned for this citation.'}
-              </div>
-            </aside>
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 font-mono text-[12px] leading-6 text-foreground shadow-inner">
+                  {citation?.excerpt || citation?.content || citation?.snippet || 'No excerpt was returned for this citation.'}
+                </div>
+              </aside>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-3">

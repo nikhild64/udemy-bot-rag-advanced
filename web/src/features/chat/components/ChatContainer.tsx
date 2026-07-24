@@ -8,6 +8,7 @@ import { useSourcesQuery, useSourceStatusQuery } from '@/features/sources/hooks/
 import { SourceStatus } from '@/shared/types';
 import { MessageList } from './MessageList';
 import { Send, Sparkles, BookOpen, Upload, Loader2, Lock } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function ChatContainer() {
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
@@ -16,7 +17,7 @@ export function ChatContainer() {
   const [inputQuery, setInputQuery] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { data: messages = [] } = useMessagesQuery(activeNotebookId);
+  const { data: messages = [], isLoading: isLoadingMessages } = useMessagesQuery(activeNotebookId);
   const deleteMutation = useDeleteMessageMutation(activeNotebookId);
   const { data: sources = [], isLoading: isLoadingSources } = useSourcesQuery(activeNotebookId);
   const { sendMessage, isStreaming, streamingContent, streamingCitations } = useChat(activeNotebookId);
@@ -116,7 +117,33 @@ export function ChatContainer() {
       `}} />
       <div className="flex-1 flex flex-col h-full bg-[#121212] relative overflow-hidden text-white">
         {/* Main Content Area */}
-        {!hasSources && !isLoadingSources ? (
+        {isLoadingSources || isLoadingMessages ? (
+          /* Loading Skeleton */
+          <div className="flex-1 flex flex-col p-6 space-y-8 overflow-hidden bg-[#121212]">
+            <div className="flex items-start gap-4 opacity-50">
+              <Skeleton className="w-8 h-8 rounded-full shrink-0 bg-[#2B2B2B]" />
+              <div className="space-y-3 flex-1 max-w-2xl">
+                <Skeleton className="h-4 w-[250px] rounded-lg bg-[#2B2B2B]" />
+                <Skeleton className="h-4 w-full rounded-lg bg-[#2B2B2B]" />
+                <Skeleton className="h-4 w-[80%] rounded-lg bg-[#2B2B2B]" />
+              </div>
+            </div>
+            <div className="flex items-start gap-4 justify-end opacity-50">
+              <div className="space-y-3 flex-1 max-w-xl flex flex-col items-end">
+                <Skeleton className="h-4 w-[200px] rounded-lg bg-[#2B2B2B]" />
+                <Skeleton className="h-4 w-[300px] rounded-lg bg-[#2B2B2B]" />
+              </div>
+              <Skeleton className="w-8 h-8 rounded-full shrink-0 bg-[#2B2B2B]" />
+            </div>
+            <div className="flex items-start gap-4 opacity-50">
+              <Skeleton className="w-8 h-8 rounded-full shrink-0 bg-[#2B2B2B]" />
+              <div className="space-y-3 flex-1 max-w-2xl">
+                <Skeleton className="h-4 w-[300px] rounded-lg bg-[#2B2B2B]" />
+                <Skeleton className="h-24 w-full rounded-xl bg-[#2B2B2B]" />
+              </div>
+            </div>
+          </div>
+        ) : !hasSources ? (
           /* Empty State: No Sources Added */
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#121212]">
             <div className="max-w-md w-full p-8 rounded-2xl bg-[#1A1A1A] border border-[#2B2B2B] shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
