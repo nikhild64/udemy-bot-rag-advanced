@@ -31,4 +31,25 @@ export class PrismaMessageRepository implements IMessageRepository {
     });
     return result.count;
   }
+
+  async deleteFromMessageId(messageId: string, notebookId: string): Promise<number> {
+    const targetMessage = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!targetMessage || targetMessage.notebookId !== notebookId) {
+      return 0;
+    }
+
+    const result = await this.prisma.message.deleteMany({
+      where: {
+        notebookId,
+        createdAt: {
+          gte: targetMessage.createdAt,
+        },
+      },
+    });
+
+    return result.count;
+  }
 }

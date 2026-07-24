@@ -38,4 +38,13 @@ export const chatApi = {
       onError
     );
   },
+
+  deleteMessageAndSubsequent: async (
+    notebookId: string,
+    messageId: string,
+  ): Promise<{ success: boolean; deletedCount: number }> => {
+    return apiClient.delete<{ success: boolean; deletedCount: number }>(
+      `/api/notebooks/${notebookId}/messages/${messageId}`,
+    );
+  },
 };

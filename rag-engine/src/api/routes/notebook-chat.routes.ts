@@ -3,6 +3,7 @@ import {
   postNotebookChatController,
   postNotebookChatStreamController,
   getNotebookMessagesController,
+  deleteNotebookMessageController,
 } from '../controllers/notebook-chat.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 
@@ -41,5 +42,12 @@ export async function notebookChatRoutes(app: FastifyInstance): Promise<void> {
     '/api/v1/notebooks/:id/messages',
     { preHandler: [requireAuth] },
     getNotebookMessagesController,
+  );
+
+  // Delete message and all subsequent messages
+  app.delete(
+    '/api/notebooks/:notebookId/messages/:messageId',
+    { preHandler: [requireAuth] },
+    deleteNotebookMessageController,
   );
 }

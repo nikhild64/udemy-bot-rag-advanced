@@ -230,7 +230,7 @@ describe('VectorStore Layer Implementation Tests', () => {
         await store.upsert([sampleChunk], [vector]);
 
         expect(mockQdrantClient.upsert).toHaveBeenCalledWith('test-collection', {
-          wait: true,
+          wait: false,
           points: [
             {
               id: expect.any(String),

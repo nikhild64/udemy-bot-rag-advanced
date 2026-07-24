@@ -104,4 +104,29 @@ export class MessageService {
     logger.info({ notebookId, count }, 'Notebook messages cleared');
     return count;
   }
+
+  /**
+   * Deletes a specific message and all messages in the notebook created after it.
+   */
+  public async deleteMessageAndSubsequent(
+    messageId: string,
+    notebookId: string,
+    userId: string,
+  ): Promise<number> {
+    if (!messageId || !notebookId || !userId) {
+      throw new ValidationError('messageId, notebookId, and userId are required');
+    }
+
+    const notebook = await this.notebookRepository.findById(notebookId);
+    if (!notebook) {
+      throw new NotFoundError(`Notebook with ID ${notebookId} not found`);
+    }
+    if (notebook.userId !== userId) {
+      throw new UnauthorizedError('Unauthorized access to this notebook');
+    }
+
+    const count = await this.messageRepository.deleteFromMessageId(messageId, notebookId);
+    logger.info({ messageId, notebookId, count }, 'Deleted message and all subsequent messages');
+    return count;
+  }
 }

@@ -26,15 +26,18 @@ export class EmbeddingService implements IEmbeddingService {
   private _provider: EmbeddingProvider | undefined;
   private readonly validator: IEmbeddingValidator;
   private readonly batchSize: number;
+  private readonly concurrency: number;
 
   constructor(
     provider?: EmbeddingProvider,
     validator?: IEmbeddingValidator,
     batchSize?: number,
+    concurrency?: number,
   ) {
     this._provider = provider;
     this.validator = validator ?? new EmbeddingValidator();
-    this.batchSize = batchSize ?? config.embeddings.batchSize ?? 50;
+    this.batchSize = batchSize ?? config.embeddings.batchSize ?? 100;
+    this.concurrency = concurrency ?? config.embeddings.concurrency ?? 4;
   }
 
   private getProvider(): EmbeddingProvider {
@@ -91,66 +94,74 @@ export class EmbeddingService implements IEmbeddingService {
       batches.push(chunks.slice(i, i + this.batchSize) as Chunk[]);
     }
 
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      const batch = batches[batchIndex] ?? [];
-      const validBatchChunks: Chunk[] = [];
+    const concurrency = this.concurrency;
 
-      for (const chunk of batch) {
-        const valRes = this.validator.validateChunkBeforeEmbed(chunk);
-        if (!valRes.valid) {
-          failedChunksCount++;
-          for (const err of valRes.errors) {
-            errors.push(err);
-          }
-        } else {
-          validBatchChunks.push(chunk);
-        }
-      }
+    for (let waveIndex = 0; waveIndex < batches.length; waveIndex += concurrency) {
+      const waveBatches = batches.slice(waveIndex, waveIndex + concurrency);
 
-      if (validBatchChunks.length === 0) {
-        continue;
-      }
+      await Promise.all(
+        waveBatches.map(async (batch, relativeIdx) => {
+          const batchIndex = waveIndex + relativeIdx;
+          const validBatchChunks: Chunk[] = [];
 
-      const texts = validBatchChunks.map((c) => c.text);
-      try {
-        const vectors = await provider.embed(texts);
-
-        for (let i = 0; i < validBatchChunks.length; i++) {
-          const chunk = validBatchChunks[i]!;
-          const vector = vectors[i];
-
-          const vecValRes = this.validator.validateEmbeddingVector(chunk, vector, expectedDimension);
-          if (!vecValRes.valid) {
-            failedChunksCount++;
-            for (const err of vecValRes.errors) {
-              errors.push(err);
+          for (const chunk of batch) {
+            const valRes = this.validator.validateChunkBeforeEmbed(chunk);
+            if (!valRes.valid) {
+              failedChunksCount++;
+              for (const err of valRes.errors) {
+                errors.push(err);
+              }
+            } else {
+              validBatchChunks.push(chunk);
             }
-          } else if (vector) {
-            const embeddedChunk: EmbeddedChunk = {
-              ...chunk,
-              embedding: vector,
-              embeddingModel,
-              embeddingDimension: vector.length,
-              providerName,
-              provider: providerName,
-            };
-            embeddedChunks.push(embeddedChunk);
           }
-        }
 
-        logger.info(
-          { courseId, batchIndex: batchIndex + 1, totalBatches: batches.length, batchSize: validBatchChunks.length },
-          'Batch processed',
-        );
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error(
-          { courseId, batchIndex: batchIndex + 1, err: errorMessage },
-          'Batch embedding generation failed',
-        );
-        failedChunksCount += validBatchChunks.length;
-        errors.push(`Batch ${batchIndex + 1} failed: ${errorMessage}`);
-      }
+          if (validBatchChunks.length === 0) {
+            return;
+          }
+
+          const texts = validBatchChunks.map((c) => c.text);
+          try {
+            const vectors = await provider.embed(texts);
+
+            for (let i = 0; i < validBatchChunks.length; i++) {
+              const chunk = validBatchChunks[i]!;
+              const vector = vectors[i];
+
+              const vecValRes = this.validator.validateEmbeddingVector(chunk, vector, expectedDimension);
+              if (!vecValRes.valid) {
+                failedChunksCount++;
+                for (const err of vecValRes.errors) {
+                  errors.push(err);
+                }
+              } else if (vector) {
+                const embeddedChunk: EmbeddedChunk = {
+                  ...chunk,
+                  embedding: vector,
+                  embeddingModel,
+                  embeddingDimension: vector.length,
+                  providerName,
+                  provider: providerName,
+                };
+                embeddedChunks.push(embeddedChunk);
+              }
+            }
+
+            logger.info(
+              { courseId, batchIndex: batchIndex + 1, totalBatches: batches.length, batchSize: validBatchChunks.length },
+              'Batch processed',
+            );
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error(
+              { courseId, batchIndex: batchIndex + 1, err: errorMessage },
+              'Batch embedding generation failed',
+            );
+            failedChunksCount += validBatchChunks.length;
+            errors.push(`Batch ${batchIndex + 1} failed: ${errorMessage}`);
+          }
+        }),
+      );
     }
 
     const durationMs = Date.now() - startTime;

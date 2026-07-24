@@ -19,7 +19,7 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
 
   const title = citation.sourceTitle || citation.title || `Source ${index + 1}`;
-  let rawExcerpt = citation.excerpt || citation.content || citation.snippet || '';
+  let rawExcerpt = citation.excerpt || citation.content || (citation as any).snippet || '';
   const page = citation.pageNumber || citation.page;
   
   // Extract timestamp like [14:32] or [01:14:32] from snippet if present

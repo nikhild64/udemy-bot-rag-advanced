@@ -144,13 +144,13 @@ export class QdrantVectorStore implements VectorStore {
     });
 
     const startTime = Date.now();
-    const BATCH_SIZE = 100;
+    const BATCH_SIZE = 500;
 
     try {
       for (let i = 0; i < points.length; i += BATCH_SIZE) {
         const batch = points.slice(i, i + BATCH_SIZE);
         await this.client.upsert(name, {
-          wait: true,
+          wait: false,
           points: batch,
         });
       }

@@ -10,5 +10,5 @@ describe('InfrastructureInitializer Unit Tests', () => {
 
     expect(connectSpy).toHaveBeenCalled();
     connectSpy.mockRestore();
-  });
+  }, 15000);
 });

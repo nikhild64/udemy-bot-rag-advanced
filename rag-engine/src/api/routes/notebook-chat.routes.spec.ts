@@ -154,4 +154,27 @@ describe('Notebook Chat Routes', () => {
       );
     });
   });
+
+  describe('DELETE /api/notebooks/:notebookId/messages/:messageId', () => {
+    it('should delete specified message and all subsequent messages', async () => {
+      mockMessageService.deleteMessageAndSubsequent = vi.fn().mockResolvedValue(3);
+
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/api/notebooks/nb_123/messages/msg_target',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        success: true,
+        deletedCount: 3,
+        message: 'Deleted message and 2 subsequent messages',
+      });
+      expect(mockMessageService.deleteMessageAndSubsequent).toHaveBeenCalledWith(
+        'msg_target',
+        'nb_123',
+        'user_test_123',
+      );
+    });
+  });
 });

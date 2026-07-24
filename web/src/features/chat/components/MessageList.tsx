@@ -13,6 +13,7 @@ interface MessageListProps {
   streamingContent: string;
   streamingCitations: Citation[];
   onSendMessage: (query: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
 export function MessageList({
@@ -21,6 +22,7 @@ export function MessageList({
   streamingContent,
   streamingCitations,
   onSendMessage,
+  onDeleteMessage,
 }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -65,7 +67,7 @@ export function MessageList({
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {messages.map((message) => (
-        <MessageItem key={message.id} message={message} />
+        <MessageItem key={message.id} message={message} onDelete={onDeleteMessage} />
       ))}
 
       {/* Live Streaming Response */}

@@ -130,4 +130,5 @@ export interface IMessageRepository {
   create(data: CreateMessageInput): Promise<Message>;
   findByNotebookId(notebookId: string, limit?: number): Promise<Message[]>;
   deleteByNotebookId(notebookId: string): Promise<number>;
+  deleteFromMessageId(messageId: string, notebookId: string): Promise<number>;
 }

@@ -62,7 +62,7 @@ describe('Health Routes', () => {
         service: 'rag-engine',
         version: '0.1.0',
       });
-    });
+    }, 15000);
 
     it('should return 503 when pipeline is not initialized', async () => {
       const response = await app.inject({

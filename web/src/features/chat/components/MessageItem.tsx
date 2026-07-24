@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Message } from '@/shared/types';
 import { MarkdownRenderer } from '@/components/markdown-renderer';
 import { CitationCard } from './CitationCard';
-import { Bot, User, Copy, Check, RotateCcw, Sparkles } from 'lucide-react';
+import { Bot, User, Copy, Check, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -12,9 +12,10 @@ import { cn } from '@/lib/utils';
 interface MessageItemProps {
   message: Message;
   onRetry?: (content: string) => void;
+  onDelete?: (messageId: string) => void;
 }
 
-export function MessageItem({ message, onRetry }: MessageItemProps) {
+export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const isAssistant = message.role?.toLowerCase() === 'assistant';
 
@@ -28,7 +29,7 @@ export function MessageItem({ message, onRetry }: MessageItemProps) {
   return (
     <div
       className={cn(
-        'flex gap-3 p-4 rounded-2xl transition-colors',
+        'group relative flex gap-3 p-4 rounded-2xl transition-colors',
         isAssistant ? 'bg-card/70 border border-border/70 shadow-2xs' : 'bg-primary/5 ml-8 border border-primary/10'
       )}
     >
@@ -54,30 +55,43 @@ export function MessageItem({ message, onRetry }: MessageItemProps) {
             </span>
           </div>
 
-          {isAssistant && message.content && (
-            <div className="flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                onClick={handleCopy}
-                title="Copy response"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-              </Button>
-              {onRetry && (
+          <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+            {isAssistant && message.content && (
+              <>
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                  onClick={() => onRetry(message.content)}
-                  title="Retry response"
+                  onClick={handleCopy}
+                  title="Copy response"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                 </Button>
-              )}
-            </div>
-          )}
+                {onRetry && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    onClick={() => onRetry(message.content)}
+                    title="Retry response"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+              </>
+            )}
+            {onDelete && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                onClick={() => onDelete(message.id)}
+                title="Delete message and all subsequent messages"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Text / Markdown */}
