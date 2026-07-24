@@ -59,38 +59,58 @@ export function Header({
     router.push('/');
   };
 
+  const mobileSidebarOpen = useUIStore((s) => s.mobileSidebarOpen);
+  const toggleMobileSidebar = useUIStore((s) => s.toggleMobileSidebar);
+  const mobileSourcesPanelOpen = useUIStore((s) => s.mobileSourcesPanelOpen);
+  const toggleMobileSourcesPanel = useUIStore((s) => s.toggleMobileSourcesPanel);
+
   return (
-    <header className="h-14 border-b border-border bg-card/50 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
+    <header className="h-14 border-b border-border bg-card/50 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between shrink-0">
       {/* Left section: Sidebar toggle & Notebook info + actions */}
-      <div className="flex items-center gap-3 min-w-0">
-        {!hideSidebarToggle && !sidebarOpen && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            onClick={toggleSidebar}
-            title="Open Navigation Sidebar"
-          >
-            <PanelLeft className="w-4 h-4" />
-          </Button>
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {!hideSidebarToggle && (
+          <>
+            {/* Desktop toggle button (shows when sidebar collapsed) */}
+            {!sidebarOpen && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="hidden md:flex h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+                onClick={toggleSidebar}
+                title="Open Navigation Sidebar"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </Button>
+            )}
+            {/* Mobile toggle button (always available on mobile) */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="flex md:hidden h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+              onClick={toggleMobileSidebar}
+              title="Open Navigation Sidebar"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </Button>
+          </>
         )}
 
-        {(hideSidebarToggle || !sidebarOpen) && (
-          <div
-            onClick={handleGoHome}
-            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition shrink-0"
-            title="Go to Dashboard"
-          >
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">ChaibookLM</span>
-          </div>
-        )}
+        <div
+          onClick={handleGoHome}
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition shrink-0"
+          title="Go to Dashboard"
+        >
+          <Sparkles className="w-4 h-4 text-primary shrink-0" />
+          <span className={`text-sm font-semibold text-foreground ${notebook && !hideNotebookInfo ? 'hidden sm:inline' : 'inline'}`}>
+            ChaibookLM
+          </span>
+        </div>
 
         {!hideNotebookInfo && notebook && (
-          <div className={`flex items-center gap-2 min-w-0 ${!sidebarOpen ? 'border-l border-border/50 pl-3' : ''}`}>
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 border-l border-border/50 pl-2 sm:pl-3">
             <BookOpen className="w-4 h-4 text-primary shrink-0" />
-            <h1 className="text-sm font-semibold text-foreground truncate">{notebook.title}</h1>
-            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 hidden sm:inline-flex">
+            <h1 className="text-xs sm:text-sm font-semibold text-foreground truncate max-w-[120px] sm:max-w-[200px] md:max-w-xs">{notebook.title}</h1>
+            <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 hidden lg:inline-flex">
               Notebook
             </Badge>
 
@@ -101,7 +121,7 @@ export function Header({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
                   title="Notebook Options"
                 >
                   <MoreVertical className="w-4 h-4" />
@@ -145,18 +165,32 @@ export function Header({
       </div>
 
       {/* Right section: Sources toggle, Settings, User Profile */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {!hideSourcesToggle && activeNotebookId && (
-          <Button
-            size="sm"
-            variant={sourcesPanelOpen ? 'secondary' : 'ghost'}
-            className="h-8 text-xs gap-1.5"
-            onClick={toggleSourcesPanel}
-            title="Toggle Knowledge Sources Panel"
-          >
-            <PanelRight className="w-4 h-4" />
-            <span className="hidden sm:inline">Sources</span>
-          </Button>
+          <>
+            {/* Desktop Sources Toggle */}
+            <Button
+              size="sm"
+              variant={sourcesPanelOpen ? 'secondary' : 'ghost'}
+              className="hidden md:flex h-8 text-xs gap-1.5"
+              onClick={toggleSourcesPanel}
+              title="Toggle Knowledge Sources Panel"
+            >
+              <PanelRight className="w-4 h-4" />
+              <span>Sources</span>
+            </Button>
+            {/* Mobile Sources Toggle */}
+            <Button
+              size="sm"
+              variant={mobileSourcesPanelOpen ? 'secondary' : 'ghost'}
+              className="flex md:hidden h-8 text-xs gap-1.5 px-2"
+              onClick={toggleMobileSourcesPanel}
+              title="Toggle Knowledge Sources Panel"
+            >
+              <PanelRight className="w-4 h-4" />
+              <span className="hidden xs:inline text-[11px]">Sources</span>
+            </Button>
+          </>
         )}
 
         {isSignedIn && adminStatus?.data?.isAdmin && (

@@ -145,8 +145,8 @@ export function ChatContainer() {
           </div>
         ) : !hasSources ? (
           /* Empty State: No Sources Added */
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#121212]">
-            <div className="max-w-md w-full p-8 rounded-2xl bg-[#1A1A1A] border border-[#2B2B2B] shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 text-center bg-[#121212]">
+            <div className="max-w-md w-full p-6 sm:p-8 rounded-2xl bg-[#1A1A1A] border border-[#2B2B2B] shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
               <div className="p-4 rounded-2xl bg-[#F2A23A]/10 text-[#F2A23A] border border-[#F2A23A]/20">
                 <BookOpen className="w-8 h-8" />
               </div>
@@ -167,8 +167,8 @@ export function ChatContainer() {
           </div>
         ) : isIndexingSources ? (
           /* Indexing State: At least one source is still processing */
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#121212]">
-            <div className="max-w-md w-full p-8 rounded-2xl bg-[#1A1A1A] border border-[#2B2B2B] shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 text-center bg-[#121212]">
+            <div className="max-w-md w-full p-6 sm:p-8 rounded-2xl bg-[#1A1A1A] border border-[#2B2B2B] shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
               <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
                 <Loader2 className="w-8 h-8 animate-spin" />
               </div>

@@ -16,12 +16,12 @@ export function Dialog({ open, onOpenChange, children, contentClassName }: Dialo
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={() => onOpenChange(false)}
       />
-      <div className={cn("z-50 w-full max-w-lg p-6 bg-card border border-border rounded-xl shadow-2xl animate-in zoom-in-95 duration-200", contentClassName)}>
+      <div className={cn("z-50 w-full max-w-lg p-4 sm:p-6 bg-card border border-border rounded-xl shadow-2xl animate-in zoom-in-95 duration-200 max-h-[calc(100dvh-2rem)] overflow-y-auto", contentClassName)}>
         {children}
       </div>
     </div>

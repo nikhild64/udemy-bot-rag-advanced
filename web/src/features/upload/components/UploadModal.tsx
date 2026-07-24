@@ -192,7 +192,7 @@ export function UploadModal() {
     (mode === 'text' && !textContent.trim());
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()} contentClassName="max-w-xl w-full max-h-[92dvh] overflow-y-auto p-4 sm:p-6">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Upload className="w-5 h-5 text-primary" />
@@ -204,44 +204,44 @@ export function UploadModal() {
       </DialogHeader>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-border pb-2 my-2">
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 border-b border-border pb-2 my-2">
         <button
           onClick={() => { setMode('file'); resetState(); }}
           className={cn(
-            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition',
+            'flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition flex-1 sm:flex-none justify-center',
             mode === 'file'
               ? 'bg-primary/10 text-primary border border-primary/20'
               : 'text-muted-foreground hover:bg-muted'
           )}
         >
-          <FileText className="w-4 h-4" />
+          <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>File Upload</span>
         </button>
 
         <button
           onClick={() => { setMode('url'); resetState(); }}
           className={cn(
-            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition',
+            'flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition flex-1 sm:flex-none justify-center',
             mode === 'url'
               ? 'bg-primary/10 text-primary border border-primary/20'
               : 'text-muted-foreground hover:bg-muted'
           )}
         >
-          <Video className="w-4 h-4 text-red-400" />
-          <span>Web & YouTube URL</span>
+          <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-400" />
+          <span>Web & YouTube</span>
         </button>
 
         <button
           onClick={() => { setMode('text'); resetState(); }}
           className={cn(
-            'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition',
+            'flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition flex-1 sm:flex-none justify-center',
             mode === 'text'
               ? 'bg-primary/10 text-primary border border-primary/20'
               : 'text-muted-foreground hover:bg-muted'
           )}
         >
-          <Type className="w-4 h-4 text-emerald-400" />
-          <span>Plain Text / Note</span>
+          <Type className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
+          <span>Plain Text</span>
         </button>
       </div>
 

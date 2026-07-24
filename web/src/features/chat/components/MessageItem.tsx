@@ -33,7 +33,7 @@ export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
     <div
       className={cn(
         'group relative flex gap-2.5 p-3 sm:p-3.5 rounded-xl transition-colors',
-        isAssistant ? 'bg-card/70 border border-border/70 shadow-2xs' : 'bg-primary/5 ml-4 sm:ml-6 border border-primary/10'
+        isAssistant ? 'bg-card/70 border border-border/70 shadow-2xs' : 'bg-primary/5 ml-2 sm:ml-6 border border-primary/10'
       )}
     >
       {/* Avatar */}
@@ -64,13 +64,13 @@ export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
             </span>
           </div>
 
-          <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
             {isAssistant && message.content && (
               <>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  className="h-7 w-7 sm:h-6 sm:w-6 text-muted-foreground hover:text-foreground"
                   onClick={handleCopy}
                   title="Copy response"
                 >
@@ -80,7 +80,7 @@ export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                    className="h-7 w-7 sm:h-6 sm:w-6 text-muted-foreground hover:text-foreground"
                     onClick={() => onRetry(message.content)}
                     title="Retry response"
                   >
@@ -93,7 +93,7 @@ export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                className="h-7 w-7 sm:h-6 sm:w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 onClick={() => onDelete(message.id)}
                 title="Delete message and all subsequent messages"
               >

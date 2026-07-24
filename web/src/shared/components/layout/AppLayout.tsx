@@ -48,10 +48,32 @@ export function AppLayout({
     }
   }, [getToken, isLoaded, isSignedIn]);
 
+  const mobileSidebarOpen = useUIStore((s) => s.mobileSidebarOpen);
+  const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
+  const mobileSourcesPanelOpen = useUIStore((s) => s.mobileSourcesPanelOpen);
+  const setMobileSourcesPanelOpen = useUIStore((s) => s.setMobileSourcesPanelOpen);
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background selection:bg-primary/20">
-      {/* Navigation Sidebar */}
-      {!hideSidebar && <Sidebar />}
+      {/* Desktop Navigation Sidebar */}
+      {!hideSidebar && (
+        <div className="hidden md:flex h-full shrink-0">
+          <Sidebar />
+        </div>
+      )}
+
+      {/* Mobile Sidebar Overlay Drawer */}
+      {!hideSidebar && mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative z-50 w-72 h-full bg-background border-r border-border shadow-2xl animate-in slide-in-from-left duration-200">
+            <Sidebar isMobile />
+          </div>
+        </div>
+      )}
 
       {/* Main Workspace Column */}
       <div className="flex-1 flex flex-col h-full min-w-0">
@@ -61,17 +83,30 @@ export function AppLayout({
           hideNotebookInfo={hideNotebookInfo || hideSidebar}
         />
 
-        <div className="flex-1 flex h-full min-h-0 overflow-hidden">
+        <div className="flex-1 flex h-full min-h-0 overflow-hidden relative">
           {/* Main Content Area (Chat/Dashboard) */}
           <main className="flex-1 flex flex-col h-full min-w-0 relative overflow-hidden">
             {children}
           </main>
 
-          {/* Right Sources Drawer Panel */}
+          {/* Desktop Right Sources Drawer Panel */}
           {!hideSources && activeNotebookId && sourcesPanelOpen && (
-            <aside className="w-80 border-l border-border bg-card/30 flex flex-col h-full p-4 shrink-0 overflow-hidden animate-in slide-in-from-right-4 duration-200">
+            <aside className="hidden md:flex w-80 border-l border-border bg-card/30 flex-col h-full p-4 shrink-0 overflow-hidden animate-in slide-in-from-right-4 duration-200">
               <SourceList />
             </aside>
+          )}
+
+          {/* Mobile Right Sources Drawer Overlay */}
+          {!hideSources && activeNotebookId && mobileSourcesPanelOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end md:hidden">
+              <div
+                className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+                onClick={() => setMobileSourcesPanelOpen(false)}
+              />
+              <aside className="relative z-50 w-80 max-w-[85vw] h-full border-l border-border bg-card/95 backdrop-blur-md flex flex-col p-4 shadow-2xl animate-in slide-in-from-right duration-200">
+                <SourceList />
+              </aside>
+            </div>
           )}
         </div>
       </div>

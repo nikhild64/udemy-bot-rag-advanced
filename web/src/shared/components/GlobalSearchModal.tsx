@@ -60,11 +60,11 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-16 bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-4 sm:pt-16 bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200"
       role="search"
       aria-label="Global Workspace Search"
     >
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-4 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-3 sm:p-4 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[80vh]">
         {/* Search Header */}
         <div className="flex items-center space-x-3 border-b border-border pb-3 px-2">
           <Search className="h-5 w-5 text-primary shrink-0" />

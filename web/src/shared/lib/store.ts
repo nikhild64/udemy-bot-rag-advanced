@@ -9,6 +9,12 @@ interface UIState {
   sourcesPanelOpen: boolean;
   setSourcesPanelOpen: (open: boolean) => void;
   toggleSourcesPanel: () => void;
+  mobileSidebarOpen: boolean;
+  setMobileSidebarOpen: (open: boolean) => void;
+  toggleMobileSidebar: () => void;
+  mobileSourcesPanelOpen: boolean;
+  setMobileSourcesPanelOpen: (open: boolean) => void;
+  toggleMobileSourcesPanel: () => void;
   createNotebookModalOpen: boolean;
   setCreateNotebookModalOpen: (open: boolean) => void;
   uploadModalOpen: boolean;
@@ -30,6 +36,12 @@ export const useUIStore = create<UIState>((set) => ({
   sourcesPanelOpen: true,
   setSourcesPanelOpen: (open) => set({ sourcesPanelOpen: open }),
   toggleSourcesPanel: () => set((state) => ({ sourcesPanelOpen: !state.sourcesPanelOpen })),
+  mobileSidebarOpen: false,
+  setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
+  toggleMobileSidebar: () => set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen })),
+  mobileSourcesPanelOpen: false,
+  setMobileSourcesPanelOpen: (open) => set({ mobileSourcesPanelOpen: open }),
+  toggleMobileSourcesPanel: () => set((state) => ({ mobileSourcesPanelOpen: !state.mobileSourcesPanelOpen })),
   createNotebookModalOpen: false,
   setCreateNotebookModalOpen: (open) => set({ createNotebookModalOpen: open }),
   uploadModalOpen: false,

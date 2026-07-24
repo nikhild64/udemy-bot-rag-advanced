@@ -663,7 +663,7 @@ export function PodcastScriptDialog({
   const miniTileContent = isMinimized && script ? (
     <div
       onClick={() => setIsMinimized(false)}
-      className="fixed bottom-6 right-6 z-[9999] group/minitile bg-[#121216]/95 backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.8)] rounded-2xl p-3.5 flex items-center gap-3.5 text-white max-w-md w-full animate-in slide-in-from-bottom-5 duration-300 overflow-hidden cursor-pointer hover:border-amber-500/40 hover:shadow-amber-500/10 transition-all"
+      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 z-[9999] group/minitile bg-[#121216]/95 backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.8)] rounded-2xl p-3 sm:p-3.5 flex items-center gap-2.5 sm:gap-3.5 text-white max-w-none sm:max-w-md w-auto animate-in slide-in-from-bottom-5 duration-300 overflow-hidden cursor-pointer hover:border-amber-500/40 hover:shadow-amber-500/10 transition-all"
     >
       {/* Animated Liquid Waveform Canvas Background */}
       <MiniBackgroundWaveform
@@ -678,7 +678,7 @@ export function PodcastScriptDialog({
           e.stopPropagation();
           togglePlay();
         }}
-        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 shadow-lg z-10 ${
+        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 shadow-lg z-10 ${
           isPlaying
             ? currentSpeaker === 'Alex'
               ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/40'
@@ -690,7 +690,7 @@ export function PodcastScriptDialog({
       </button>
 
       <div className="min-w-0 flex-1 z-10">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <p className="text-xs font-semibold text-white truncate drop-shadow">{script.title}</p>
           {isPlaying && (
             <span
@@ -710,10 +710,10 @@ export function PodcastScriptDialog({
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-1.5 shrink-0 z-10" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 z-10" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={handleCycleSpeed}
-          className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/10 text-[10px] font-mono text-amber-400 font-semibold transition-all hover:scale-105"
+          className="px-1.5 sm:px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/10 text-[10px] font-mono text-amber-400 font-semibold transition-all hover:scale-105"
         >
           {playbackRate}x
         </button>
@@ -725,7 +725,7 @@ export function PodcastScriptDialog({
           className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white transition-all hover:scale-105"
           title="Expand Studio"
         >
-          <Maximize2 className="w-4 h-4" />
+          <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
         <button
           onClick={(e) => {
@@ -736,7 +736,7 @@ export function PodcastScriptDialog({
           className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white transition-all hover:scale-105"
           title="Close"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
       </div>
     </div>
@@ -758,39 +758,39 @@ export function PodcastScriptDialog({
               }
             }
           }}
-          contentClassName="max-w-2xl w-full bg-[#121212] border border-[#262626] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col"
+          contentClassName="max-w-2xl w-full max-h-[92dvh] bg-[#121212] border border-[#262626] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col"
         >
       {/* ── Header ── */}
-      <DialogHeader className="px-6 pt-5 pb-4 border-b border-[#262626] shrink-0">
+      <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#262626] shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              <Radio className="w-5 h-5 animate-pulse" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+              <Radio className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
             </div>
-            <div>
-              <DialogTitle className="text-base font-semibold text-white leading-tight">
+            <div className="min-w-0">
+              <DialogTitle className="text-sm sm:text-base font-semibold text-white leading-tight truncate">
                 {isGenerating ? 'Synthesizing Podcast…' : (script?.title || 'AI Audio Studio')}
               </DialogTitle>
               {script?.synopsis && !isGenerating && (
-                <p className="text-xs text-[#A9A9A9] mt-0.5 leading-relaxed max-w-md line-clamp-1">
+                <p className="text-[11px] sm:text-xs text-[#A9A9A9] mt-0.5 leading-relaxed max-w-md line-clamp-1">
                   {script.synopsis}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {script && !isGenerating && (
               <>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setIsMinimized(true)}
-                  className="h-8 text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50"
+                  className="h-8 text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50 px-2 sm:px-3"
                   title="Run in Background Mini Player Mode"
                 >
                   <Minimize2 className="w-3.5 h-3.5" />
-                  Background Mode
+                  <span className="hidden sm:inline">Background Mode</span>
                 </Button>
                 <Button
                   size="sm"

@@ -343,12 +343,12 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
   };
 
   return (
-    <div className={cn("flex flex-col h-[70vh] max-h-[800px] bg-background", className)}>
+    <div className={cn("flex flex-col h-full max-h-none sm:h-[70vh] sm:max-h-[800px] bg-background", className)}>
       {/* Header bar */}
-      <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between shrink-0 bg-muted/10 gap-2">
+      <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border/60 flex flex-wrap items-center justify-between shrink-0 bg-muted/10 gap-2">
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-          <h3 className="font-semibold text-sm line-clamp-1">{viewData?.displayName || 'Loading...'}</h3>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <h3 className="font-semibold text-xs sm:text-sm line-clamp-1">{viewData?.displayName || 'Loading...'}</h3>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground">
             {type === 'WEBSITE' && <span>Source: {getDomainName(url || metadata?.url)}</span>}
             {pageNumber !== undefined && <span>Page {pageNumber}</span>}
             {displayTimestamp && <span>Timestamp: {displayTimestamp}</span>}
@@ -358,30 +358,30 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
 
         {/* View Mode Toggle Switch */}
         {hasMedia && (
-          <div className="flex items-center p-0.5 bg-muted/80 rounded-lg border border-border text-xs shrink-0">
+          <div className="flex items-center p-0.5 bg-muted/80 rounded-lg border border-border text-[11px] sm:text-xs shrink-0">
             <button
               onClick={() => setActiveMode('media')}
               className={cn(
-                "px-3 py-1 rounded-md transition-all font-medium flex items-center gap-1.5 cursor-pointer",
+                "px-2 sm:px-3 py-1 rounded-md transition-all font-medium flex items-center gap-1 sm:gap-1.5 cursor-pointer",
                 activeMode === 'media'
                   ? "bg-background text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               {videoId ? <Video className="w-3.5 h-3.5 text-blue-400" /> : <FileText className="w-3.5 h-3.5 text-red-400" />}
-              <span>{videoId ? 'Video Player' : 'PDF View'}</span>
+              <span>{videoId ? 'Video' : 'PDF'}</span>
             </button>
             <button
               onClick={() => setActiveMode('transcript')}
               className={cn(
-                "px-3 py-1 rounded-md transition-all font-medium flex items-center gap-1.5 cursor-pointer",
+                "px-2 sm:px-3 py-1 rounded-md transition-all font-medium flex items-center gap-1 sm:gap-1.5 cursor-pointer",
                 activeMode === 'transcript'
                   ? "bg-background text-primary shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <AlignLeft className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{videoId ? 'Transcript' : 'Extracted Text'}</span>
+              <span>{videoId ? 'Transcript' : 'Text'}</span>
             </button>
           </div>
         )}
@@ -390,7 +390,7 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-2 shrink-0 border-primary/30 text-primary hover:bg-primary/10"
+            className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1.5 sm:gap-2 shrink-0 border-primary/30 text-primary hover:bg-primary/10"
             onClick={() => openOriginalWebsite(url || metadata?.url)}
           >
             <ExternalLink className="w-3.5 h-3.5" />

@@ -7,21 +7,38 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
-export function Sidebar() {
+interface SidebarProps {
+  isMobile?: boolean;
+}
+
+export function Sidebar({ isMobile = false }: SidebarProps) {
   const router = useRouter();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const setActiveNotebookId = useUIStore((s) => s.setActiveNotebookId);
 
-  if (!sidebarOpen) return null;
+  if (!isMobile && !sidebarOpen) return null;
+
+  const handleClose = () => {
+    if (isMobile) {
+      setMobileSidebarOpen(false);
+    } else {
+      toggleSidebar();
+    }
+  };
 
   const handleGoHome = () => {
     setActiveNotebookId(null);
+    if (isMobile) setMobileSidebarOpen(false);
     router.push('/');
   };
 
   return (
-    <aside className="w-64 border-r border-border bg-card/40 flex flex-col h-full shrink-0 transition-all duration-300">
+    <aside className={cn(
+      "w-full flex flex-col h-full shrink-0 transition-all duration-300",
+      !isMobile && "w-64 border-r border-border bg-card/40"
+    )}>
       {/* Brand Header */}
       <div className="h-14 px-4 border-b border-border flex items-center justify-between">
         <div
@@ -47,7 +64,7 @@ export function Sidebar() {
           size="icon"
           variant="ghost"
           className="h-7 w-7 text-muted-foreground hover:text-foreground"
-          onClick={toggleSidebar}
+          onClick={handleClose}
         >
           <PanelLeftClose className="w-4 h-4" />
         </Button>
@@ -55,7 +72,7 @@ export function Sidebar() {
 
       {/* Notebook List */}
       <div className="flex-1 overflow-hidden p-3">
-        <NotebookList />
+        <NotebookList isMobile={isMobile} />
       </div>
     </aside>
   );

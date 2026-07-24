@@ -67,17 +67,19 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
     <Dialog 
       open={isOpen} 
       onOpenChange={(open) => !open && onClose()}
-      contentClassName="max-w-[85vw] w-full p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl h-[85vh] flex"
+      contentClassName="w-[calc(100%-1rem)] sm:max-w-[85vw] w-full p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl h-[92dvh] sm:h-[85vh] flex flex-col md:flex-row"
     >
-        {/* Left Sidebar - Source List */}
-        <div className="w-[300px] border-r border-border bg-card/30 flex flex-col shrink-0 overflow-hidden">
-          <div className="p-4 border-b border-border bg-muted/20">
-            <h3 className="font-semibold text-sm">Notebook Sources</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{sources.length} available</p>
+        {/* Left Sidebar / Top Bar - Source List */}
+        <div className="w-full md:w-[300px] border-b md:border-b-0 md:border-r border-border bg-card/30 flex flex-col shrink-0 overflow-hidden">
+          <div className="p-3 md:p-4 border-b border-border bg-muted/20 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-xs md:text-sm">Notebook Sources</h3>
+              <p className="text-[10px] md:text-xs text-muted-foreground">{sources.length} available</p>
+            </div>
           </div>
           
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="p-2 flex flex-col gap-1">
+          <div className="flex-1 min-h-0 overflow-x-auto md:overflow-y-auto">
+            <div className="p-2 flex md:flex-col gap-1.5 min-w-max md:min-w-0">
               {sources.map((src) => {
                 const isActive = src.id === activeSourceId;
                 return (
@@ -86,24 +88,24 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
                     ref={isActive ? activeSourceRef : null}
                     onClick={() => setActiveSourceId(src.id)}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border w-full",
+                      "flex items-center gap-2 md:gap-3 p-2 md:p-3 rounded-lg text-left transition-all duration-200 border shrink-0 md:w-full",
                       isActive 
-                        ? "bg-primary/10 border-primary/30 text-primary shadow-sm" 
+                        ? "bg-primary/10 border-primary/30 text-primary shadow-xs" 
                         : "bg-transparent border-transparent hover:bg-muted/50 hover:border-border/50 text-foreground"
                     )}
                   >
                     <div className={cn(
-                      "p-1.5 rounded-md flex items-center justify-center shrink-0",
+                      "p-1 md:p-1.5 rounded-md flex items-center justify-center shrink-0",
                       isActive ? "bg-primary/20" : "bg-muted text-muted-foreground"
                     )}>
                       {getFileIcon(src)}
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 max-w-[140px] md:max-w-none flex-1">
                       <p className={cn(
                         "text-xs font-medium truncate",
                         isActive ? "text-primary" : "text-foreground"
                       )}>{src.displayName || src.title}</p>
-                      <p className="text-[10px] text-muted-foreground truncate opacity-80 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground truncate opacity-80 mt-0.5 hidden md:block">
                         {src.status}
                       </p>
                     </div>
@@ -115,7 +117,7 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
         </div>
 
         {/* Right Area - Source Viewer */}
-        <div className="flex-1 flex flex-col bg-background min-w-0">
+        <div className="flex-1 flex flex-col bg-background min-w-0 min-h-0 overflow-hidden">
           {activeSourceId ? (
             <SourceViewer
               sourceId={activeSourceId}

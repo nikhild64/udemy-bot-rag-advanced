@@ -95,7 +95,7 @@ export function CitationCard({ citation, index, allCitations }: CitationCardProp
         </p>
       )}
 
-      <Dialog open={viewerOpen} onOpenChange={setViewerOpen} contentClassName="max-w-6xl overflow-hidden p-0">
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen} contentClassName="max-w-6xl w-full max-h-[95dvh] overflow-hidden p-0">
         <div className="relative flex items-center justify-between border-b border-border/40 px-4 py-3" onClick={(event) => event.stopPropagation()}>
           <DialogTitle className="text-sm">Source viewer</DialogTitle>
           <span className="text-[11px] text-muted-foreground">{page ? `Page ${page}` : displayTimestamp || 'Cited passage'}</span>

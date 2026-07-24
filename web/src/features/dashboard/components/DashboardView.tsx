@@ -179,7 +179,7 @@ export function DashboardView({
           border-radius: 8px;
         }
       `}} />
-      <div className="dash-view p-6 space-y-8 max-w-7xl mx-auto h-full w-full overflow-y-auto">
+      <div className="dash-view p-4 sm:p-6 space-y-6 sm:space-y-8 max-w-7xl mx-auto h-full w-full overflow-y-auto">
         {/* Header Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#2B2B2B] pb-6">
           <div>

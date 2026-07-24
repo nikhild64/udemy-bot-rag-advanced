@@ -247,17 +247,17 @@ export function LearningPathDialog({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
-      contentClassName="max-w-2xl w-full bg-[#141414] border border-[#2B2B2B] text-white p-0 overflow-hidden rounded-2xl shadow-2xl max-h-[85vh] flex flex-col"
+      contentClassName="max-w-2xl w-full bg-[#141414] border border-[#2B2B2B] text-white p-0 overflow-hidden rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col"
     >
       {/* ── Header ── */}
-      <DialogHeader className="px-6 pt-5 pb-4 border-b border-[#2B2B2B] shrink-0">
+      <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#2B2B2B] shrink-0">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div className="flex items-start gap-2.5 sm:gap-3 flex-1 min-w-0">
             <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 shrink-0 mt-0.5">
               <GitCommit className="w-4 h-4 text-cyan-400" />
             </div>
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold text-white leading-tight">
+              <DialogTitle className="text-sm sm:text-base font-semibold text-white leading-tight truncate">
                 {isGenerating ? 'Building Learning Path…' : (learningPath?.title || 'Learning Path')}
               </DialogTitle>
               {learningPath && !isGenerating && (

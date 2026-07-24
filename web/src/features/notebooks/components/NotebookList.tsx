@@ -13,11 +13,16 @@ import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
-export function NotebookList() {
+interface NotebookListProps {
+  isMobile?: boolean;
+}
+
+export function NotebookList({ isMobile }: NotebookListProps) {
   const router = useRouter();
   const { data: notebooks, isLoading, isError, error } = useNotebooksQuery();
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const setActiveNotebookId = useUIStore((s) => s.setActiveNotebookId);
+  const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const setCreateNotebookModalOpen = useUIStore((s) => s.setCreateNotebookModalOpen);
   const setEditingNotebook = useUIStore((s) => s.setEditingNotebook);
   const setDeletingNotebook = useUIStore((s) => s.setDeletingNotebook);
@@ -58,7 +63,10 @@ export function NotebookList() {
         <div className="flex items-center justify-between px-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-[#A9A9A9]">Notebooks</h2>
           <button
-            onClick={() => setCreateNotebookModalOpen(true)}
+            onClick={() => {
+              if (isMobile) setMobileSidebarOpen(false);
+              setCreateNotebookModalOpen(true);
+            }}
             className="h-7 px-2.5 text-xs flex items-center gap-1.5 rounded-full bg-[#F2A23A] text-[#121212] font-semibold hover:bg-[#e09229] transition cursor-pointer border-none"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -120,6 +128,7 @@ export function NotebookList() {
                   key={nb.id}
                   onClick={() => {
                     setActiveNotebookId(nb.id);
+                    if (isMobile) setMobileSidebarOpen(false);
                     router.push(`/notebooks/${nb.id}`);
                   }}
                   className={cn(
