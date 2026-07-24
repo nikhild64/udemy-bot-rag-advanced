@@ -5,6 +5,7 @@ import { PdfExtractor } from '@/ingestion/extraction/extractors/PdfExtractor';
 import { HtmlExtractor } from '@/ingestion/extraction/extractors/HtmlExtractor';
 import { ExtractorFactory } from '@/ingestion/extraction/extractors/ExtractorFactory';
 import { SourceType } from '@prisma/client';
+import zlib from 'node:zlib';
 
 describe('Document Extractors', () => {
   describe('TxtExtractor', () => {
@@ -47,6 +48,20 @@ Today we will learn about RAG architectures.
       const res = await extractor.extract(pdfSimulatedBuffer, 'application/pdf', 'doc.pdf');
 
       expect(res.text).toContain('Hello PDF World');
+    });
+
+    it('extracts only content stream text and never PDF object structure', async () => {
+      const compressedStream = zlib.deflateSync(Buffer.from('(Actual document text) Tj', 'latin1'));
+      const pdf = Buffer.concat([
+        Buffer.from('%PDF-1.7\n50 0 obj\n<< /Type /Page /Contents 425 0 R >>\nstream\n', 'latin1'),
+        compressedStream,
+        Buffer.from('\nendstream\nendobj\n%%EOF', 'latin1'),
+      ]);
+
+      const res = await new PdfExtractor().extract(pdf, 'application/pdf', 'document.pdf');
+
+      expect(res.text).toContain('Actual document text');
+      expect(res.text).not.toMatch(/endstream|endobj|\/Type \/Page|425 0 R/i);
     });
   });
 
