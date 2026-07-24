@@ -55,10 +55,10 @@ export function UploadModal() {
   };
 
   const handleFileSelect = (file: File) => {
-    const allowed = ['.pdf', '.txt', '.md', '.markdown', '.docx', '.json', '.mp3', '.mp4', '.wav', '.m4a', '.zip'];
+    const allowed = ['.pdf', '.txt', '.vtt', '.srt', '.zip'];
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!allowed.includes(ext)) {
-      setErrorMessage(`Unsupported file format "${ext}". Supported: ${allowed.join(', ')}`);
+      setErrorMessage(`Unsupported file format "${ext}". Supported: PDF (.pdf), Plain Text (.txt), VTT / Transcripts (.vtt, .srt), or ZIP archives (.zip)`);
       return;
     }
     setErrorMessage(null);
@@ -83,8 +83,18 @@ export function UploadModal() {
       if (mode === 'file') {
         if (!selectedFile) return;
 
+        const ext = '.' + selectedFile.name.split('.').pop()?.toLowerCase();
+        let sourceType = 'TXT';
+        if (ext === '.pdf') {
+          sourceType = 'PDF';
+        } else if (ext === '.vtt' || ext === '.srt' || ext === '.zip') {
+          sourceType = 'VTT';
+        } else {
+          sourceType = 'TXT';
+        }
+
         const source = await sourcesApi.createSource(activeNotebookId, {
-          type: selectedFile.type.includes('pdf') ? 'PDF' : selectedFile.name.toLowerCase().endsWith('.zip') ? 'VTT' : 'DOCX',
+          type: sourceType as any,
           title: selectedFile.name,
           displayName: selectedFile.name,
           size: selectedFile.size,
@@ -159,7 +169,7 @@ export function UploadModal() {
           <span>Add Knowledge Source</span>
         </DialogTitle>
         <DialogDescription>
-          Upload documents, add Web/YouTube links, or paste raw text into your notebook.
+          Upload PDF, Plain Text, VTT/Transcript files (or ZIP archive), Web URLs, or YouTube links.
         </DialogDescription>
       </DialogHeader>
 
@@ -201,7 +211,7 @@ export function UploadModal() {
           )}
         >
           <Type className="w-4 h-4 text-emerald-400" />
-          <span>Pasted Text Note</span>
+          <span>Pasted Plain Text</span>
         </button>
       </div>
 
@@ -226,7 +236,7 @@ export function UploadModal() {
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
-                  input.accept = '.pdf,.txt,.md,.markdown,.docx,.json,.mp3,.mp4,.wav,.m4a,.zip';
+                  input.accept = '.pdf,.txt,.vtt,.srt,.zip';
                   input.onchange = (e: any) => {
                     if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
                   };
@@ -241,7 +251,7 @@ export function UploadModal() {
                     Drag & drop file here, or <span className="text-primary hover:underline">browse</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Supports PDF, TXT, Markdown, DOCX, JSON, Audio & Video
+                    Supports PDF (.pdf), Plain Text (.txt), VTT / Transcripts (.vtt), or ZIP archives (.zip)
                   </p>
                 </div>
               </div>
