@@ -52,21 +52,9 @@ export class HtmlExtractor implements IExtractor {
       if (hText) headings.push(hText);
     }
 
-    // 4. Remove <head>, <script>, <style>, <noscript>, SVG, and HTML comments
-    let bodyHtml = htmlStr
-      .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
-
-
-    // Replace block elements with linebreaks to preserve readable paragraph layout
-    bodyHtml = bodyHtml.replace(/<\/(p|div|h[1-6]|li|tr|br|section|article)>/gi, '\n');
-
-    // Clean remaining tags
-    const mainText = this.cleanText(bodyHtml);
+    // 4. Extract and clean main body text
+    const extractedContent = this.extractMainContent(htmlStr);
+    const mainText = this.cleanText(extractedContent);
 
     if (!mainText) {
       throw new ExtractionError('Failed to extract text from HTML content');
@@ -93,9 +81,32 @@ export class HtmlExtractor implements IExtractor {
     };
   }
 
+  private extractMainContent(htmlStr: string): string {
+    let clean = htmlStr
+      .replace(/<head[\s\S]*?<\/head>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+      .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<header[\s\S]*?<\/header>/gi, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, '');
+
+    // Preserve structure by mapping headings and block elements to linebreaks
+    clean = clean
+      .replace(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi, (_, hText) => `\n\n### ${hText.replace(/<[^>]*>/g, '').trim()}\n\n`)
+      .replace(/<li[^>]*>/gi, '\n• ')
+      .replace(/<\/(p|div|tr|br|section|article|li)>/gi, '\n');
+
+    return clean;
+  }
+
   private cleanText(rawHtml?: string): string {
     if (!rawHtml) return '';
-    return rawHtml
+
+    let text = rawHtml
       .replace(/<[^>]*>/g, ' ') // Strip HTML tags
       .replace(/&nbsp;/gi, ' ')
       .replace(/&amp;/gi, '&')
@@ -103,8 +114,25 @@ export class HtmlExtractor implements IExtractor {
       .replace(/&gt;/gi, '>')
       .replace(/&quot;/gi, '"')
       .replace(/&#39;/gi, "'")
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
-      .trim();
+      .replace(/&copy;/gi, '©')
+      .replace(/&ndash;|&mdash;/gi, '-');
+
+    // Scrub inline JavaScript remnants, code runner snippets, and web boilerplate patterns
+    text = text
+      .replace(/\$\{html\}[\s\S]*?sourceURL=[^\n]*/gi, '')
+      .replace(/jQuery\s*\([\s\S]*?\)\s*;?/gi, '')
+      .replace(/document\s*\.\s*(?:querySelectorAll|querySelector|getElementById|addEventListener)[\s\S]*?\)\s*;?/gi, '')
+      .replace(/localStorage\s*\.\s*(?:getItem|setItem)[\s\S]*?\)\s*;?/gi, '')
+      .replace(/\/\/#\s*sourceURL=.*$/gm, '')
+      .replace(/Skip to content/gi, '');
+
+    // Clean whitespace and paragraph linebreaks
+    text = text
+      .split('\n')
+      .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+      .filter((line) => line.length > 0)
+      .join('\n\n');
+
+    return text.trim();
   }
 }

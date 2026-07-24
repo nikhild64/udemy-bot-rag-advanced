@@ -34,7 +34,7 @@ interface LearningPathDialogProps {
   onClose: () => void;
   isGenerating: boolean;
   learningPath: LearningPath | null;
-  onSelectSource?: (sourceTitle: string) => void;
+  onSelectSource?: (sourceTitle: string, timestamp?: string) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ function StepCard({
 }: {
   step: LearningStep;
   isLast: boolean;
-  onSelectSource?: (sourceTitle: string) => void;
+  onSelectSource?: (sourceTitle: string, timestamp?: string) => void;
 }) {
   const color = STEP_COLORS[(step.order - 1) % STEP_COLORS.length];
 
@@ -151,13 +151,14 @@ function StepCard({
               <div className="grid grid-cols-1 gap-1.5">
                 {step.sources.map((src, i) => {
                   const title = typeof src === 'string' ? src : src.title;
-                  const timestamp = typeof src === 'object' && src.timestamp ? src.timestamp : 'Full Video';
+                  const tsRaw = typeof src === 'object' && src.timestamp ? src.timestamp : undefined;
+                  const displayTs = tsRaw || 'Full Video';
 
                   return (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => onSelectSource?.(title)}
+                      onClick={() => onSelectSource?.(title, tsRaw)}
                       className="group/src flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-500/40 text-left transition-all duration-200 text-xs cursor-pointer w-full"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -168,7 +169,7 @@ function StepCard({
                       </div>
                       <span className="shrink-0 px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5" />
-                        {timestamp}
+                        {displayTs}
                       </span>
                       <ExternalLink className="w-3.5 h-3.5 text-[#A9A9A9] group-hover/src:text-cyan-400 shrink-0 opacity-70 group-hover/src:opacity-100 transition-opacity" />
                     </button>

@@ -1,7 +1,7 @@
 import { Dialog } from '@/components/ui/dialog';
 import { Source } from '@/shared/types';
 import { SourceViewer } from './SourceViewer';
-import { FileText, Video, Music, FileCode, HardDrive } from 'lucide-react';
+import { FileText, Video, Music, FileCode, HardDrive, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 
@@ -10,25 +10,40 @@ interface SourceViewerDialogProps {
   onClose: () => void;
   sources: Source[];
   initialSourceId: string;
+  initialTimestamp?: string;
 }
 
-export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId }: SourceViewerDialogProps) {
+export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, initialTimestamp }: SourceViewerDialogProps) {
   const [activeSourceId, setActiveSourceId] = useState(initialSourceId);
+  const [activeTimestamp, setActiveTimestamp] = useState<string | undefined>(initialTimestamp);
 
   // Update active source if initialSourceId changes or dialog opens
   useEffect(() => {
     if (initialSourceId) {
       setActiveSourceId(initialSourceId);
     }
-  }, [initialSourceId, isOpen]);
+    setActiveTimestamp(initialTimestamp);
+  }, [initialSourceId, initialTimestamp, isOpen]);
 
   const getFileIcon = (source: Source) => {
     const mime = source.mimeType?.toLowerCase() || '';
     const title = source.title.toLowerCase();
-    if (mime.includes('pdf') || title.endsWith('.pdf')) {
-      return <FileText className="w-4 h-4 text-red-400 shrink-0" />;
-    } else if (mime.includes('video') || title.includes('youtube')) {
+    const type = String(source.type || '').toUpperCase();
+    const urlStr = source.fileUrl || (source.metadata?.url as string) || '';
+    const isYouTube =
+      type === 'YOUTUBE' ||
+      urlStr.includes('youtu') ||
+      title.includes('youtube') ||
+      !!source.metadata?.videoId;
+
+    if (type === 'YOUTUBE' || isYouTube || mime.includes('video')) {
       return <Video className="w-4 h-4 text-blue-400 shrink-0" />;
+    } else if (type === 'WEBSITE' || type === 'URL' || (source.metadata?.url && !isYouTube)) {
+      return <Globe className="w-4 h-4 text-cyan-400 shrink-0" />;
+    } else if (type === 'PDF' || mime.includes('pdf') || title.endsWith('.pdf')) {
+      return <FileText className="w-4 h-4 text-red-400 shrink-0" />;
+    } else if (type === 'VTT' || mime.includes('vtt') || mime.includes('subrip') || title.endsWith('.vtt') || title.endsWith('.srt')) {
+      return <FileText className="w-4 h-4 text-emerald-400 shrink-0" />;
     } else if (mime.includes('audio')) {
       return <Music className="w-4 h-4 text-green-400 shrink-0" />;
     } else if (mime.includes('json') || mime.includes('javascript') || mime.includes('typescript')) {
@@ -90,7 +105,10 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId }
         {/* Right Area - Source Viewer */}
         <div className="flex-1 flex flex-col bg-background min-w-0">
           {activeSourceId ? (
-            <SourceViewer sourceId={activeSourceId} />
+            <SourceViewer
+              sourceId={activeSourceId}
+              timestamp={activeSourceId === initialSourceId ? activeTimestamp : undefined}
+            />
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               Select a source to view

@@ -22,19 +22,27 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   let rawExcerpt = citation.excerpt || citation.content || (citation as any).snippet || '';
   const page = citation.pageNumber || citation.page;
   
-  // Extract timestamp like [14:32] or [01:14:32] from snippet if present
-  let extractedTimestamp = citation.timestamp;
+  // Extract timestamp from timestamp property, startTime, start_time, or rawExcerpt
+  let extractedTimestamp: string | number | undefined =
+    citation.timestamp || citation.startTime || (citation as any).start_time;
+
   if (!extractedTimestamp && rawExcerpt) {
-    const tsMatch = rawExcerpt.match(/\[(\d{2}:\d{2}(?::\d{2})?)\]/);
+    const tsMatch = rawExcerpt.match(/(?:\[)?(\d{1,2}:\d{2}(?::\d{2})?)(?:\])?/);
     if (tsMatch && tsMatch[1]) {
       extractedTimestamp = tsMatch[1];
-      // Optionally remove it from the displayed excerpt for cleanliness
-      rawExcerpt = rawExcerpt.replace(tsMatch[0], '').trim();
     }
   }
 
   const excerpt = rawExcerpt;
   const timestamp = extractedTimestamp;
+
+  const displayTimestamp = timestamp !== undefined && timestamp !== null ? (
+    typeof timestamp === 'number'
+      ? (timestamp >= 3600
+          ? new Date(timestamp * 1000).toISOString().substring(11, 19)
+          : new Date(timestamp * 1000).toISOString().substring(14, 19))
+      : String(timestamp)
+  ) : null;
 
   const scorePercentage = citation.score !== undefined ? Math.round(citation.score * 100) : null;
 
@@ -59,10 +67,10 @@ export function CitationCard({ citation, index }: CitationCardProps) {
             </Badge>
           )}
 
-          {timestamp && (
+          {displayTimestamp && (
             <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 gap-0.5 font-mono">
               <Clock className="w-2.5 h-2.5" />
-              <span>{timestamp}</span>
+              <span>{displayTimestamp}</span>
             </Badge>
           )}
 

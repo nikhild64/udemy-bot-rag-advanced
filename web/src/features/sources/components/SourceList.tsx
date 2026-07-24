@@ -17,6 +17,7 @@ export function SourceList() {
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState('');
+  const [selectedTimestamp, setSelectedTimestamp] = useState<string | undefined>(undefined);
 
   // ── Dialog modal states ──
   const [podcastOpen, setPodcastOpen] = useState(false);
@@ -76,7 +77,7 @@ export function SourceList() {
     learningPathMutation.mutate({ notebookId: activeNotebookId, force: true });
   };
 
-  const handleSelectSourceFromPath = (sourceTitle: string) => {
+  const handleSelectSourceFromPath = (sourceTitle: string, timestamp?: string) => {
     setLearningPathOpen(false);
     if (!sources || sources.length === 0) return;
     const search = sourceTitle.toLowerCase().trim();
@@ -91,6 +92,7 @@ export function SourceList() {
     } else {
       setSelectedSourceId(sources[0].id);
     }
+    setSelectedTimestamp(timestamp);
     setViewerOpen(true);
   };
 
@@ -198,11 +200,15 @@ export function SourceList() {
       {/* Source Viewer Dialog */}
       {sources && (
         <SourceViewerDialog
-          key={selectedSourceId || 'default'}
+          key={`${selectedSourceId}-${selectedTimestamp || 'default'}`}
           isOpen={viewerOpen}
-          onClose={() => setViewerOpen(false)}
+          onClose={() => {
+            setViewerOpen(false);
+            setSelectedTimestamp(undefined);
+          }}
           sources={sources}
           initialSourceId={selectedSourceId}
+          initialTimestamp={selectedTimestamp}
         />
       )}
 

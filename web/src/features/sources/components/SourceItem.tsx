@@ -25,6 +25,8 @@ import {
   Ban,
   Info,
   Download,
+  Loader2,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -53,14 +55,36 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
   const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(currentStatus);
   const isQueuedOrProcessing = isProcessing || currentStatus === 'Queued' || currentStatus === 'Uploading' || currentStatus === 'Uploaded';
 
+  const extractVideoId = (url?: string | null) => {
+    if (!url) return null;
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
+    const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    return match ? match[1] : null;
+  };
+
+  const videoId =
+    source.metadata?.videoId ||
+    extractVideoId(source.fileUrl || (source.metadata?.url as string) || (source.metadata?.videoUrl as string));
+
+  const isYouTube =
+    String(source.type || '').toUpperCase() === 'YOUTUBE' ||
+    !!videoId ||
+    !!(source.fileUrl && source.fileUrl.includes('youtu')) ||
+    !!((source.metadata?.url as string)?.includes('youtu'));
+
   const getFileIcon = () => {
     const mime = source.mimeType?.toLowerCase() || '';
     const title = source.title.toLowerCase();
+    const type = String(source.type || '').toUpperCase();
 
-    if (mime.includes('pdf') || title.endsWith('.pdf')) {
-      return <FileText className="w-4 h-4 text-red-400 shrink-0" />;
-    } else if (mime.includes('video') || title.includes('youtube')) {
+    if (type === 'YOUTUBE' || isYouTube || mime.includes('video') || title.includes('youtube')) {
       return <Video className="w-4 h-4 text-blue-400 shrink-0" />;
+    } else if (type === 'WEBSITE' || type === 'URL' || (source.metadata?.url && !isYouTube)) {
+      return <Globe className="w-4 h-4 text-cyan-400 shrink-0" />;
+    } else if (type === 'PDF' || mime.includes('pdf') || title.endsWith('.pdf')) {
+      return <FileText className="w-4 h-4 text-red-400 shrink-0" />;
+    } else if (type === 'VTT' || mime.includes('vtt') || mime.includes('subrip') || title.endsWith('.vtt') || title.endsWith('.srt')) {
+      return <FileText className="w-4 h-4 text-emerald-400 shrink-0" />;
     } else if (mime.includes('audio')) {
       return <Music className="w-4 h-4 text-green-400 shrink-0" />;
     } else if (mime.includes('json') || mime.includes('javascript') || mime.includes('typescript')) {
@@ -83,29 +107,25 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
         window.open(res.downloadUrl, '_blank');
       }
     } catch (e) {
-      logger.error({ err: e }, 'Source download failed');
+      toast.error('Failed to download source file');
     }
   };
 
-  const extractVideoId = (url?: string | null) => {
-    if (!url) return null;
-    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
-    const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-    return match ? match[1] : null;
-  };
-
-  const videoId =
-    source.metadata?.videoId ||
-    extractVideoId(source.fileUrl || (source.metadata?.url as string) || (source.metadata?.videoUrl as string));
+  const isAnyMutationPending =
+    deleteMutation.isPending ||
+    reindexMutation.isPending ||
+    retryMutation.isPending ||
+    cancelMutation.isPending;
 
   return (
     <>
       <div 
         className={cn(
           "p-3 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-2 group",
-          onOpenViewer && "cursor-pointer hover:border-primary/50"
+          onOpenViewer && !isAnyMutationPending && "cursor-pointer hover:border-primary/50",
+          (currentStatus === 'Deleting' || deleteMutation.isPending) && "opacity-60 pointer-events-none"
         )}
-        onClick={() => onOpenViewer && onOpenViewer(source.id)}
+        onClick={() => !isAnyMutationPending && onOpenViewer && onOpenViewer(source.id)}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -131,8 +151,13 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    disabled={isAnyMutationPending}
                   >
-                    <MoreVertical className="w-3.5 h-3.5" />
+                    {isAnyMutationPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    ) : (
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    )}
                   </Button>
                 }
               >
@@ -146,24 +171,57 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuItem onClick={() => reindexMutation.mutate(source.id)}>
-                <RefreshCw className="w-3.5 h-3.5 mr-2 text-cyan-400" /> Re-index
+              <DropdownMenuItem
+                disabled={reindexMutation.isPending || isQueuedOrProcessing}
+                onClick={() => reindexMutation.mutate(source.id)}
+              >
+                {reindexMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-2 text-cyan-400 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 mr-2 text-cyan-400" />
+                )}
+                <span>{reindexMutation.isPending ? 'Re-indexing...' : 'Re-index'}</span>
               </DropdownMenuItem>
 
               {currentStatus === 'Failed' && (
-                <DropdownMenuItem onClick={() => retryMutation.mutate(source.id)}>
-                  <RotateCcw className="w-3.5 h-3.5 mr-2 text-amber-400" /> Retry Ingestion
+                <DropdownMenuItem
+                  disabled={retryMutation.isPending}
+                  onClick={() => retryMutation.mutate(source.id)}
+                >
+                  {retryMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-2 text-amber-400 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                  )}
+                  <span>Retry Ingestion</span>
                 </DropdownMenuItem>
               )}
 
               {(isQueuedOrProcessing) && (
-                <DropdownMenuItem onClick={() => cancelMutation.mutate(source.id)}>
-                  <Ban className="w-3.5 h-3.5 mr-2 text-amber-400" /> Cancel Processing
+                <DropdownMenuItem
+                  disabled={cancelMutation.isPending}
+                  onClick={() => cancelMutation.mutate(source.id)}
+                >
+                  {cancelMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-2 text-amber-400 animate-spin" />
+                  ) : (
+                    <Ban className="w-3.5 h-3.5 mr-2 text-amber-400" />
+                  )}
+                  <span>Cancel Processing</span>
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuItem destructive onClick={() => deleteMutation.mutate(source.id)}>
-                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+              <DropdownMenuItem
+                destructive
+                disabled={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate(source.id)}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                )}
+                <span>{deleteMutation.isPending ? 'Deleting...' : 'Delete'}</span>
               </DropdownMenuItem>
             </DropdownMenu>
             </div>

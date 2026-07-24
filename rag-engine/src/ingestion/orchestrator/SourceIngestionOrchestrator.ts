@@ -15,6 +15,8 @@ import { config } from '@/config';
 import { logger } from '@/shared/logger';
 import { NotFoundError, ValidationError, UnauthorizedError, IngestionError } from '@/shared/errors';
 import { Chunk } from '@/core/models';
+import { ChatRole } from '@/types';
+import { ChatProviderFactory } from '@/providers/chat/ChatProviderFactory';
 
 export interface SourceIngestionResult {
   sourceId: string;
@@ -179,6 +181,18 @@ export class SourceIngestionOrchestrator {
       logger.info({ sourceId, normalizedLength: normalizedText.length }, 'Normalized content successfully');
       ingestionEvents.publish('Normalization Completed', { jobId: currentJobId, sourceId, notebookId, stage: 'Normalizing', details: { normalizedLength: normalizedText.length } });
 
+      // Generate AI title for Website or generic titled sources
+      let finalTitle = extractedDoc.title || source.title;
+      const isGenericTitle =
+        !finalTitle ||
+        finalTitle === 'Web Source' ||
+        finalTitle === 'Untitled Web Page' ||
+        /^https?:\/\//i.test(finalTitle);
+
+      if ((source.type === 'WEBSITE' || isGenericTitle) && normalizedText.length > 50) {
+        finalTitle = await this.generateAiTitle(normalizedText, finalTitle || 'Web Source');
+        logger.info({ sourceId, finalTitle }, 'Generated AI title for web source');
+      }
 
       // 5. Chunking Stage
       await this.updateProgress(sourceId, 'Chunking', 60, 'Processing', currentJobId, notebookId);
@@ -188,8 +202,8 @@ export class SourceIngestionOrchestrator {
         chunkSize: config.ingestion.chunkSize,
         chunkOverlap: config.ingestion.chunkOverlap,
         metadata: {
-          title: source.title,
-          displayName: source.displayName,
+          title: finalTitle,
+          displayName: finalTitle,
           sourceType: source.type,
           ...extractedDoc.metadata,
         },
@@ -325,6 +339,8 @@ export class SourceIngestionOrchestrator {
       };
 
       await this.sourceRepository.update(sourceId, userId, {
+        title: finalTitle,
+        displayName: finalTitle,
         status: 'Ready' as any,
         metadata: updatedMetadata,
       });
@@ -429,5 +445,27 @@ export class SourceIngestionOrchestrator {
     };
 
     await this.notebookRepository.update(notebookId, userId, { stats } as any);
+  }
+
+  private async generateAiTitle(text: string, defaultTitle: string): Promise<string> {
+    try {
+      const chatProvider = ChatProviderFactory.create();
+      const prompt = `Generate a short, concise, descriptive title (3 to 6 words) summarizing the main topic of the following website article/content. Do NOT use quotation marks, markdown, or prefixes like "Title:". Output ONLY the title text.
+
+Content:
+${text.slice(0, 1500)}`;
+
+      const response = await chatProvider.generateResponse(
+        [{ role: ChatRole.USER, content: prompt }],
+        { task: 'chat' }
+      );
+      const cleaned = response.message?.content?.trim().replace(/^["']|["']$/g, '');
+      if (cleaned && cleaned.length >= 3 && cleaned.length <= 80) {
+        return cleaned;
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to generate AI title for website source');
+    }
+    return defaultTitle;
   }
 }

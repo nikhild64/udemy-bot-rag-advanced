@@ -16,7 +16,7 @@ export function useSourcesQuery(notebookId: string | null) {
       const isProcessing = sources.some((s) =>
         ['PendingUpload', 'Uploading', 'Uploaded', 'Queued', 'Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing', 'Deleting'].includes(s.status)
       );
-      return isProcessing ? 3000 : false;
+      return isProcessing ? 1500 : false;
     },
   });
 }
@@ -24,7 +24,7 @@ export function useSourcesQuery(notebookId: string | null) {
 export function useSourceStatusQuery(sourceId: string, currentStatus: SourceStatus) {
   const { isLoaded, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
-  const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(currentStatus);
+  const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing', 'Deleting'].includes(currentStatus);
   const shouldPoll = currentStatus === 'Queued' || isProcessing || currentStatus === 'Uploading';
 
   return useQuery({
@@ -43,7 +43,7 @@ export function useSourceStatusQuery(sourceId: string, currentStatus: SourceStat
       if (data?.status === 'Ready' || data?.status === 'Failed') {
         return false;
       }
-      return 2000;
+      return 1500;
     },
   });
 }
@@ -53,14 +53,33 @@ export function useDeleteSourceMutation(notebookId: string | null) {
 
   return useMutation({
     mutationFn: (sourceId: string) => sourcesApi.deleteSource(sourceId),
-    onSuccess: () => {
+    onMutate: async (sourceId: string) => {
+      toast.loading('Deleting source...', { id: `delete-${sourceId}` });
+      if (notebookId) {
+        await queryClient.cancelQueries({ queryKey: ['sources', notebookId] });
+        const previousSources = queryClient.getQueryData(['sources', notebookId]);
+        queryClient.setQueryData(['sources', notebookId], (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((s: any) =>
+            s.id === sourceId ? { ...s, status: 'Deleting', progress: 50, currentStage: 'Deleting...' } : s,
+          );
+        });
+        return { previousSources };
+      }
+    },
+    onSuccess: (_, sourceId) => {
+      toast.success('Source deleted successfully', { id: `delete-${sourceId}` });
+    },
+    onError: (err: any, sourceId, context: any) => {
+      if (notebookId && context?.previousSources) {
+        queryClient.setQueryData(['sources', notebookId], context.previousSources);
+      }
+      toast.error(err.message || 'Failed to delete source', { id: `delete-${sourceId}` });
+    },
+    onSettled: () => {
       if (notebookId) {
         queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
       }
-      toast.success('Source deleted');
-    },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to delete source');
     },
   });
 }
@@ -70,12 +89,36 @@ export function useReindexSourceMutation(notebookId: string | null) {
 
   return useMutation({
     mutationFn: (sourceId: string) => sourcesApi.reindexSource(sourceId),
-    onSuccess: () => {
-      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
-      toast.success('Source re-indexing triggered');
+    onMutate: async (sourceId: string) => {
+      toast.loading('Triggering re-index...', { id: `reindex-${sourceId}` });
+      if (notebookId) {
+        await queryClient.cancelQueries({ queryKey: ['sources', notebookId] });
+        const previousSources = queryClient.getQueryData(['sources', notebookId]);
+        queryClient.setQueryData(['sources', notebookId], (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((s: any) =>
+            s.id === sourceId
+              ? { ...s, status: 'Indexing', progress: 10, currentStage: 'Queued for Re-indexing...' }
+              : s,
+          );
+        });
+        return { previousSources };
+      }
     },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to re-index source');
+    onSuccess: (_, sourceId) => {
+      toast.success('Re-indexing in progress...', { id: `reindex-${sourceId}` });
+    },
+    onError: (err: any, sourceId, context: any) => {
+      if (notebookId && context?.previousSources) {
+        queryClient.setQueryData(['sources', notebookId], context.previousSources);
+      }
+      toast.error(err.message || 'Failed to re-index source', { id: `reindex-${sourceId}` });
+    },
+    onSettled: (_, __, sourceId) => {
+      if (notebookId) {
+        queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
+        queryClient.invalidateQueries({ queryKey: ['sourceStatus', sourceId] });
+      }
     },
   });
 }
@@ -85,12 +128,34 @@ export function useRetrySourceMutation(notebookId: string | null) {
 
   return useMutation({
     mutationFn: (sourceId: string) => sourcesApi.retrySource(sourceId),
-    onSuccess: () => {
-      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
-      toast.success('Retrying source ingestion');
+    onMutate: async (sourceId: string) => {
+      toast.loading('Retrying ingestion...', { id: `retry-${sourceId}` });
+      if (notebookId) {
+        await queryClient.cancelQueries({ queryKey: ['sources', notebookId] });
+        const previousSources = queryClient.getQueryData(['sources', notebookId]);
+        queryClient.setQueryData(['sources', notebookId], (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((s: any) =>
+            s.id === sourceId ? { ...s, status: 'Queued', progress: 5, currentStage: 'Retrying Ingestion...' } : s,
+          );
+        });
+        return { previousSources };
+      }
     },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to retry source ingestion');
+    onSuccess: (_, sourceId) => {
+      toast.success('Ingestion retry started', { id: `retry-${sourceId}` });
+    },
+    onError: (err: any, sourceId, context: any) => {
+      if (notebookId && context?.previousSources) {
+        queryClient.setQueryData(['sources', notebookId], context.previousSources);
+      }
+      toast.error(err.message || 'Failed to retry source ingestion', { id: `retry-${sourceId}` });
+    },
+    onSettled: (_, __, sourceId) => {
+      if (notebookId) {
+        queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
+        queryClient.invalidateQueries({ queryKey: ['sourceStatus', sourceId] });
+      }
     },
   });
 }
@@ -100,12 +165,15 @@ export function useCancelSourceMutation(notebookId: string | null) {
 
   return useMutation({
     mutationFn: (sourceId: string) => sourcesApi.cancelSource(sourceId),
-    onSuccess: () => {
-      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
-      toast.info('Source processing cancelled');
+    onMutate: async (sourceId: string) => {
+      toast.loading('Cancelling processing...', { id: `cancel-${sourceId}` });
     },
-    onError: (err: any) => {
-      toast.error(err.message || 'Failed to cancel source processing');
+    onSuccess: (_, sourceId) => {
+      if (notebookId) queryClient.invalidateQueries({ queryKey: ['sources', notebookId] });
+      toast.info('Source processing cancelled', { id: `cancel-${sourceId}` });
+    },
+    onError: (err: any, sourceId) => {
+      toast.error(err.message || 'Failed to cancel source processing', { id: `cancel-${sourceId}` });
     },
   });
 }
