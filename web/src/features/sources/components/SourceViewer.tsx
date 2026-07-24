@@ -119,6 +119,8 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
   }
 
   const { type, url, rawText, metadata } = viewData;
+  const pageNumber = citation?.pageNumber || citation?.page;
+  const isPdf = type === 'PDF' || viewData.mimeType === 'application/pdf';
 
   const extractVideoId = (urlStr?: string | null) => {
     if (!urlStr) return null;
@@ -183,7 +185,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
           <h3 className="font-semibold text-sm line-clamp-1">{viewData.displayName}</h3>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {type === 'WEBSITE' && <span>Source: {getDomainName(url || metadata?.url)}</span>}
-            {citation?.page !== undefined && <span>Page {citation.page}</span>}
+            {pageNumber !== undefined && <span>Page {pageNumber}</span>}
             {displayTimestamp && <span>Timestamp: {displayTimestamp}</span>}
             {rawText && <span>{rawText.split(/\s+/).length} words</span>}
           </div>
@@ -245,13 +247,32 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
               allowFullScreen
             />
           </div>
-        ) : activeMode === 'media' && type === 'PDF' && url ? (
-          <div className="h-full w-full">
-            <iframe 
-              src={`${url}${citation?.page ? `#page=${citation.page}` : ''}`} 
-              className="w-full h-full border-0 bg-white"
-              title="PDF Viewer"
-            />
+        ) : activeMode === 'media' && isPdf && url ? (
+          <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-h-[360px] bg-muted/10 p-2 lg:min-h-0">
+              <iframe
+                src={`${url}${pageNumber ? `#page=${pageNumber}` : ''}`}
+                className="h-full min-h-[360px] w-full rounded-md border border-border/50 bg-white lg:min-h-0"
+                title={`PDF viewer${pageNumber ? ` — page ${pageNumber}` : ''}`}
+              />
+            </div>
+            <div className="overflow-y-auto border-t border-border/60 bg-card p-4 lg:border-l lg:border-t-0">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Cited passage</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {pageNumber ? `Located on page ${pageNumber}` : 'Matched in the extracted document text'}
+                  </p>
+                </div>
+                <FileText className="h-4 w-4 text-primary/70" />
+              </div>
+              <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-[13px] leading-6 text-foreground shadow-inner">
+                {highlightExcerpt(citation?.excerpt || citation?.content || '', rawText || '')}
+              </div>
+              <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                The PDF is positioned to the cited page. The highlighted passage is the extracted text used for this answer.
+              </p>
+            </div>
           </div>
         ) : rawText ? (
           <div className="p-6 max-w-4xl mx-auto w-full space-y-4">
@@ -298,5 +319,25 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
         </div>
       )}
     </div>
+  );
+}
+
+function highlightExcerpt(excerpt: string, sourceText: string) {
+  const cleanExcerpt = excerpt.replace(/\s+/g, ' ').trim();
+  if (!cleanExcerpt) return 'No excerpt was returned for this citation.';
+
+  const normalizedSource = sourceText.replace(/\s+/g, ' ');
+  const start = normalizedSource.toLowerCase().indexOf(cleanExcerpt.toLowerCase());
+  if (start < 0) return excerpt;
+
+  const matchEnd = start + cleanExcerpt.length;
+  return (
+    <>
+      {normalizedSource.slice(Math.max(0, start - 180), start)}
+      <mark className="rounded bg-primary/35 px-1 text-foreground decoration-primary decoration-2 underline-offset-2">
+        {normalizedSource.slice(start, matchEnd)}
+      </mark>
+      {normalizedSource.slice(matchEnd, matchEnd + 180)}
+    </>
   );
 }

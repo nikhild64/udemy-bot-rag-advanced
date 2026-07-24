@@ -40,16 +40,16 @@ export function MessageList({
         <div className="max-w-md space-y-2">
           <h3 className="text-xl font-bold tracking-tight text-foreground">Ask your AI Notebook</h3>
           <p className="text-sm text-muted-foreground">
-            Ask any question about your uploaded documents, videos, lectures, or transcripts. Answers will be generated with strict citations.
+            Ask any question about your knowledge sources, documents, or transcripts. Answers will be generated with strict citations.
           </p>
         </div>
 
         <div className="flex flex-wrap justify-center gap-2 max-w-lg">
           {[
-            'Summarize the core concepts in my notebook',
-            'What are the key takeaways from the latest upload?',
-            'Explain step-by-step instructions mentioned in the sources',
-            'Compare key arguments across documents',
+            'Summarize the key themes across my sources',
+            'What are the most important insights from this notebook?',
+            'Explain the core concepts and definitions mentioned',
+            'Synthesize the main arguments and conclusions',
           ].map((prompt) => (
             <button
               key={prompt}

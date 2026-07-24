@@ -98,6 +98,8 @@ export function SourceList() {
 
   const hasSources = !!(sources && sources.length > 0);
   const hasReadySources = hasSources && sources.some((s) => s.status === 'Ready' || (s.status as string) === 'Indexed');
+  const isAnySourceProcessing = sources?.some((s) => !['Ready', 'Indexed', 'Failed'].includes(s.status as string));
+  const areAllSourcesReady = hasSources && !isAnySourceProcessing;
 
   if (!activeNotebookId) {
     return (
@@ -168,7 +170,7 @@ export function SourceList() {
       </div>
 
       {/* Quick Actions Section */}
-      {hasReadySources && (
+      {hasSources && (
         <div className="pt-3 border-t border-border/60 space-y-2.5 shrink-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between px-1 shrink-0">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
@@ -184,6 +186,7 @@ export function SourceList() {
               isGenerating={isPodcastGenerating}
               onClick={handlePodcastClick}
               onRefresh={handlePodcastRefresh}
+              disabled={!areAllSourcesReady}
             />
 
             {/* ── Learning Timeline Tile ── */}
@@ -192,6 +195,7 @@ export function SourceList() {
               isGenerating={isPathGenerating}
               onClick={handleLearningPathClick}
               onRefresh={handleLearningPathRefresh}
+              disabled={!areAllSourcesReady}
             />
           </div>
         </div>
@@ -241,24 +245,32 @@ function PodcastTile({
   isGenerating,
   onClick,
   onRefresh,
+  disabled,
 }: {
   status: string;
   isGenerating: boolean;
   onClick: () => void;
   onRefresh: (e: React.MouseEvent) => void;
+  disabled?: boolean;
 }) {
   const isDone = status === 'READY';
   const isFailed = status === 'FAILED';
 
   return (
     <div
-      onClick={onClick}
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-card/40 hover:bg-card/90 hover:border-amber-500/50 transition-all duration-200 text-left shadow-xs hover:shadow-md cursor-pointer ${
+      onClick={disabled ? undefined : onClick}
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-card/40 transition-all duration-200 text-left shadow-xs ${
         isGenerating ? 'opacity-80' : ''
+      } ${
+        disabled 
+          ? 'opacity-50 cursor-not-allowed grayscale-[0.5]' 
+          : 'hover:bg-card/90 hover:border-amber-500/50 hover:shadow-md cursor-pointer'
       }`}
     >
       <div className={`p-2 rounded-lg transition-colors shrink-0 ${
-        isGenerating
+        disabled
+          ? 'bg-muted text-muted-foreground'
+          : isGenerating
           ? 'bg-amber-500/20 text-amber-400'
           : isDone
           ? 'bg-emerald-500/10 text-emerald-400'
@@ -286,7 +298,7 @@ function PodcastTile({
           </span>
 
           <div className="flex items-center gap-1">
-            {(isDone || isFailed) && (
+            {(isDone || isFailed) && !disabled && (
               <button
                 type="button"
                 onClick={onRefresh}
@@ -296,7 +308,7 @@ function PodcastTile({
                 <RefreshCw className="w-3 h-3" />
               </button>
             )}
-            {!isGenerating && (
+            {!isGenerating && !disabled && (
               <ChevronRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-amber-500" />
             )}
           </div>
@@ -321,24 +333,32 @@ function LearningTimelineTile({
   isGenerating,
   onClick,
   onRefresh,
+  disabled,
 }: {
   status: string;
   isGenerating: boolean;
   onClick: () => void;
   onRefresh: (e: React.MouseEvent) => void;
+  disabled?: boolean;
 }) {
   const isDone = status === 'READY';
   const isFailed = status === 'FAILED';
 
   return (
     <div
-      onClick={onClick}
-      className={`group relative flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-card/40 hover:bg-card/90 hover:border-cyan-500/50 transition-all duration-200 text-left shadow-xs hover:shadow-md cursor-pointer ${
+      onClick={disabled ? undefined : onClick}
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-card/40 transition-all duration-200 text-left shadow-xs ${
         isGenerating ? 'opacity-80' : ''
+      } ${
+        disabled 
+          ? 'opacity-50 cursor-not-allowed grayscale-[0.5]' 
+          : 'hover:bg-card/90 hover:border-cyan-500/50 hover:shadow-md cursor-pointer'
       }`}
     >
       <div className={`p-2 rounded-lg transition-colors shrink-0 ${
-        isGenerating
+        disabled
+          ? 'bg-muted text-muted-foreground'
+          : isGenerating
           ? 'bg-cyan-500/20 text-cyan-400'
           : isDone
           ? 'bg-emerald-500/10 text-emerald-400'
@@ -366,7 +386,7 @@ function LearningTimelineTile({
           </span>
 
           <div className="flex items-center gap-1">
-            {(isDone || isFailed) && (
+            {(isDone || isFailed) && !disabled && (
               <button
                 type="button"
                 onClick={onRefresh}
@@ -376,7 +396,7 @@ function LearningTimelineTile({
                 <RefreshCw className="w-3 h-3" />
               </button>
             )}
-            {!isGenerating && (
+            {!isGenerating && !disabled && (
               <ChevronRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-cyan-400" />
             )}
           </div>

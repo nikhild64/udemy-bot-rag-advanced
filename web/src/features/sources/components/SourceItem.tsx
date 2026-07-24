@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Source } from '@/shared/types';
 import { cn } from '@/lib/utils';
 import {
@@ -48,9 +48,28 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
   const retryMutation = useRetrySourceMutation(notebookId);
   const cancelMutation = useCancelSourceMutation(notebookId);
 
-  const currentStatus = liveStatus?.status || source.status;
-  const progress = liveStatus?.progress ?? (currentStatus === 'Ready' ? 100 : 0);
-  const currentStage = liveStatus?.currentStage || '';
+  const [isForcedQueued, setIsForcedQueued] = useState(false);
+
+  useEffect(() => {
+    if (reindexMutation.isPending || retryMutation.isPending) {
+      setIsForcedQueued(true);
+    } else if (isForcedQueued) {
+      const timer = setTimeout(() => setIsForcedQueued(false), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [reindexMutation.isPending, retryMutation.isPending, isForcedQueued]);
+
+  useEffect(() => {
+    const s = liveStatus?.status;
+    if (s && s !== 'Ready' && s !== 'Failed') {
+      setIsForcedQueued(false);
+    }
+  }, [liveStatus?.status]);
+
+  const isOptimisticQueued = isForcedQueued || reindexMutation.isPending || retryMutation.isPending;
+  const currentStatus = isOptimisticQueued ? 'Queued' : (liveStatus?.status || source.status);
+  const progress = isOptimisticQueued ? 0 : (liveStatus?.progress ?? (currentStatus === 'Ready' ? 100 : 0));
+  const currentStage = isOptimisticQueued ? 'Queued for processing' : (liveStatus?.currentStage || '');
 
   const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(currentStatus);
   const isQueuedOrProcessing = isProcessing || currentStatus === 'Queued' || currentStatus === 'Uploading' || currentStatus === 'Uploaded';

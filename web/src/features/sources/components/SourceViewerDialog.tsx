@@ -29,7 +29,10 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
   // Scroll active source into view
   useEffect(() => {
     if (isOpen && activeSourceRef.current) {
-      activeSourceRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const timer = setTimeout(() => {
+        activeSourceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 200);
+      return () => clearTimeout(timer);
     }
   }, [activeSourceId, isOpen]);
 

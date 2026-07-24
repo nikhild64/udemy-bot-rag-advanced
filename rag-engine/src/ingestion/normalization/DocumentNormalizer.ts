@@ -10,7 +10,9 @@ export class DocumentNormalizer {
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       // 2. Strip non-printable null/control characters except tab and newline
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
+      // 2.5. Strip lone surrogates which break strict JSON parsers (like Mistral and Qdrant)
+      .replace(/[\uD800-\uDFFF]/g, '')
       // 3. Replace tabs with space
       .replace(/\t/g, ' ')
       // 4. Collapse multiple spaces into a single space on lines

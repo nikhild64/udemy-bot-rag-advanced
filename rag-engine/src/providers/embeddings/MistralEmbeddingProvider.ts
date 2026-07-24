@@ -83,6 +83,12 @@ export class MistralEmbeddingProvider implements EmbeddingProvider {
 
         let response: Response;
         try {
+          const sanitizedTexts = texts.map((t) =>
+            t
+              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
+              .replace(/[\uD800-\uDFFF]/g, '')
+          );
+
           response = await fetch(this.apiUrl, {
             method: 'POST',
             headers: {
@@ -91,7 +97,7 @@ export class MistralEmbeddingProvider implements EmbeddingProvider {
             },
             body: JSON.stringify({
               model: this.modelName,
-              input: texts,
+              input: sanitizedTexts,
             }),
             signal: controller.signal,
           });

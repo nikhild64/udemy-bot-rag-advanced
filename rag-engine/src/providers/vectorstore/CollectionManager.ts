@@ -212,10 +212,24 @@ export class CollectionManager implements ICollectionManager {
       throw new ProviderError(`Connection failure with Qdrant Cloud: ${message}`, { statusCode: 503, cause: err instanceof Error ? err : undefined });
     }
 
-    if (message.includes('timeout') || message.includes('ETIMEDOUT') || message.includes('abort')) {
-      throw new ProviderError(`Timeout connecting to Qdrant Cloud: ${message}`, { statusCode: 504, cause: err instanceof Error ? err : undefined });
+    let extraMsg = '';
+    if (err && typeof err === 'object') {
+      const e = err as any;
+      if (e.data && e.data.status?.error) {
+        extraMsg = `: ${e.data.status.error}`;
+      } else if (e.response && e.response.data) {
+        extraMsg = `: ${JSON.stringify(e.response.data)}`;
+      } else if (e.body) {
+        extraMsg = `: ${JSON.stringify(e.body)}`;
+      } else if (e.message) {
+        extraMsg = `: ${e.message}`;
+      }
     }
 
-    throw new ProviderError(`Qdrant Cloud operation failed: ${message}`, { statusCode: status ?? 502, cause: err instanceof Error ? err : undefined });
+    if (message.includes('timeout') || message.includes('ETIMEDOUT') || message.includes('abort')) {
+      throw new ProviderError(`Timeout connecting to Qdrant Cloud${extraMsg}`, { statusCode: 504, cause: err instanceof Error ? err : undefined });
+    }
+
+    throw new ProviderError(`Qdrant Cloud operation failed${extraMsg}`, { statusCode: status ?? 502, cause: err instanceof Error ? err : undefined });
   }
 }
