@@ -30,6 +30,8 @@ export function Header() {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
+  const setActiveNotebookId = useUIStore((s) => s.setActiveNotebookId);
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const toggleSourcesPanel = useUIStore((s) => s.toggleSourcesPanel);
   const sourcesPanelOpen = useUIStore((s) => s.sourcesPanelOpen);
@@ -43,22 +45,40 @@ export function Header() {
 
   const { data: notebook } = useNotebookQuery(activeNotebookId);
 
+  const handleGoHome = () => {
+    setActiveNotebookId(null);
+    router.push('/');
+  };
+
   return (
     <header className="h-14 border-b border-border bg-card/50 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
       {/* Left section: Sidebar toggle & Notebook info + actions */}
       <div className="flex items-center gap-3 min-w-0">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          onClick={toggleSidebar}
-          title="Toggle Navigation Sidebar"
-        >
-          <PanelLeft className="w-4 h-4" />
-        </Button>
+        {!sidebarOpen && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={toggleSidebar}
+            title="Open Navigation Sidebar"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </Button>
+        )}
 
-        {notebook ? (
-          <div className="flex items-center gap-2 min-w-0">
+        {!sidebarOpen && (
+          <div
+            onClick={handleGoHome}
+            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition shrink-0"
+            title="Go to Dashboard"
+          >
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">ChaibookLM</span>
+          </div>
+        )}
+
+        {notebook && (
+          <div className={`flex items-center gap-2 min-w-0 ${!sidebarOpen ? 'border-l border-border/50 pl-3' : ''}`}>
             <BookOpen className="w-4 h-4 text-primary shrink-0" />
             <h1 className="text-sm font-semibold text-foreground truncate">{notebook.title}</h1>
             <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 hidden sm:inline-flex">
@@ -111,11 +131,6 @@ export function Header() {
                 Delete Notebook
               </DropdownMenuItem>
             </DropdownMenu>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">ChaibookLM</span>
           </div>
         )}
       </div>
