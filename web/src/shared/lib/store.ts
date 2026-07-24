@@ -17,6 +17,8 @@ interface UIState {
   toggleMobileSourcesPanel: () => void;
   createNotebookModalOpen: boolean;
   setCreateNotebookModalOpen: (open: boolean) => void;
+  notebookLimitModalOpen: boolean;
+  setNotebookLimitModalOpen: (open: boolean) => void;
   uploadModalOpen: boolean;
   setUploadModalOpen: (open: boolean) => void;
   settingsModalOpen: boolean;
@@ -44,6 +46,8 @@ export const useUIStore = create<UIState>((set) => ({
   toggleMobileSourcesPanel: () => set((state) => ({ mobileSourcesPanelOpen: !state.mobileSourcesPanelOpen })),
   createNotebookModalOpen: false,
   setCreateNotebookModalOpen: (open) => set({ createNotebookModalOpen: open }),
+  notebookLimitModalOpen: false,
+  setNotebookLimitModalOpen: (open) => set({ notebookLimitModalOpen: open }),
   uploadModalOpen: false,
   setUploadModalOpen: (open) => set({ uploadModalOpen: open }),
   settingsModalOpen: false,

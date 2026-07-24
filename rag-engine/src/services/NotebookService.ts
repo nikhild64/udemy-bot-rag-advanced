@@ -2,7 +2,7 @@ import { Notebook } from '@prisma/client';
 import { INotebookRepository, IUserRepository, UpdateNotebookInput, ListNotebooksQuery, PaginatedResult } from '@/repositories/interfaces';
 import { PrismaNotebookRepository } from '@/repositories/PrismaNotebookRepository';
 import { PrismaUserRepository } from '@/repositories/PrismaUserRepository';
-import { NotFoundError, ValidationError } from '@/shared/errors';
+import { NotFoundError, ValidationError, ForbiddenError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 
 export class NotebookService {
@@ -20,7 +20,19 @@ export class NotebookService {
     }
 
     logger.info({ userId, title }, 'Creating notebook');
-    await this.userRepository.findOrCreate({ id: userId });
+    const user = await this.userRepository.findOrCreate({ id: userId });
+
+    // Non-Pro user notebook count restriction (Max 2 active notebooks)
+    if (!user.isPro) {
+      const activeNotebooks = await this.notebookRepository.findMany({
+        userId,
+        isArchived: false,
+        limit: 100,
+      });
+      if (activeNotebooks.data.length >= 2) {
+        throw new ForbiddenError('Free account notebook limit reached (max 2 notebooks). Contact admin to increase the limit.');
+      }
+    }
 
     return this.notebookRepository.create({
       userId,

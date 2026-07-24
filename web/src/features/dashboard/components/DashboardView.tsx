@@ -23,6 +23,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/shared/lib/i18n-context';
 import { toast } from 'sonner';
 import { useAuth } from '@clerk/nextjs';
+import { useUserProfileQuery } from '@/shared/hooks/useUserProfile';
+import { useUIStore } from '@/shared/lib/store';
 
 export function DashboardView({
   onOpenSearch,
@@ -34,6 +36,8 @@ export function DashboardView({
   onCreateNotebook: () => void;
 }) {
   const { isLoaded, isSignedIn } = useAuth();
+  const { data: userProfile } = useUserProfileQuery();
+  const setNotebookLimitModalOpen = useUIStore((s) => s.setNotebookLimitModalOpen);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +46,15 @@ export function DashboardView({
 
   const router = useRouter();
   const { t } = useTranslation();
+
+  const handleCreateNotebook = () => {
+    const totalCount = data?.stats?.totalNotebooks ?? 0;
+    if (!userProfile?.isPro && totalCount >= 2) {
+      setNotebookLimitModalOpen(true);
+    } else {
+      onCreateNotebook();
+    }
+  };
 
   const fetchSummary = async () => {
     setLoading(true);
@@ -201,7 +214,7 @@ export function DashboardView({
               <span>Search (Ctrl+K)</span>
             </button>
             <button
-              onClick={onCreateNotebook}
+              onClick={handleCreateNotebook}
               className="dash-btn-primary px-3.5 py-1.5 text-xs flex items-center gap-1.5"
             >
               <PlusCircle className="h-3.5 w-3.5" />
@@ -288,7 +301,7 @@ export function DashboardView({
                 title={t('notebooks.empty_title', 'No Notebooks Yet')}
                 description={t('notebooks.empty_desc', 'Create your first notebook to get started.')}
                 actionLabel="Create Notebook"
-                onAction={onCreateNotebook}
+                onAction={handleCreateNotebook}
               />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

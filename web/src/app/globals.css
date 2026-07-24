@@ -132,4 +132,39 @@
   button, a, [role="button"] {
     @apply cursor-pointer;
   }
+
+  /* ── PRO avatar ring animation ── */
+  @keyframes pro-ring-spin {
+    from { --pro-angle: 0deg; }
+    to   { --pro-angle: 360deg; }
+  }
+
+  @property --pro-angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
+  .pro-avatar-ring {
+    animation: pro-ring-spin 4s linear infinite;
+    background: conic-gradient(
+      from var(--pro-angle),
+      #b8860b 0%,
+      #ffd700 20%,
+      #fff8dc 35%,
+      #ffd700 50%,
+      #daa520 65%,
+      #b8860b 80%,
+      #ffd700 100%
+    );
+  }
+
+  @keyframes pro-badge-shimmer {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.7; }
+  }
+
+  .pro-badge-pill {
+    animation: pro-badge-shimmer 3s ease-in-out infinite;
+  }
 }

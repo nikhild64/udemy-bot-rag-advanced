@@ -12,6 +12,7 @@ export * from './parsing.error';
 export * from './chunking.error';
 export * from './guardrail.error';
 export * from './unauthorized.error';
+export * from './forbidden.error';
 export * from './loader.error';
 export * from './storage.error';
 

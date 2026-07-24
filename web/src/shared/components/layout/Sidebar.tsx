@@ -37,16 +37,16 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
   return (
     <aside className={cn(
       "w-full flex flex-col h-full shrink-0 transition-all duration-300",
-      !isMobile && "w-64 border-r border-border bg-card/40"
+      !isMobile && "w-56 border-r border-[#1e1e1e] bg-[#0d0d0d]"
     )}>
       {/* Brand Header */}
-      <div className="h-14 px-4 border-b border-border flex items-center justify-between">
+      <div className="h-12 px-3 border-b border-[#1e1e1e] flex items-center justify-between">
         <div
           onClick={handleGoHome}
           className="flex items-center gap-2 font-bold text-sm text-foreground cursor-pointer hover:opacity-80 transition"
           title="Go to Dashboard"
         >
-          <div className="w-7 h-7 flex items-center justify-center shrink-0">
+          <div className="w-6 h-6 flex items-center justify-center shrink-0">
             <div style={{ transform: "rotate(3.62886deg)" }} className="w-full h-full">
               <svg viewBox="0 0 2000 2000" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="w-full h-full fill-[#B0B0B0] stroke-[#B0B0B0] dark:fill-[#ffffff] dark:stroke-[#ffffff]">
                 <path d="M1507.79 760.427c-.65 63.101-207.62 111.366-468.81 108.688-261.194-2.678-465.548-45.025-464.901-108.125s206.05-123.061 467.241-120.383 467.11 56.719 466.47 119.82Z" fill="#FF7D0C" style={{ transform: "translateY(-4.94929px) scaleX(1.0198)", transformOrigin: "50% 50%", transformBox: "fill-box" }}></path>
@@ -57,21 +57,21 @@ export function Sidebar({ isMobile = false }: SidebarProps) {
               </svg>
             </div>
           </div>
-          <span className="font-onest font-medium tracking-tight">ChaibookLM</span>
+          <span className="text-[13px] font-onest font-medium tracking-tight">ChaibookLM</span>
         </div>
 
         <Button
           size="icon"
           variant="ghost"
-          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          className="h-6 w-6 text-[#505050] hover:text-[#888]"
           onClick={handleClose}
         >
-          <PanelLeftClose className="w-4 h-4" />
+          <PanelLeftClose className="w-3.5 h-3.5" />
         </Button>
       </div>
 
       {/* Notebook List */}
-      <div className="flex-1 overflow-hidden p-3">
+      <div className="flex-1 overflow-hidden px-2 py-2.5">
         <NotebookList isMobile={isMobile} />
       </div>
     </aside>

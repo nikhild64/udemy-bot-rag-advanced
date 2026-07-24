@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useUIStore } from '@/shared/lib/store';
-import { useCreateNotebookMutation } from '../hooks/useNotebooks';
+import { useNotebooksQuery, useCreateNotebookMutation } from '../hooks/useNotebooks';
+import { useUserProfileQuery } from '@/shared/hooks/useUserProfile';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,9 @@ type CreateNotebookFormValues = z.infer<typeof createNotebookSchema>;
 export function CreateNotebookModal() {
   const isOpen = useUIStore((s) => s.createNotebookModalOpen);
   const setOpen = useUIStore((s) => s.setCreateNotebookModalOpen);
+  const setNotebookLimitModalOpen = useUIStore((s) => s.setNotebookLimitModalOpen);
+  const { data: notebooks } = useNotebooksQuery();
+  const { data: userProfile } = useUserProfileQuery();
   const createMutation = useCreateNotebookMutation();
 
   const {
@@ -35,8 +39,21 @@ export function CreateNotebookModal() {
   });
 
   const onSubmit = (data: CreateNotebookFormValues) => {
+    const activeCount = (notebooks || []).filter((nb) => !nb.isArchived).length;
+    if (!userProfile?.isPro && activeCount >= 2) {
+      setOpen(false);
+      setNotebookLimitModalOpen(true);
+      return;
+    }
+
     createMutation.mutate(data, {
       onSuccess: () => reset(),
+      onError: (err: any) => {
+        if (err?.status === 403 || err?.message?.toLowerCase().includes('limit')) {
+          setOpen(false);
+          setNotebookLimitModalOpen(true);
+        }
+      },
     });
   };
 

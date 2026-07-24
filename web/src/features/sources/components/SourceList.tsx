@@ -12,9 +12,13 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { useUserProfileQuery } from '@/shared/hooks/useUserProfile';
+import { ProRequiredModal } from '@/shared/components/ProRequiredModal';
+
 export function SourceList() {
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const setUploadModalOpen = useUIStore((s) => s.setUploadModalOpen);
+  const { data: userProfile } = useUserProfileQuery();
 
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedSourceId, setSelectedSourceId] = useState('');
@@ -24,6 +28,8 @@ export function SourceList() {
   const [podcastOpen, setPodcastOpen] = useState(false);
   const [learningPathOpen, setLearningPathOpen] = useState(false);
   const [confirmReindexAllOpen, setConfirmReindexAllOpen] = useState(false);
+  const [proRequiredOpen, setProRequiredOpen] = useState(false);
+  const [proFeatureName, setProFeatureName] = useState('Re-creating AI Artifacts');
 
   const { data: sources, isLoading, isError, error } = useSourcesQuery(activeNotebookId);
   const { data: artifacts } = useNotebookArtifactsQuery(activeNotebookId);
@@ -60,6 +66,11 @@ export function SourceList() {
 
   const handlePodcastRefresh = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!userProfile?.isPro) {
+      setProFeatureName('Re-creating AI Podcast');
+      setProRequiredOpen(true);
+      return;
+    }
     if (!activeNotebookId || isPodcastGenerating) return;
     podcastMutation.mutate({ notebookId: activeNotebookId, force: true });
   };
@@ -76,6 +87,11 @@ export function SourceList() {
 
   const handleLearningPathRefresh = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!userProfile?.isPro) {
+      setProFeatureName('Re-creating Learning Path');
+      setProRequiredOpen(true);
+      return;
+    }
     if (!activeNotebookId || isPathGenerating) return;
     learningPathMutation.mutate({ notebookId: activeNotebookId, force: true });
   };
@@ -258,6 +274,13 @@ export function SourceList() {
         isGenerating={isPathGenerating}
         learningPath={pathData}
         onSelectSource={handleSelectSourceFromPath}
+      />
+
+      {/* Pro Entitlement Required Dialog */}
+      <ProRequiredModal
+        isOpen={proRequiredOpen}
+        onClose={() => setProRequiredOpen(false)}
+        featureName={proFeatureName}
       />
 
       {/* Custom Re-index All Sources Confirmation Dialog */}

@@ -5,6 +5,7 @@ import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { SourceList } from '@/features/sources/components/SourceList';
 import { CreateNotebookModal } from '@/features/notebooks/components/CreateNotebookModal';
+import { NotebookLimitModal } from '@/features/notebooks/components/NotebookLimitModal';
 import { RenameNotebookModal } from '@/features/notebooks/components/RenameNotebookModal';
 import { DeleteNotebookModal } from '@/features/notebooks/components/DeleteNotebookModal';
 import { UploadModal } from '@/features/upload/components/UploadModal';
@@ -113,6 +114,7 @@ export function AppLayout({
 
       {/* Global Modals */}
       <CreateNotebookModal />
+      <NotebookLimitModal />
       <RenameNotebookModal />
       <DeleteNotebookModal />
       <UploadModal />

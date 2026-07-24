@@ -6,7 +6,8 @@ import { SourceService } from '@/services/SourceService';
 import { audioStorageService } from '@/services/audio-storage.service';
 import { TTSServiceFactory } from '@/services/tts.service';
 import { DenseNotebookRetriever } from '@/retrieval/notebook/DenseNotebookRetriever';
-import { UnauthorizedError, ValidationError } from '@/shared/errors';
+import { PrismaUserRepository } from '@/repositories/PrismaUserRepository';
+import { UnauthorizedError, ValidationError, ForbiddenError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 import fs from 'fs';
 
@@ -179,6 +180,15 @@ export async function generatePodcastController(
   const body = (request.body as { force?: boolean }) || {};
   const force = !!body.force;
 
+  // Non-Pro entitlement check for forced re-creation
+  if (force) {
+    const userRepository = new PrismaUserRepository();
+    const user = await userRepository.findById(userId);
+    if (!user?.isPro) {
+      throw new ForbiddenError('Re-creating AI artifacts (Podcast & Learning Path) requires a PRO account.');
+    }
+  }
+
   const notebookService = new NotebookService();
   const notebook = await notebookService.getNotebook(notebookId, userId);
 
@@ -346,6 +356,15 @@ export async function generateLearningPathController(
 
   const body = (request.body as { force?: boolean }) || {};
   const force = !!body.force;
+
+  // Non-Pro entitlement check for forced re-creation
+  if (force) {
+    const userRepository = new PrismaUserRepository();
+    const user = await userRepository.findById(userId);
+    if (!user?.isPro) {
+      throw new ForbiddenError('Re-creating AI artifacts (Podcast & Learning Path) requires a PRO account.');
+    }
+  }
 
   const notebookService = new NotebookService();
   const notebook = await notebookService.getNotebook(notebookId, userId);
