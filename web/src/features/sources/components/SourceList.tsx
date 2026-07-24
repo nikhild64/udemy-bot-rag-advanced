@@ -153,6 +153,7 @@ export function SourceList() {
       {/* Source Viewer Dialog for Notebook Sources */}
       {sources && (
         <SourceViewerDialog
+          key={selectedSourceId || 'default'}
           isOpen={viewerOpen}
           onClose={() => setViewerOpen(false)}
           sources={sources}

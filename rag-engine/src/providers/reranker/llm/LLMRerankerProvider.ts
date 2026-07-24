@@ -142,37 +142,50 @@ Candidate Passages
 
   private parseAndValidate(content: string, batch: T[]): Map<string, number> | null {
     try {
-      const cleaned = content.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
-      const parsed = JSON.parse(cleaned);
+      let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+      const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || cleaned.match(/(\[\s*\{[\s\S]*\}\s*\])/);
+      if (jsonMatch && jsonMatch[1]) {
+        cleaned = jsonMatch[1].trim();
+      }
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch (parseErr) {
+        logger.error({ err: parseErr, rawContent: content.substring(0, 300) }, 'Failed to parse reranker JSON response');
+        return null;
+      }
 
       if (!Array.isArray(parsed)) {
-        logger.error('Reranker response is not a JSON array');
+        logger.error({ rawContent: content.substring(0, 300) }, 'Reranker response is not a JSON array');
         return null;
       }
 
       const scores = new Map<string, number>();
 
-      for (const item of parsed) {
+      for (let itemIdx = 0; itemIdx < parsed.length; itemIdx++) {
+        const item = parsed[itemIdx];
         if (!item || typeof item !== 'object') {
-          logger.error('Invalid item in reranker response.');
-          return null;
-        }
-        
-        if (typeof item.chunkId !== 'string' || typeof item.score !== 'number') {
-          logger.error('Invalid chunkId or score format in reranker response.');
-          return null;
+          continue;
         }
 
-        if (item.score < 0 || item.score > 1) {
-          logger.error(`Invalid score value (must be between 0 and 1): ${item.score}.`);
-          return null;
+        const rawChunkId = String(item.chunkId ?? item.id ?? item.index ?? itemIdx);
+        let rawScore = Number(item.score ?? item.relevance_score ?? item.relevanceScore ?? 0);
+
+        if (isNaN(rawScore)) {
+          rawScore = 0;
+        } else if (rawScore > 1 && rawScore <= 100) {
+          rawScore = rawScore / 100;
+        } else if (rawScore < 0) {
+          rawScore = 0;
+        } else if (rawScore > 1) {
+          rawScore = 1;
         }
 
-        const chunkId = item.chunkId;
         let matchedId: string | undefined;
 
-        // Try mapping from index-based ID idx-ref-idx to original ID first
-        const match = chunkId.match(/^idx-ref-(\d+)$/);
+        // Try index-based ID (idx-ref-0 or number 0..batch.length)
+        const match = rawChunkId.match(/^(?:idx-ref-)?(\d+)$/);
         if (match) {
           const idx = parseInt(match[1], 10);
           if (idx >= 0 && idx < batch.length && batch[idx] !== undefined) {
@@ -180,59 +193,37 @@ Candidate Passages
           }
         }
 
-        // Backward compatibility fallback for tests and direct matches
         if (!matchedId) {
-          const batchIds = new Set(batch.map(b => this.getChunkId(b)));
-          if (batchIds.has(chunkId)) {
-            matchedId = chunkId;
+          const batchIds = new Set(batch.map((b) => this.getChunkId(b)));
+          if (batchIds.has(rawChunkId)) {
+            matchedId = rawChunkId;
           } else {
-            // Fuzzy match on original IDs
             const foundOriginal = Array.from(batchIds).find(
-              (id) => id.startsWith(chunkId) || chunkId.startsWith(id)
+              (id) => id.startsWith(rawChunkId) || rawChunkId.startsWith(id),
             );
             if (foundOriginal) {
               matchedId = foundOriginal;
-            } else {
-              // Fuzzy match on idx-ref-idx patterns
-              const foundIdxKey = batch.findIndex((_, idx) => {
-                const key = `idx-ref-${idx}`;
-                return key.startsWith(chunkId) || chunkId.startsWith(key);
-              });
-              if (foundIdxKey !== -1 && batch[foundIdxKey] !== undefined) {
-                matchedId = this.getChunkId(batch[foundIdxKey]!);
-              }
             }
           }
         }
 
-        if (!matchedId) {
-          logger.error(`Unknown chunk ID in response: ${item.chunkId}.`);
-          return null;
-        }
-
-        if (scores.has(matchedId)) {
-          logger.error(`Duplicate chunk ID in response: ${matchedId}.`);
-          return null;
-        }
-        
-        scores.set(matchedId, item.score);
-      }
-
-      // Check for missing chunk IDs
-      const batchIds = batch.map(item => this.getChunkId(item));
-      if (scores.size !== batchIds.length) {
-        logger.warn(`Missing chunk IDs in response. Expected ${batchIds.length}, got ${scores.size}. Assigning 0 to missing chunks.`);
-        for (const id of batchIds) {
-          if (!scores.has(id)) {
-            scores.set(id, 0);
-          }
+        if (matchedId && !scores.has(matchedId)) {
+          scores.set(matchedId, rawScore);
         }
       }
 
-      logger.debug('Response validation completed');
+      // Ensure all batch items have a score (defaulting missing to 0)
+      const batchIds = batch.map((item) => this.getChunkId(item));
+      for (const id of batchIds) {
+        if (!scores.has(id)) {
+          scores.set(id, 0);
+        }
+      }
+
+      logger.debug({ scoredCount: scores.size }, 'Response validation completed');
       return scores;
     } catch (error) {
-      logger.error({ err: error }, 'Failed to parse reranker JSON response');
+      logger.error({ err: error }, 'Unexpected error during reranker response parsing');
       return null;
     }
   }

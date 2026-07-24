@@ -380,7 +380,7 @@ export class NvidiaChatProvider implements ChatProvider {
       case 'query-transformation':
         return this.queryTransformationModel;
       case 'reranking':
-        return this.chatModel;
+        return this.queryTransformationModel;
       case 'chat':
         return this.chatModel;
       default:

@@ -78,4 +78,11 @@ export interface VectorStore {
    * @param collectionName Optional collection name to target (defaults to configured collection).
    */
   copyVectorsBySource?(sourceId: string, newSourceId: string, newNotebookId: string, newTitle: string, collectionName?: string): Promise<number>;
+
+  /**
+   * Deletes vectors matching a specific filter specification.
+   * @param collectionName Optional collection name to target.
+   * @param filter Filter criteria for deleting points.
+   */
+  deleteVectorsByFilter?(collectionName?: string, filter?: Record<string, unknown>): Promise<boolean>;
 }

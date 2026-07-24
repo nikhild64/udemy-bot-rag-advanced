@@ -349,4 +349,26 @@ export class QdrantVectorStore implements VectorStore {
       return 0;
     }
   }
+
+  async deleteVectorsByFilter(collectionName?: string, filter?: Record<string, unknown>): Promise<boolean> {
+    const name = collectionName ?? this.collectionName;
+
+    if (!filter || Object.keys(filter).length === 0) {
+      throw new ValidationError('Invalid payload: filter object is required to delete vectors by filter');
+    }
+
+    const startTime = Date.now();
+    try {
+      await this.client.delete(name, {
+        wait: true,
+        filter: filter as any,
+      });
+      const durationMs = Date.now() - startTime;
+      logger.info({ collectionName: name, filter, durationMs }, 'Delete vectors by filter completed');
+      return true;
+    } catch (err) {
+      this.collectionManager.handleQdrantError(err, name);
+      return false;
+    }
+  }
 }

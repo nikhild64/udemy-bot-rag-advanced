@@ -3,7 +3,6 @@
 import React from 'react';
 import { X, FileText, HardDrive, Calendar, Database, CheckCircle } from 'lucide-react';
 import { Source } from '@/shared/types';
-import { sourcesApi } from '../api/sources.api';
 import { Button } from '@/components/ui/button';
 
 interface SourceMetadataDrawerProps {
@@ -22,7 +21,7 @@ export function SourceMetadataDrawer({ source, isOpen, onClose }: SourceMetadata
         window.open(info.downloadUrl, '_blank');
       }
     } catch (e) {
-      console.error('Download failed', e);
+      logger.error({ err: e }, 'Download failed');
     }
   };
 

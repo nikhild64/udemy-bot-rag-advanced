@@ -15,7 +15,7 @@ export const ChatConfigSchema = z
     RERANK_MODEL: z.string().default('mistral-small-latest'),
     CHAT_MODEL: z.string().default('mistral-medium-latest'),
     MISTRAL_API_URL: z.string().url().default('https://api.mistral.ai/v1/chat/completions'),
-    CHAT_TIMEOUT: z.coerce.number().default(30000),
+    CHAT_TIMEOUT: z.coerce.number().default(60000),
   })
   .superRefine((data, ctx) => {
     const provider = data.CHAT_PROVIDER.toLowerCase();

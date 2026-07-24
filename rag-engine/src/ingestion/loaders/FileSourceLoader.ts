@@ -16,15 +16,22 @@ export class FileSourceLoader implements ISourceLoader {
       'Loading file source content',
     );
 
-    if (!source.storagePath && !source.fileUrl) {
-      throw new SourceLoaderError(`File source '${source.id}' is missing a storagePath or fileUrl`);
+    const hasRawText =
+      source.metadata &&
+      typeof (source.metadata as any).rawText === 'string' &&
+      (source.metadata as any).rawText.length > 0;
+
+    if (!source.storagePath && !source.fileUrl && !hasRawText) {
+      throw new SourceLoaderError(
+        `File source '${source.id}' is missing a storagePath, fileUrl, or rawText content`,
+      );
     }
 
-    const filePath = source.storagePath || source.fileUrl;
+    const filePath = source.storagePath || source.fileUrl || '';
     let content: Buffer;
 
     try {
-      if (source.metadata && typeof (source.metadata as any).rawText === 'string') {
+      if (hasRawText) {
         content = Buffer.from((source.metadata as any).rawText, 'utf-8');
       } else if (filePath && (await this.isLocalFile(filePath))) {
         content = await fs.readFile(filePath);
@@ -95,8 +102,8 @@ export class FileSourceLoader implements ISourceLoader {
       return providedMime.toLowerCase();
     }
 
-    if (!filePath) {
-      return 'application/octet-stream';
+    if (!filePath || filePath === '') {
+      return 'text/plain';
     }
 
     const ext = path.extname(filePath).toLowerCase();

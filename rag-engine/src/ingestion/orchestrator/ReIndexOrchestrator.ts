@@ -41,9 +41,12 @@ export class ReIndexOrchestrator {
     // 2. Delete Existing Vectors
     try {
       const collectionName = config.vectorStore.userKnowledgeCollection;
-      if (typeof (this.vectorStore as any).deleteVectorsByFilter === 'function') {
-        await (this.vectorStore as any).deleteVectorsByFilter(collectionName, {
-          must: [{ key: 'sourceId', match: { value: sourceId } }]
+      if (typeof this.vectorStore.deleteVectorsByFilter === 'function') {
+        await this.vectorStore.deleteVectorsByFilter(collectionName, {
+          should: [
+            { key: 'sourceId', match: { value: sourceId } },
+            { key: 'lessonId', match: { value: sourceId } },
+          ],
         });
       }
       logger.info({ sourceId, collectionName }, 'Cleaned up previous vector embeddings for re-indexing');

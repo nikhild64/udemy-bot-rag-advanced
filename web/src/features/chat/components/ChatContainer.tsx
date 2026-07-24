@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { useUIStore } from '@/shared/lib/store';
 import { useMessagesQuery, useDeleteMessageMutation } from '../hooks/useMessages';
 import { useChat } from '../hooks/useChat';
-import { useSourcesQuery } from '@/features/sources/hooks/useSources';
+import { useSourcesQuery, useSourceStatusQuery } from '@/features/sources/hooks/useSources';
+import { SourceStatus } from '@/shared/types';
 import { MessageList } from './MessageList';
 import { Send, Sparkles, BookOpen, Upload, Loader2, Lock } from 'lucide-react';
 
@@ -23,6 +24,26 @@ export function ChatContainer() {
   const hasSources = sources.length > 0;
   const hasReadySources = hasSources && sources.some((s) => s.status === 'Ready' || (s.status as string) === 'Indexed');
   const isIndexingSources = hasSources && !hasReadySources;
+
+  // Track the source currently undergoing processing
+  const processingSource = sources.find((s) =>
+    ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing', 'Queued', 'Uploading', 'Uploaded', 'Pending', 'Processing'].includes(s.status)
+  );
+
+  const { data: liveStatus } = useSourceStatusQuery(
+    processingSource?.id || '',
+    (processingSource?.status as SourceStatus) || 'Queued'
+  );
+
+  const currentStatus = liveStatus?.status || processingSource?.status || 'Processing';
+  const progress = liveStatus?.progress ?? 0;
+
+  const statusLabel =
+    progress > 0 && progress < 100
+      ? `${currentStatus} (${progress}%)`
+      : currentStatus !== 'Ready' && currentStatus !== 'Indexed'
+      ? `${currentStatus} in progress...`
+      : 'Processing & Indexing...';
 
   const handleSend = () => {
     if (!inputQuery.trim() || isStreaming || !hasReadySources) return;
@@ -116,14 +137,16 @@ export function ChatContainer() {
                 <Loader2 className="w-8 h-8 animate-spin" />
               </div>
               <div className="space-y-1.5">
-                <h3 className="text-base font-semibold text-white">Processing & Indexing Sources</h3>
+                <h3 className="text-base font-semibold text-white">
+                  {processingSource ? `Processing ${processingSource.displayName || processingSource.title}` : 'Processing & Indexing Sources'}
+                </h3>
                 <p className="text-xs text-[#A9A9A9] leading-relaxed">
-                  Your knowledge sources are currently being extracted, chunked, and embedded into vector storage. Chat will unlock automatically as soon as indexing completes.
+                  Your knowledge source is currently being extracted, chunked, and embedded into vector storage. Chat will unlock automatically as soon as ingestion completes.
                 </p>
               </div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-400">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-400">
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span>Indexing in progress...</span>
+                <span>{statusLabel}</span>
               </div>
             </div>
           </div>

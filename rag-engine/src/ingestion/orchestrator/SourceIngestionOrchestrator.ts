@@ -317,6 +317,7 @@ export class SourceIngestionOrchestrator {
       // 8. Update Source Lifecycle & Completed Progress
       const updatedMetadata = {
         ...((source.metadata as Record<string, any>) || {}),
+        rawText: extractedDoc.content,
         indexedAt: new Date().toISOString(),
         chunksCount: chunks.length,
         embeddingsCount: embeddingResult.embeddedChunks.length,

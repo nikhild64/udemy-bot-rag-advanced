@@ -72,7 +72,7 @@ export default function AdminLogsPage() {
       setConfirmClearOpen(false);
       refetchLogs();
     } catch (e) {
-      console.error('Failed to clear logs', e);
+      console.error('Failed to clear logs:', e);
     }
   };
 
@@ -287,7 +287,12 @@ export default function AdminLogsPage() {
                             {log.context || 'System'}
                           </td>
                           <td className="py-3 px-4 font-mono text-foreground/90 truncate max-w-md">
-                            {log.message}
+                            <span className="truncate">{log.message}</span>
+                            {log.metadata && Object.keys(log.metadata).length > 0 && (
+                              <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-muted font-sans font-medium text-muted-foreground shrink-0 border border-border/50">
+                                {Object.keys(log.metadata).length} meta
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-right">
                             <Button

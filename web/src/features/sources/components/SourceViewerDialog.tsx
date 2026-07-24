@@ -16,12 +16,12 @@ interface SourceViewerDialogProps {
 export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId }: SourceViewerDialogProps) {
   const [activeSourceId, setActiveSourceId] = useState(initialSourceId);
 
-  // Update active source if dialog opens with a new initialSourceId
+  // Update active source if initialSourceId changes or dialog opens
   useEffect(() => {
-    if (isOpen && initialSourceId) {
+    if (initialSourceId) {
       setActiveSourceId(initialSourceId);
     }
-  }, [isOpen, initialSourceId]);
+  }, [initialSourceId, isOpen]);
 
   const getFileIcon = (source: Source) => {
     const mime = source.mimeType?.toLowerCase() || '';

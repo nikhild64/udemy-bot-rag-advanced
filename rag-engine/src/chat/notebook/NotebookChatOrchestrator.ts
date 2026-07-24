@@ -86,8 +86,8 @@ export class NotebookChatOrchestrator {
     try {
       const providerOptions: ChatProviderOptions = {
         task: 'chat',
+        maxTokens: options.maxTokens ?? 1500,
         ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-        ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
       };
       aiResponse = await this.chatProvider.generateResponse(messages, providerOptions);
     } catch (err) {
@@ -97,6 +97,18 @@ export class NotebookChatOrchestrator {
     const completionDurationMs = Math.round(performance.now() - startCompletion);
 
     const answerContent = aiResponse.message.content;
+
+    logger.info(
+      {
+        context: 'RAG Engine',
+        phase: 'answer-generation',
+        notebookId,
+        durationMs: completionDurationMs,
+        promptCharacters: messages.reduce((acc, m) => acc + m.content.length, 0),
+        responseCharacters: answerContent.length,
+      },
+      `[Phase 6] LLM Answer Generation Completed (${completionDurationMs}ms)`,
+    );
 
     // 6. Save Assistant Message with attached citations
     const assistantMessage = await this.messageService.createMessage({
@@ -117,6 +129,8 @@ export class NotebookChatOrchestrator {
     // 7. Structured Telemetry Logging
     logger.info(
       {
+        context: 'RAG Engine',
+        phase: 'pipeline-summary',
         notebookId,
         userMessageId: userMessage.id,
         assistantMessageId: assistantMessage.id,
@@ -126,7 +140,7 @@ export class NotebookChatOrchestrator {
         promptCharacters: messages.reduce((acc, m) => acc + m.content.length, 0),
         citationCount: retrievalResult.citations.length,
       },
-      'Notebook chat pipeline completed successfully',
+      `[RAG Pipeline Complete] End-to-End Execution Completed (${totalDurationMs}ms | Retrieval: ${retrievalDurationMs}ms | LLM: ${completionDurationMs}ms)`,
     );
 
     return {

@@ -35,10 +35,49 @@ export class SourceViewerService {
       url = `/api/storage/files/${source.storagePath}`;
     }
 
-    // In case of TEXT/Markdown types where content might be embedded
-    let rawText = null;
-    if (source.type === 'TEXT' || source.type === 'MARKDOWN') {
-      rawText = meta.rawText || null;
+    // Extract raw text or transcript across all source types (PDF, Youtube, Audio, Website, Text)
+    let rawText = meta.rawText || meta.transcript || meta.extractedText || meta.content || null;
+
+    // Fallback for existing sources: Recover transcript/text from Qdrant vector store points
+    if (!rawText) {
+      try {
+        const { VectorStoreFactory } = await import('@/providers/vectorstore/VectorStoreFactory');
+        const vectorStore = VectorStoreFactory.create();
+        const client = (vectorStore as any).client;
+        const collectionName = (vectorStore as any).collectionName;
+
+        if (client && collectionName) {
+          const scrollRes = await client.scroll(collectionName, {
+            filter: {
+              should: [
+                { key: 'lessonId', match: { value: source.id } },
+                { key: 'sourceId', match: { value: source.id } },
+              ],
+            },
+            limit: 500,
+            with_payload: true,
+            with_vector: false,
+          });
+
+          if (scrollRes.points && scrollRes.points.length > 0) {
+            const sorted = scrollRes.points.sort((a: any, b: any) => {
+              const idxA = a.payload?.chunkIndex ?? a.payload?.startTime ?? 0;
+              const idxB = b.payload?.chunkIndex ?? b.payload?.startTime ?? 0;
+              return idxA - idxB;
+            });
+
+            const texts = sorted
+              .map((p: any) => String(p.payload?.text || p.payload?.chunkText || p.payload?.content || '').trim())
+              .filter(Boolean);
+
+            if (texts.length > 0) {
+              rawText = texts.join('\n\n');
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn({ sourceId: source.id, err }, 'Failed to fetch vector chunks for viewer fallback');
+      }
     }
 
     return {

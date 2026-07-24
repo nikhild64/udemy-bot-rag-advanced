@@ -73,32 +73,64 @@ export class RetrievalOrchestrator {
     const userId = options.userId;
     const rawQuery = options.query.trim();
 
-    logger.info({ notebookId, userId, query: rawQuery }, 'Starting notebook retrieval orchestration');
+    logger.info(
+      { context: 'RAG Engine', phase: 'orchestration-start', notebookId, userId, query: rawQuery },
+      'Starting notebook retrieval orchestration',
+    );
 
     // 2. Validate Notebook Security & Tenant Access
     await this.notebookService.getNotebook(notebookId, userId);
 
-    // 3. Execute Initial Query Transformation
+    // 3. Execute Initial Query Transformation (Phase 1)
+    const startTransform = performance.now();
     let transformedQuery = rawQuery;
     try {
       const transformationResult = await this.queryTransformationService.transform(rawQuery);
       transformedQuery = transformationResult.transformedQuery || rawQuery;
     } catch (err) {
-      logger.warn({ notebookId, err }, 'Query transformation failed, falling back to raw query');
+      logger.warn(
+        { context: 'RAG Engine', phase: 'query-transformation', notebookId, err },
+        'Query transformation failed, falling back to raw query',
+      );
     }
+    const transformationDurationMs = Math.round(performance.now() - startTransform);
+    logger.info(
+      {
+        context: 'RAG Engine',
+        phase: 'query-transformation',
+        notebookId,
+        rawQuery,
+        transformedQuery,
+        durationMs: transformationDurationMs,
+      },
+      `[Phase 1] Query Transformation Completed (${transformationDurationMs}ms)`,
+    );
 
-    // 4. Vector Retrieval (Tenant Isolated with Notebook ID)
+    // 4. Vector Retrieval (Phase 2)
     const startRetrieval = performance.now();
     let candidates: NotebookRetrievedChunk[] = [];
     try {
       candidates = await this.retriever.retrieve(transformedQuery, options);
     } catch (err) {
-      logger.error({ notebookId, err }, 'Retriever failed during notebook orchestration');
+      logger.error(
+        { context: 'RAG Engine', phase: 'vector-search', notebookId, err },
+        'Retriever failed during notebook orchestration',
+      );
       throw err instanceof AppError ? err : new AppError('Retrieval failed', { statusCode: 500, cause: err });
     }
     const retrievalDurationMs = Math.round(performance.now() - startRetrieval);
+    logger.info(
+      {
+        context: 'RAG Engine',
+        phase: 'vector-search',
+        notebookId,
+        resultsCount: candidates.length,
+        durationMs: retrievalDurationMs,
+      },
+      `[Phase 2] Vector Search Completed (${candidates.length} chunks, ${retrievalDurationMs}ms)`,
+    );
 
-    // 5. Initial Reranking
+    // 5. Initial Reranking (Phase 3)
     const startRerank = performance.now();
     let rerankedChunks: NotebookRetrievedChunk[] = candidates;
     if (candidates.length > 0) {
@@ -106,29 +138,54 @@ export class RetrievalOrchestrator {
         const rerankResult = await this.rerankingService.rerank(transformedQuery, candidates);
         rerankedChunks = Array.from(rerankResult.chunks) as NotebookRetrievedChunk[];
       } catch (err) {
-        logger.warn({ notebookId, err }, 'Reranking failed, preserving vector search ordering');
+        logger.warn(
+          { context: 'RAG Engine', phase: 'reranking', notebookId, err },
+          'Reranking failed, preserving vector search ordering',
+        );
       }
     }
     const rerankDurationMs = Math.round(performance.now() - startRerank);
+    logger.info(
+      {
+        context: 'RAG Engine',
+        phase: 'reranking',
+        notebookId,
+        inputCount: candidates.length,
+        outputCount: rerankedChunks.length,
+        durationMs: rerankDurationMs,
+      },
+      `[Phase 3] Reranking Completed (${rerankedChunks.length} chunks, ${rerankDurationMs}ms)`,
+    );
 
-    // 6. CRAG Retrieval Evaluation & Corrective Retry Pipeline
+    // 6. CRAG Retrieval Evaluation & Corrective Retry Pipeline (Phase 4)
     let currentChunks = [...rerankedChunks];
     let retryCount = 0;
     const queryRewrites: string[] = [];
     let activeQuery = transformedQuery;
     let currentTopK = options.topK && options.topK > 0 ? options.topK : 5;
-
-    let evalResult = await this.evaluator.evaluate(activeQuery, currentChunks as unknown as RetrievedChunk[]);
-    logger.info(
-      { notebookId, decision: evalResult.decision, score: evalResult.score },
-      'Initial notebook retrieval evaluation completed'
-    );
+    let finalDecision: 'accept' | 'correct' | 'reject' = 'accept';
+    let evalResult: any = { score: 1.0, decision: 'accept', averageSimilarity: 1.0 };
 
     if (config.crag.enabled) {
+      const startEval = performance.now();
+      evalResult = await this.evaluator.evaluate(activeQuery, currentChunks as unknown as RetrievedChunk[]);
+      const evalDurationMs = Math.round(performance.now() - startEval);
+      logger.info(
+        {
+          context: 'RAG Engine',
+          phase: 'crag-evaluation',
+          notebookId,
+          decision: evalResult.decision,
+          score: evalResult.score,
+          durationMs: evalDurationMs,
+        },
+        `[Phase 4] CRAG Evaluation (${evalResult.decision}, score: ${evalResult.score}, ${evalDurationMs}ms)`,
+      );
+
       while (evalResult.decision === 'correct' && this.retryPolicy.canRetry(retryCount)) {
         logger.info(
-          { notebookId, retryCount, currentTopK, activeQuery },
-          'CRAG triggering corrective retrieval loop'
+          { context: 'RAG Engine', phase: 'crag-corrective-loop', notebookId, retryCount, currentTopK, activeQuery },
+          'CRAG triggering corrective retrieval loop',
         );
 
         const outcome = await this.improver.executeCorrectiveRetrieval({
@@ -150,7 +207,7 @@ export class RetrievalOrchestrator {
             const rerankRes = await this.rerankingService.rerank(outcome.rewrittenQuery, outcome.chunks);
             newReranked = Array.from(rerankRes.chunks) as NotebookRetrievedChunk[];
           } catch (err) {
-            logger.warn({ notebookId, err }, 'Corrective reranking failed, keeping raw order');
+            logger.warn({ context: 'RAG Engine', phase: 'crag-rerank', notebookId, err }, 'Corrective reranking failed');
           }
         }
 
@@ -159,26 +216,35 @@ export class RetrievalOrchestrator {
 
         evalResult = await this.evaluator.evaluate(activeQuery, currentChunks as unknown as RetrievedChunk[]);
         logger.info(
-          { notebookId, retryCount, decision: evalResult.decision, score: evalResult.score },
-          'Re-evaluated corrective retrieval attempt'
+          {
+            context: 'RAG Engine',
+            phase: 'crag-re-evaluation',
+            notebookId,
+            retryCount,
+            decision: evalResult.decision,
+            score: evalResult.score,
+          },
+          'Re-evaluated corrective retrieval attempt',
         );
       }
-    }
 
-    // Resolve final decision if retries exhausted
-    let finalDecision = evalResult.decision;
-    if (finalDecision === 'correct') {
-      if (evalResult.averageSimilarity >= config.crag.minChunkConfidence && currentChunks.length > 0) {
-        finalDecision = 'accept';
-        logger.info({ notebookId }, 'CRAG retries exhausted; accepting best available context');
-      } else {
-        finalDecision = 'reject';
-        logger.info({ notebookId }, 'CRAG retries exhausted; rejecting context due to low confidence');
+      // Resolve final decision if retries exhausted
+      finalDecision = evalResult.decision;
+      if (finalDecision === 'correct') {
+        if (evalResult.averageSimilarity >= config.crag.minChunkConfidence && currentChunks.length > 0) {
+          finalDecision = 'accept';
+          logger.info({ context: 'RAG Engine', phase: 'crag-decision', notebookId }, 'CRAG retries exhausted; accepting best available context');
+        } else {
+          finalDecision = 'reject';
+          logger.info({ context: 'RAG Engine', phase: 'crag-decision', notebookId }, 'CRAG retries exhausted; rejecting context due to low confidence');
+        }
       }
+    } else {
+      logger.info({ context: 'RAG Engine', phase: 'crag-status', notebookId }, 'CRAG pipeline disabled; accepting retrieved vector context directly');
     }
 
-    // 7. Context Refinement & Token Trimming
-    // Cap final output to the initially requested topK (or 5 default), regardless of how many CRAG retrieved.
+    // 7. Context Refinement & Token Trimming (Phase 5)
+    const startContext = performance.now();
     const finalTopK = options.topK && options.topK > 0 ? options.topK : 5;
     let includedChunks: NotebookRetrievedChunk[] = [];
     let context = '';
@@ -191,7 +257,6 @@ export class RetrievalOrchestrator {
       context = '';
       citations = [];
     } else {
-      // Filter out low confidence chunks below minimum threshold
       const minConfidence = config.crag.minChunkConfidence;
       const validChunks = currentChunks.filter((c) => (c.score || 0) >= minConfidence);
       rejectedChunkCount = currentChunks.length - validChunks.length;
@@ -202,14 +267,26 @@ export class RetrievalOrchestrator {
       context = built.context;
       includedChunks = built.includedChunks;
 
-      // 8. Citation Generation ONLY for retained/accepted chunks
       citations = CitationBuilder.buildCitations(includedChunks);
     }
+    const contextDurationMs = Math.round(performance.now() - startContext);
+    logger.info(
+      {
+        context: 'RAG Engine',
+        phase: 'context-building',
+        notebookId,
+        inputChunksCount: currentChunks.length,
+        includedChunksCount: includedChunks.length,
+        contextLength: context.length,
+        citationCount: citations.length,
+        durationMs: contextDurationMs,
+      },
+      `[Phase 5] Context & Citation Building Completed (${includedChunks.length} chunks, ${citations.length} citations, ${contextDurationMs}ms)`,
+    );
 
     const totalDurationMs = Math.round(performance.now() - totalStart);
 
-    // Record Telemetry Metrics
-    const confidenceScore = evalResult.confidenceScore ?? Math.round(evalResult.score * 1000) / 1000;
+    const confidenceScore = evalResult.confidenceScore ?? Math.round((evalResult.score || 0) * 1000) / 1000;
     const confidenceLabel =
       evalResult.confidenceLabel ??
       (confidenceScore >= 0.8
@@ -219,6 +296,28 @@ export class RetrievalOrchestrator {
           : `${confidenceScore.toFixed(2)} - Low Confidence`);
 
     metrics.recordCragEvaluation(finalDecision, confidenceScore, retryCount);
+
+    logger.info(
+      {
+        context: 'RAG Engine',
+        phase: 'retrieval-summary',
+        notebookId,
+        originalQuery: rawQuery,
+        transformedQuery: activeQuery,
+        candidateCount: candidates.length,
+        finalChunkCount: includedChunks.length,
+        citationCount: citations.length,
+        confidenceScore,
+        confidenceLabel,
+        decision: finalDecision,
+        retryCount,
+        transformationDurationMs,
+        retrievalDurationMs,
+        rerankDurationMs,
+        totalDurationMs,
+      },
+      `[RAG Summary] Retrieval Orchestration Completed (Total: ${totalDurationMs}ms | Vector: ${retrievalDurationMs}ms | Rerank: ${rerankDurationMs}ms)`,
+    );
 
     const metadata = {
       notebookId,

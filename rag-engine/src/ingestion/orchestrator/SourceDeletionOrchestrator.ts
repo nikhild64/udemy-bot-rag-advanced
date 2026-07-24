@@ -40,13 +40,12 @@ export class SourceDeletionOrchestrator {
     // 3. Delete Vector Embeddings
     try {
       const collectionName = config.vectorStore.userKnowledgeCollection;
-      
-      // We assume chunks were saved with payload sourceId = source.id
-      // Let's delete all points where metadata.sourceId === sourceId
-      // Standard Qdrant allows delete by filter.
-      if (typeof (this.vectorStore as any).deleteVectorsByFilter === 'function') {
-        await (this.vectorStore as any).deleteVectorsByFilter(collectionName, {
-          must: [{ key: 'sourceId', match: { value: sourceId } }]
+      if (typeof this.vectorStore.deleteVectorsByFilter === 'function') {
+        await this.vectorStore.deleteVectorsByFilter(collectionName, {
+          should: [
+            { key: 'sourceId', match: { value: sourceId } },
+            { key: 'lessonId', match: { value: sourceId } },
+          ],
         });
       }
       logger.info({ sourceId, collectionName }, 'Deleted vector embeddings successfully');

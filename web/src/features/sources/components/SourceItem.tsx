@@ -83,7 +83,7 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
         window.open(res.downloadUrl, '_blank');
       }
     } catch (e) {
-      console.error(e);
+      logger.error({ err: e }, 'Source download failed');
     }
   };
 

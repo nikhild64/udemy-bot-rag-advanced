@@ -1,4 +1,5 @@
 import { config } from '@/config';
+import { logger } from '@/shared/logger';
 import { IInputDiscoveryService } from '@/ingestion/discovery';
 import { IIngestionOrchestrator, IngestionOrchestrator } from '@/ingestion/orchestrator';
 
@@ -14,56 +15,47 @@ export async function runManifest(
             : undefined,
         );
 
-  console.log('Generating course manifests...\n');
+  logger.info('Generating course manifests...');
 
   let results;
   try {
     results = await orch.manifest();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`Manifest generation failed:\n\nReason:\n${errorMessage}`);
+    logger.error({ err: error }, `Manifest generation failed: ${errorMessage}`);
 
     if (config.app.env === 'development' && error instanceof Error && error.stack) {
-      console.error(`\n${error.stack}`);
+      logger.error(error.stack);
     }
 
     process.exit(1);
   }
 
   if (results.length === 0) {
-    console.log('No extracted courses found. Run extraction first (`pnpm extract`).\n');
+    logger.info('No extracted courses found. Run extraction first (`pnpm extract`).');
     return;
   }
 
   let hasFailures = false;
 
   for (const result of results) {
-    console.log('Course');
-    console.log(result.courseName);
-    console.log();
-    console.log('Modules');
-    console.log(result.modulesCount);
-    console.log();
-    console.log('Lessons');
-    console.log(result.lessonsCount);
-    console.log();
-    console.log('Preferred transcripts');
-    console.log(`${result.preferredTranscriptsCount} VTT`);
-    console.log();
-    console.log('Secondary transcripts');
-    console.log(`${result.secondaryTranscriptsCount} SRT`);
-    console.log();
+    logger.info(
+      {
+        course: result.courseName,
+        modules: result.modulesCount,
+        lessons: result.lessonsCount,
+        preferredTranscripts: result.preferredTranscriptsCount,
+        secondaryTranscripts: result.secondaryTranscriptsCount,
+      },
+      `Course Manifest Summary: ${result.courseName}`,
+    );
 
     if (result.success) {
-      console.log('Manifest created successfully.');
+      logger.info(`Manifest created successfully for ${result.courseName}.`);
     } else {
       hasFailures = true;
-      console.log('Manifest validation failed:');
-      for (const err of result.validationErrors) {
-        console.log(`  ✗ ${err}`);
-      }
+      logger.warn({ errors: result.validationErrors }, `Manifest validation failed for ${result.courseName}`);
     }
-    console.log();
   }
 
   if (hasFailures) {
