@@ -49,7 +49,7 @@ export const apiClient = {
     return res.json();
   },
 
-  async post<T>(path: string, body?: any, headers: Record<string, string> = {}): Promise<T> {
+  async post<T>(path: string, body: any = {}, headers: Record<string, string> = {}): Promise<T> {
     const authHeaders = await getHeaders({
       'Content-Type': 'application/json',
       ...headers,
@@ -57,7 +57,7 @@ export const apiClient = {
     const res = await fetch(`${BASE_URL}${path}`, {
       method: 'POST',
       headers: authHeaders,
-      body: body ? JSON.stringify(body) : undefined,
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));

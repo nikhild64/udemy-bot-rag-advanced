@@ -2,19 +2,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { notebooksApi } from '../api/notebooks.api';
 import { useUIStore } from '@/shared/lib/store';
+import { useAuth } from '@clerk/nextjs';
 
 export function useNotebooksQuery() {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery({
     queryKey: ['notebooks'],
     queryFn: () => notebooksApi.listNotebooks(),
+    enabled: isLoaded && isSignedIn,
   });
 }
 
 export function useNotebookQuery(id: string | null) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery({
     queryKey: ['notebook', id],
     queryFn: () => (id ? notebooksApi.getNotebook(id) : null),
-    enabled: !!id,
+    enabled: !!id && isLoaded && isSignedIn,
   });
 }
 

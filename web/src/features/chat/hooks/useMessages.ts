@@ -1,12 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { chatApi } from '../api/chat.api';
+import { useAuth } from '@clerk/nextjs';
 
 export function useMessagesQuery(notebookId: string | null) {
+  const { isLoaded, isSignedIn } = useAuth();
   return useQuery({
     queryKey: ['messages', notebookId],
     queryFn: () => (notebookId ? chatApi.getMessages(notebookId) : []),
-    enabled: !!notebookId,
+    enabled: !!notebookId && isLoaded && isSignedIn,
   });
 }
 

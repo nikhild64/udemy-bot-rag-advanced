@@ -1,7 +1,6 @@
 import { Dialog } from '@/components/ui/dialog';
 import { Source } from '@/shared/types';
 import { SourceViewer } from './SourceViewer';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, Video, Music, FileCode, HardDrive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
@@ -45,13 +44,13 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId }
       contentClassName="max-w-[85vw] w-full p-0 gap-0 overflow-hidden bg-background border-border shadow-2xl h-[85vh] flex"
     >
         {/* Left Sidebar - Source List */}
-        <div className="w-[300px] border-r border-border bg-card/30 flex flex-col shrink-0">
+        <div className="w-[300px] border-r border-border bg-card/30 flex flex-col shrink-0 overflow-hidden">
           <div className="p-4 border-b border-border bg-muted/20">
             <h3 className="font-semibold text-sm">Notebook Sources</h3>
             <p className="text-xs text-muted-foreground mt-0.5">{sources.length} available</p>
           </div>
           
-          <ScrollArea className="flex-1">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="p-2 flex flex-col gap-1">
               {sources.map((src) => {
                 const isActive = src.id === activeSourceId;
@@ -85,7 +84,7 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId }
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {/* Right Area - Source Viewer */}

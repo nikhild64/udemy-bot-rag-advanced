@@ -27,17 +27,20 @@ export class EmbeddingService implements IEmbeddingService {
   private readonly validator: IEmbeddingValidator;
   private readonly batchSize: number;
   private readonly concurrency: number;
+  private readonly waveDelayMs: number;
 
   constructor(
     provider?: EmbeddingProvider,
     validator?: IEmbeddingValidator,
     batchSize?: number,
     concurrency?: number,
+    waveDelayMs?: number,
   ) {
     this._provider = provider;
     this.validator = validator ?? new EmbeddingValidator();
     this.batchSize = batchSize ?? config.embeddings.batchSize ?? 100;
     this.concurrency = concurrency ?? config.embeddings.concurrency ?? 4;
+    this.waveDelayMs = waveDelayMs ?? config.embeddings.waveDelayMs ?? 0;
   }
 
   private getProvider(): EmbeddingProvider {
@@ -162,6 +165,15 @@ export class EmbeddingService implements IEmbeddingService {
           }
         }),
       );
+
+      // Throttle between waves to avoid upstream 429s (set EMBEDDING_WAVE_DELAY_MS=0 to disable)
+      if (this.waveDelayMs > 0 && waveIndex + concurrency < batches.length) {
+        logger.debug(
+          { waveDelayMs: this.waveDelayMs, nextWaveIndex: waveIndex + concurrency },
+          'Applying inter-wave delay to avoid rate limiting',
+        );
+        await new Promise((resolve) => setTimeout(resolve, this.waveDelayMs));
+      }
     }
 
     const durationMs = Date.now() - startTime;

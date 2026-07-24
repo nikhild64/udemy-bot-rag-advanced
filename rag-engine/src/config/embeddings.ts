@@ -13,6 +13,7 @@ const embeddingsSchema = z
     NVIDIA_EMBEDDING_MODEL: z.string().default('nvidia/nv-embedqa-e5-v5'),
     EMBEDDING_BATCH_SIZE: z.coerce.number().int().positive().default(100),
     EMBEDDING_CONCURRENCY: z.coerce.number().int().positive().default(4),
+    EMBEDDING_WAVE_DELAY_MS: z.coerce.number().int().min(0).default(0),
     EMBEDDING_TIMEOUT: z.coerce.number().int().positive().default(30000),
     MISTRAL_API_URL: z.string().default('https://api.mistral.ai/v1/embeddings'),
     EMBEDDING_DIMENSION: z.coerce.number().int().positive().default(1024),
@@ -43,6 +44,7 @@ export interface EmbeddingsConfig {
   readonly nvidiaEmbeddingModel: string;
   readonly batchSize: number;
   readonly concurrency: number;
+  readonly waveDelayMs: number;
   readonly timeoutMs: number;
   readonly mistralApiUrl: string;
   readonly dimension: number;
@@ -67,6 +69,7 @@ function loadEmbeddingsConfig(): EmbeddingsConfig {
     nvidiaEmbeddingModel: result.data.NVIDIA_EMBEDDING_MODEL,
     batchSize: result.data.EMBEDDING_BATCH_SIZE,
     concurrency: result.data.EMBEDDING_CONCURRENCY,
+    waveDelayMs: result.data.EMBEDDING_WAVE_DELAY_MS,
     timeoutMs: result.data.EMBEDDING_TIMEOUT,
     mistralApiUrl: result.data.MISTRAL_API_URL,
     dimension: result.data.EMBEDDING_DIMENSION,

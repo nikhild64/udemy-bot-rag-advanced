@@ -66,4 +66,19 @@ export const sourcesApi = {
   viewSource: async (sourceId: string): Promise<any> => {
     return apiClient.get<any>(`/api/sources/${sourceId}/view`);
   },
+
+  getNotebookArtifacts: async (notebookId: string): Promise<{
+    podcast: { status: string; data: any; error?: string; updatedAt?: string };
+    learningPath: { status: string; data: any; error?: string; updatedAt?: string };
+  }> => {
+    return apiClient.get(`/api/notebooks/${notebookId}/artifacts`);
+  },
+
+  generatePodcast: async (notebookId: string, force: boolean = false): Promise<{ status: string; result?: any }> => {
+    return apiClient.post(`/api/notebooks/${notebookId}/generate/podcast`, { force });
+  },
+
+  generateLearningPath: async (notebookId: string, force: boolean = false): Promise<{ status: string; result?: any }> => {
+    return apiClient.post(`/api/notebooks/${notebookId}/generate/learning-path`, { force });
+  },
 };

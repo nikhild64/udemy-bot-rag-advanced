@@ -27,18 +27,20 @@ export function AppLayout({
   hideSources = false,
   hideNotebookInfo = false,
 }: AppLayoutProps) {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const sourcesPanelOpen = useUIStore((s) => s.sourcesPanelOpen);
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
   const settingsModalOpen = useUIStore((s) => s.settingsModalOpen);
   const setSettingsModalOpen = useUIStore((s) => s.setSettingsModalOpen);
 
-  // Set up token getter for API client
+  // Set up token getter for API client as soon as auth is ready
   useEffect(() => {
-    setAuthTokenGetter(async () => {
-      return getToken();
-    });
-  }, [getToken]);
+    if (isLoaded && isSignedIn) {
+      setAuthTokenGetter(async () => {
+        return getToken();
+      });
+    }
+  }, [getToken, isLoaded, isSignedIn]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background selection:bg-primary/20">

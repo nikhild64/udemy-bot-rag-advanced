@@ -22,13 +22,22 @@ export function ChatContainer() {
   const { sendMessage, isStreaming, streamingContent, streamingCitations } = useChat(activeNotebookId);
 
   const hasSources = sources.length > 0;
-  const hasReadySources = hasSources && sources.some((s) => s.status === 'Ready' || (s.status as string) === 'Indexed');
-  const isIndexingSources = hasSources && !hasReadySources;
 
-  // Track the source currently undergoing processing
+  const NON_READY_STATUSES = [
+    'PendingUpload', 'Uploading', 'Uploaded', 'Queued',
+    'Downloading', 'Extracting', 'Normalizing', 'Chunking',
+    'Embedding', 'Indexing', 'Pending', 'Processing',
+  ] as const;
+
+  // Block chat if ANY source is still being processed
   const processingSource = sources.find((s) =>
-    ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing', 'Queued', 'Uploading', 'Uploaded', 'Pending', 'Processing'].includes(s.status)
+    NON_READY_STATUSES.includes(s.status as any)
   );
+  const isIndexingSources = !!processingSource;
+
+  // Chat is only available when there are sources AND none are still processing
+  const allSourcesReady = hasSources && !isIndexingSources;
+  const hasReadySources = allSourcesReady && sources.some((s) => s.status === 'Ready' || (s.status as string) === 'Indexed');
 
   const { data: liveStatus } = useSourceStatusQuery(
     processingSource?.id || '',
@@ -130,7 +139,7 @@ export function ChatContainer() {
             </div>
           </div>
         ) : isIndexingSources ? (
-          /* Indexing State: Sources Processing */
+          /* Indexing State: At least one source is still processing */
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#121212]">
             <div className="max-w-md w-full p-8 rounded-2xl bg-[#1A1A1A] border border-[#2B2B2B] shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
               <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
@@ -141,7 +150,9 @@ export function ChatContainer() {
                   {processingSource ? `Processing ${processingSource.displayName || processingSource.title}` : 'Processing & Indexing Sources'}
                 </h3>
                 <p className="text-xs text-[#A9A9A9] leading-relaxed">
-                  Your knowledge source is currently being extracted, chunked, and embedded into vector storage. Chat will unlock automatically as soon as ingestion completes.
+                  {sources.filter(s => NON_READY_STATUSES.includes(s.status as any)).length > 1
+                    ? `${sources.filter(s => NON_READY_STATUSES.includes(s.status as any)).length} sources are still being processed. Chat will unlock once all sources are ready.`
+                    : 'Your knowledge source is being extracted, chunked, and embedded into vector storage. Chat will unlock automatically once ingestion completes.'}
                 </p>
               </div>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-medium text-amber-400">

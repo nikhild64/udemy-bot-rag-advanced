@@ -5,6 +5,11 @@ import {
   getNotebookMessagesController,
   deleteNotebookMessageController,
 } from '../controllers/notebook-chat.controller';
+import {
+  generatePodcastController,
+  generateLearningPathController,
+  getNotebookArtifactsController,
+} from '../controllers/generate.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 
 export async function notebookChatRoutes(app: FastifyInstance): Promise<void> {
@@ -49,5 +54,28 @@ export async function notebookChatRoutes(app: FastifyInstance): Promise<void> {
     '/api/notebooks/:notebookId/messages/:messageId',
     { preHandler: [requireAuth] },
     deleteNotebookMessageController,
+  );
+
+  // ── Generation Routes ──────────────────────────────────────────────────────
+
+  // Fetch saved artifact statuses & results for a notebook
+  app.get(
+    '/api/notebooks/:notebookId/artifacts',
+    { preHandler: [requireAuth] },
+    getNotebookArtifactsController,
+  );
+
+  // Generate a two-person podcast script from notebook sources
+  app.post(
+    '/api/notebooks/:notebookId/generate/podcast',
+    { preHandler: [requireAuth] },
+    generatePodcastController,
+  );
+
+  // Generate a structured learning path from notebook sources
+  app.post(
+    '/api/notebooks/:notebookId/generate/learning-path',
+    { preHandler: [requireAuth] },
+    generateLearningPathController,
   );
 }
