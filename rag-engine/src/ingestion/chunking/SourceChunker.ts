@@ -31,6 +31,7 @@ export class SourceChunker {
     options?: {
       chunkSize?: number;
       chunkOverlap?: number;
+      chunkIndexOffset?: number;
       metadata?: Record<string, any>;
     },
   ): SourceChunk[] {
@@ -43,7 +44,7 @@ export class SourceChunker {
 
     const chunks: SourceChunk[] = [];
     let startChar = 0;
-    let chunkIndex = 0;
+    let chunkIndex = options?.chunkIndexOffset ?? 0;
 
     const effectiveStep = Math.max(1, chunkSize - chunkOverlap);
 

@@ -65,12 +65,16 @@ export interface Citation {
   title?: string;
   excerpt?: string;
   content?: string;
+  snippet?: string;
+  sourceName?: string;
+  sourceType?: string;
   pageNumber?: number;
   page?: number;
-  timestamp?: string;
+  timestamp?: string | number;
   startTime?: number;
   endTime?: number;
   score?: number;
+  similarityScore?: number;
 }
 
 export interface Message {

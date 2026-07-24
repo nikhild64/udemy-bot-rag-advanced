@@ -17,8 +17,8 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const openViewer = () => setViewerOpen(true);
 
-  const title = citation.sourceTitle || citation.title || `Source ${index + 1}`;
-  const rawExcerpt = citation.excerpt || citation.content || '';
+  const title = citation.sourceTitle || citation.sourceName || citation.title || `Source ${index + 1}`;
+  const rawExcerpt = citation.excerpt || citation.content || citation.snippet || '';
   const page = citation.pageNumber || citation.page;
   
   // Extract timestamp from timestamp property, startTime, start_time, or rawExcerpt
@@ -43,7 +43,8 @@ export function CitationCard({ citation, index }: CitationCardProps) {
       : String(timestamp)
   ) : null;
 
-  const scorePercentage = citation.score !== undefined ? Math.round(citation.score * 100) : null;
+  const score = citation.score ?? citation.similarityScore;
+  const scorePercentage = score !== undefined ? Math.round(score * 100) : null;
 
   return (
     <div

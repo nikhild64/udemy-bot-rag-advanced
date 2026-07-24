@@ -198,16 +198,33 @@ export class SourceIngestionOrchestrator {
       await this.updateProgress(sourceId, 'Chunking', 60, 'Processing', currentJobId, notebookId);
       await this.sourceRepository.updateStatus(sourceId, 'Chunking' as any);
 
-      const chunks = SourceChunker.chunk(normalizedText, sourceId, notebookId, {
-        chunkSize: config.ingestion.chunkSize,
-        chunkOverlap: config.ingestion.chunkOverlap,
-        metadata: {
-          title: finalTitle,
-          displayName: finalTitle,
-          sourceType: source.type,
-          ...extractedDoc.metadata,
-        },
-      });
+      const { pageTexts: _pageTexts, ...documentMetadata } = extractedDoc.metadata as Record<string, any>;
+      const baseChunkMetadata = {
+        title: finalTitle,
+        displayName: finalTitle,
+        sourceType: source.type,
+        ...documentMetadata,
+      };
+      const pageTexts = source.type === 'PDF' && Array.isArray((extractedDoc.metadata as Record<string, any>)?.pageTexts)
+        ? (extractedDoc.metadata as Record<string, any>).pageTexts as Array<{ page: number; text: string }>
+        : [];
+      let nextChunkIndex = 0;
+      const chunks = pageTexts.length > 0
+        ? pageTexts.flatMap((page) => {
+            const pageChunks = SourceChunker.chunk(page.text, sourceId, notebookId, {
+              chunkSize: config.ingestion.chunkSize,
+              chunkOverlap: config.ingestion.chunkOverlap,
+              chunkIndexOffset: nextChunkIndex,
+              metadata: { ...baseChunkMetadata, page: page.page },
+            });
+            nextChunkIndex += pageChunks.length;
+            return pageChunks;
+          })
+        : SourceChunker.chunk(normalizedText, sourceId, notebookId, {
+            chunkSize: config.ingestion.chunkSize,
+            chunkOverlap: config.ingestion.chunkOverlap,
+            metadata: baseChunkMetadata,
+          });
 
       logger.info({ sourceId, totalChunksCount: chunks.length }, 'Generated chunks successfully');
       ingestionEvents.publish('Chunking Completed', { jobId: currentJobId, sourceId, notebookId, stage: 'Chunking', details: { chunksCount: chunks.length } });

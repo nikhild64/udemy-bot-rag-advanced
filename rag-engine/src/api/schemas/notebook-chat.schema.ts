@@ -24,6 +24,7 @@ export const citationSchema = z.object({
   timestamp: z.number().optional(),
   chunkId: z.string().optional(),
   excerpt: z.string().optional(),
+  snippet: z.string().optional(),
   score: z.number().optional(),
 }).passthrough();
 

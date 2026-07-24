@@ -235,7 +235,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
       </div>
 
       {/* Viewer Content */}
-      <div className="flex-1 overflow-auto bg-muted/5 relative">
+      <div className="relative flex-1 overflow-auto bg-muted/5">
         {activeMode === 'media' && videoId ? (
           <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/90">
             <iframe
@@ -267,7 +267,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
                 <FileText className="h-4 w-4 text-primary/70" />
               </div>
               <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-[13px] leading-6 text-foreground shadow-inner">
-                {highlightExcerpt(citation?.excerpt || citation?.content || '', rawText || '')}
+                {highlightExcerpt(citation?.excerpt || citation?.content || citation?.snippet || '', rawText || '')}
               </div>
               <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
                 The PDF is positioned to the cited page. The highlighted passage is the extracted text used for this answer.
@@ -275,20 +275,30 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
             </div>
           </div>
         ) : rawText ? (
-          <div className="p-6 max-w-4xl mx-auto w-full space-y-4">
-            <div className="bg-card p-6 sm:p-8 rounded-xl border border-border shadow-xs space-y-4">
-              <div className="border-b border-border/60 pb-3 flex items-center justify-between">
-                <span className="text-xs font-mono font-semibold text-primary uppercase tracking-wider">
+          <div className="grid min-h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0 bg-background p-6 sm:p-8">
+              <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
+                <span className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
                   {type === 'WEBSITE' ? 'Extracted Web Content' : type === 'PDF' ? 'Extracted Document Text' : ['YOUTUBE', 'VIDEO', 'AUDIO', 'VTT'].includes(type) ? 'Transcript' : 'Extracted Content'}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {rawText.split(/\s+/).length} words
-                </span>
+                <span className="text-xs text-muted-foreground">{rawText.split(/\s+/).length} words</span>
               </div>
-              <div className="prose prose-sm dark:prose-invert max-w-none font-sans text-sm leading-relaxed text-foreground whitespace-pre-wrap selection:bg-primary/20">
-                {rawText}
+              <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground selection:bg-primary/20">
+                {highlightFullText(citation?.excerpt || citation?.content || citation?.snippet || '', rawText)}
               </div>
             </div>
+            <aside className="border-t border-border/60 bg-card p-4 lg:sticky lg:top-0 lg:h-fit lg:max-h-[70vh] lg:overflow-y-auto lg:border-l lg:border-t-0">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Cited excerpt</p>
+                  <p className="mt-1 text-xs text-muted-foreground">The passage used for this answer</p>
+                </div>
+                <FileText className="h-4 w-4 text-primary/70" />
+              </div>
+              <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 font-mono text-[12px] leading-6 text-foreground shadow-inner">
+                {citation?.excerpt || citation?.content || citation?.snippet || 'No excerpt was returned for this citation.'}
+              </div>
+            </aside>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8 text-center space-y-3">
@@ -310,7 +320,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
       </div>
 
       {/* Snippet Highlight (if available and not playing video) */}
-      {citation?.excerpt && activeMode !== 'media' && (
+      {citation?.excerpt && activeMode !== 'media' && !rawText && (
         <div className="border-t border-border/60 bg-muted/20 p-4 shrink-0 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.1)] z-10">
           <p className="text-xs font-semibold mb-2 text-primary uppercase tracking-wider">Cited Excerpt</p>
           <div className="text-[13px] text-muted-foreground font-mono bg-background border border-border p-3 rounded-md max-h-32 overflow-y-auto">
@@ -338,6 +348,24 @@ function highlightExcerpt(excerpt: string, sourceText: string) {
         {normalizedSource.slice(start, matchEnd)}
       </mark>
       {normalizedSource.slice(matchEnd, matchEnd + 180)}
+    </>
+  );
+}
+
+function highlightFullText(excerpt: string, sourceText: string) {
+  const cleanExcerpt = excerpt.replace(/\s+/g, ' ').trim();
+  if (!cleanExcerpt) return sourceText;
+
+  const start = sourceText.toLowerCase().indexOf(cleanExcerpt.toLowerCase());
+  if (start < 0) return sourceText;
+
+  return (
+    <>
+      {sourceText.slice(0, start)}
+      <mark className="rounded bg-primary/35 px-1 text-foreground decoration-primary decoration-2 underline-offset-2">
+        {sourceText.slice(start, start + cleanExcerpt.length)}
+      </mark>
+      {sourceText.slice(start + cleanExcerpt.length)}
     </>
   );
 }

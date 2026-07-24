@@ -37,6 +37,12 @@ export class PdfExtractor implements IExtractor {
           try {
             const parsed = await parser.getText();
             if (parsed?.text && this.isUsablePdfText(parsed.text)) extractedText = this.normalizeText(parsed.text);
+            if (Array.isArray(parsed?.pages) && parsed.pages.length > 0) {
+              pdfMetadata.pageTexts = parsed.pages.map((page: { num?: number; text?: string }, index: number) => ({
+                page: page.num || index + 1,
+                text: this.normalizeText(page.text || ''),
+              })).filter((page: { text: string }) => page.text.length > 0);
+            }
             const info = await parser.getInfo();
             if (info?.info) pdfMetadata.info = info.info;
             if (info?.total) pdfMetadata.numPages = info.total;
@@ -48,6 +54,12 @@ export class PdfExtractor implements IExtractor {
           if (typeof legacyParser === 'function') {
             const parsed = await legacyParser(fileBuffer);
             if (parsed?.text && this.isUsablePdfText(parsed.text)) extractedText = this.normalizeText(parsed.text);
+            if (Array.isArray(parsed?.pages) && parsed.pages.length > 0) {
+              pdfMetadata.pageTexts = parsed.pages.map((page: { num?: number; text?: string }, index: number) => ({
+                page: page.num || index + 1,
+                text: this.normalizeText(page.text || ''),
+              })).filter((page: { text: string }) => page.text.length > 0);
+            }
             if (parsed?.info) pdfMetadata.info = parsed.info;
             if (parsed?.numpages) pdfMetadata.numPages = parsed.numpages;
           }

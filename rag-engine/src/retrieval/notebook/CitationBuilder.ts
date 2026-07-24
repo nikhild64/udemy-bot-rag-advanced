@@ -30,6 +30,7 @@ export class CitationBuilder {
         page: chunk.page ?? null,
         timestamp: chunk.timestamp ?? null,
         chunkId: chunk.chunkId,
+        excerpt: chunk.text,
         snippet: this.createSnippet(chunk.text),
         similarityScore: chunk.score,
       };

@@ -75,7 +75,11 @@ export class DenseNotebookRetriever implements INotebookRetriever {
         const sourceId = (meta.sourceId as string) || (res.chunk.lessonId as string) || 'unknown-source';
         const sourceName = (meta.sourceTitle as string) || (meta.displayName as string) || (meta.title as string) || 'Untitled Source';
         const sourceType = (meta.sourceType as string) || 'document';
-        const page = typeof meta.page === 'number' ? meta.page : null;
+        const page = typeof meta.page === 'number'
+          ? meta.page
+          : typeof meta.pageNumber === 'number'
+            ? meta.pageNumber
+            : null;
         const timestamp = typeof meta.timestamp === 'number' ? meta.timestamp : null;
 
         return {

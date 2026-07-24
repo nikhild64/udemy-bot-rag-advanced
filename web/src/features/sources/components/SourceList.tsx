@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react';
-import { useSourcesQuery, useNotebookArtifactsQuery, useGeneratePodcastMutation, useGenerateLearningPathMutation } from '../hooks/useSources';
+import { useSourcesQuery, useNotebookArtifactsQuery, useGeneratePodcastMutation, useGenerateLearningPathMutation, useReindexSourceMutation } from '../hooks/useSources';
 import { useUIStore } from '@/shared/lib/store';
 import { SourceItem } from './SourceItem';
 import { SourceViewerDialog } from './SourceViewerDialog';
@@ -28,6 +28,7 @@ export function SourceList() {
 
   const podcastMutation = useGeneratePodcastMutation();
   const learningPathMutation = useGenerateLearningPathMutation();
+  const reindexMutation = useReindexSourceMutation(activeNotebookId);
 
   const handleOpenViewer = (sourceId: string) => {
     setSelectedSourceId(sourceId);
@@ -101,6 +102,15 @@ export function SourceList() {
   const isAnySourceProcessing = sources?.some((s) => !['Ready', 'Indexed', 'Failed'].includes(s.status as string));
   const areAllSourcesReady = hasSources && !isAnySourceProcessing;
 
+  const handleReindexAll = () => {
+    if (!sources) return;
+    for (const source of sources) {
+      if (source.status === 'Ready' || (source.status as string) === 'Indexed' || source.status === 'Failed') {
+        reindexMutation.mutate(source.id);
+      }
+    }
+  };
+
   if (!activeNotebookId) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground space-y-3">
@@ -119,17 +129,32 @@ export function SourceList() {
             Sources {sources ? `(${sources.length})` : ''}
           </h3>
         </div>
-        {hasSources && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs flex items-center gap-1.5 border-dashed border-primary/40 hover:border-primary text-primary"
-            onClick={() => setUploadModalOpen(true)}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Add Source</span>
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {hasSources && areAllSourcesReady && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs flex items-center gap-1 border-dashed text-muted-foreground hover:text-foreground"
+              onClick={handleReindexAll}
+              disabled={reindexMutation.isPending}
+              title="Reindex All Sources"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${reindexMutation.isPending ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
+          {hasSources && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs flex items-center gap-1 border-dashed border-primary/40 hover:border-primary text-primary"
+              onClick={() => setUploadModalOpen(true)}
+              title="Add Source"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Sources List */}
