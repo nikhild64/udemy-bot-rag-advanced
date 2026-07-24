@@ -1,12 +1,8 @@
 "use client"
 
 import { useUIStore } from '@/shared/lib/store';
-import {
-  useNotebookQuery,
-  useDuplicateNotebookMutation,
-  useArchiveNotebookMutation,
-  useFavoriteNotebookMutation,
-} from '@/features/notebooks/hooks/useNotebooks';
+import { useNotebookQuery, useDuplicateNotebookMutation, useArchiveNotebookMutation, useFavoriteNotebookMutation } from '@/features/notebooks/hooks/useNotebooks';
+import { useAdminStatusQuery } from '@/features/admin/hooks/useAdminLogs';
 import { UserButton, SignInButton, useAuth } from '@clerk/nextjs';
 import {
   PanelLeft,
@@ -20,13 +16,25 @@ import {
   Copy,
   Star,
   Archive,
+  Terminal,
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useRouter } from 'next/navigation';
 
-export function Header() {
+interface HeaderProps {
+  hideSidebarToggle?: boolean;
+  hideSourcesToggle?: boolean;
+  hideNotebookInfo?: boolean;
+}
+
+export function Header({
+  hideSidebarToggle = false,
+  hideSourcesToggle = false,
+  hideNotebookInfo = false,
+}: HeaderProps) {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const activeNotebookId = useUIStore((s) => s.activeNotebookId);
@@ -44,6 +52,7 @@ export function Header() {
   const favoriteMutation = useFavoriteNotebookMutation();
 
   const { data: notebook } = useNotebookQuery(activeNotebookId);
+  const { data: adminStatus } = useAdminStatusQuery();
 
   const handleGoHome = () => {
     setActiveNotebookId(null);
@@ -54,7 +63,7 @@ export function Header() {
     <header className="h-14 border-b border-border bg-card/50 backdrop-blur-md px-4 flex items-center justify-between shrink-0">
       {/* Left section: Sidebar toggle & Notebook info + actions */}
       <div className="flex items-center gap-3 min-w-0">
-        {!sidebarOpen && (
+        {!hideSidebarToggle && !sidebarOpen && (
           <Button
             size="icon"
             variant="ghost"
@@ -66,7 +75,7 @@ export function Header() {
           </Button>
         )}
 
-        {!sidebarOpen && (
+        {(hideSidebarToggle || !sidebarOpen) && (
           <div
             onClick={handleGoHome}
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition shrink-0"
@@ -77,7 +86,7 @@ export function Header() {
           </div>
         )}
 
-        {notebook && (
+        {!hideNotebookInfo && notebook && (
           <div className={`flex items-center gap-2 min-w-0 ${!sidebarOpen ? 'border-l border-border/50 pl-3' : ''}`}>
             <BookOpen className="w-4 h-4 text-primary shrink-0" />
             <h1 className="text-sm font-semibold text-foreground truncate">{notebook.title}</h1>
@@ -137,7 +146,7 @@ export function Header() {
 
       {/* Right section: Sources toggle, Settings, User Profile */}
       <div className="flex items-center gap-2">
-        {activeNotebookId && (
+        {!hideSourcesToggle && activeNotebookId && (
           <Button
             size="sm"
             variant={sourcesPanelOpen ? 'secondary' : 'ghost'}
@@ -150,6 +159,18 @@ export function Header() {
           </Button>
         )}
 
+        {isSignedIn && adminStatus?.data?.isAdmin && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={() => router.push('/admin/logs')}
+            title="Admin System Logs"
+          >
+            <Terminal className="w-4 h-4 text-primary/80 hover:text-primary" />
+          </Button>
+        )}
+
         <Button
           size="icon"
           variant="ghost"
@@ -159,6 +180,7 @@ export function Header() {
         >
           <Settings className="w-4 h-4" />
         </Button>
+
 
         <div className="pl-2 border-l border-border flex items-center">
           {isLoaded && isSignedIn ? (

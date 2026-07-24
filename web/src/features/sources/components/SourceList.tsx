@@ -62,7 +62,7 @@ export function SourceList() {
       </div>
 
       {/* Sources List */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+      <div className="shrink-0 max-h-[55%] overflow-y-auto space-y-2 pr-1">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-16 w-full rounded-xl" />
@@ -98,9 +98,9 @@ export function SourceList() {
         )}
       </div>
 
-      {/* Quick Actions Section (Visible ONLY when sources exist and at least one is Ready/Indexed) */}
+      {/* Quick Actions Section (Positioned directly below sources) */}
       {hasReadySources && (
-        <div className="pt-3 border-t border-border/60 space-y-2.5 max-h-[48%] shrink-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="pt-3 border-t border-border/60 space-y-2.5 shrink-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between px-1 shrink-0">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />

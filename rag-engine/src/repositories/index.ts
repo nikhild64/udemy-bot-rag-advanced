@@ -4,3 +4,5 @@ export * from './PrismaNotebookRepository';
 export * from './PrismaSourceRepository';
 export * from './PrismaMessageRepository';
 export * from './PrismaUserPreferenceRepository';
+export * from './PrismaSystemLogRepository';
+

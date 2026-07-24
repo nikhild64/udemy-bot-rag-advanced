@@ -43,6 +43,18 @@ enum SourceStatus {
   Failed
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
 enum MessageRole {
   USER
   ASSISTANT
@@ -53,13 +65,30 @@ model User {
   id         String          @id
   email      String?
   name       String?
+  role       UserRole        @default(USER)
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
   notebooks  Notebook[]
   preference UserPreference?
 
+  @@index([role])
   @@map("users")
 }
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     LogLevel
+  message   String   @db.Text
+  context   String?
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([createdAt(sort: Desc)])
+  @@index([context])
+  @@map("system_logs")
+}
+
 
 model Notebook {
   id           String    @id @default(uuid())

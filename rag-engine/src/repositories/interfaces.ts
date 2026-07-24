@@ -1,9 +1,44 @@
-import { User, Notebook, Source, Message, UserPreference, SourceType, SourceStatus, MessageRole } from '@prisma/client';
+import { User, Notebook, Source, Message, UserPreference, SystemLog, SourceType, SourceStatus, MessageRole, LogLevel, UserRole } from '@prisma/client';
 
 export interface IUserRepository {
   findById(id: string): Promise<User | null>;
-  findOrCreate(data: { id: string; email?: string | null; name?: string | null }): Promise<User>;
+  findOrCreate(data: { id: string; email?: string | null; name?: string | null; role?: UserRole }): Promise<User>;
+  updateRole(id: string, role: UserRole): Promise<User>;
 }
+
+export interface CreateSystemLogInput {
+  level: LogLevel;
+  message: string;
+  context?: string | null | undefined;
+  metadata?: Record<string, any> | null | undefined;
+}
+
+export interface ListSystemLogsQuery {
+  level?: LogLevel | undefined;
+  search?: string | undefined;
+  context?: string | undefined;
+  startDate?: Date | undefined;
+  endDate?: Date | undefined;
+  page?: number | undefined;
+  limit?: number | undefined;
+}
+
+export interface LogStatsResult {
+  total: number;
+  errorCount: number;
+  warnCount: number;
+  infoCount: number;
+  debugCount: number;
+}
+
+export interface ISystemLogRepository {
+  create(data: CreateSystemLogInput): Promise<SystemLog>;
+  findMany(query: ListSystemLogsQuery): Promise<PaginatedResult<SystemLog>>;
+  getStats(): Promise<LogStatsResult>;
+  deleteAll(): Promise<{ count: number }>;
+  prune(olderThanDays: number): Promise<{ count: number }>;
+}
+
 
 export interface CreateNotebookInput {
   title: string;

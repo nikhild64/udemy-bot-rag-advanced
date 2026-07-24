@@ -2,7 +2,8 @@ import { prisma } from '@/shared/database/prisma';
 import { getRedisClient } from '@/shared/redis/redis';
 import { StorageService } from '@/services/StorageService';
 import { VectorStoreService } from '@/services/VectorStoreService';
-import { logger } from '@/shared/logger';
+import { LogLevel } from '@prisma/client';
+import { logger, recordSystemLog } from '@/shared/logger';
 
 export class InfrastructureInitializer {
   static async initialize(): Promise<void> {
@@ -25,6 +26,13 @@ export class InfrastructureInitializer {
     logger.info('=====================================================');
     logger.info('Infrastructure Initialization Complete. Ready!');
     logger.info('=====================================================');
+
+    void recordSystemLog(
+      LogLevel.INFO,
+      'Infrastructure initialization complete. Database, Redis, Storage & Qdrant ready.',
+      'System Startup',
+      { timestamp: new Date().toISOString() },
+    );
   }
 
   private static async initDatabase(): Promise<void> {

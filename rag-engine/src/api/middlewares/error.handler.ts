@@ -1,6 +1,7 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { LogLevel } from '@prisma/client';
 import { config } from '../../config';
-import { logger } from '../../shared';
+import { logger, recordSystemLog } from '../../shared';
 import { ValidationError, ProviderError, NotFoundError, InputGuardError } from '../../shared/errors';
 
 export interface ErrorResponse {
@@ -48,6 +49,17 @@ export function globalErrorHandler(
       },
       'Unexpected server error occurred',
     );
+    void recordSystemLog(
+      LogLevel.ERROR,
+      error.message || 'Unexpected server error occurred',
+      'HTTP Handler',
+      {
+        url: request.url,
+        method: request.method,
+        statusCode,
+        stack: error.stack,
+      }
+    );
   } else {
     logger.warn(
       {
@@ -58,7 +70,18 @@ export function globalErrorHandler(
       },
       'Client error handled',
     );
+    void recordSystemLog(
+      LogLevel.WARN,
+      error.message || 'Client error handled',
+      'HTTP Handler',
+      {
+        url: request.url,
+        method: request.method,
+        statusCode,
+      }
+    );
   }
+
 
   const isProduction = config.app.env === 'production';
   const message =

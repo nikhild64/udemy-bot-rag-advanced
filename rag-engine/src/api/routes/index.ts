@@ -11,10 +11,12 @@ import { dashboardRoutes } from './dashboard.routes';
 import { preferenceRoutes } from './preferences.routes';
 import { cleanupRoutes } from './cleanup.routes';
 import { youtubeRoutes } from './youtube.routes';
+import { adminRoutes } from './admin.routes';
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes);
   await app.register(metricsRoutes);
+  await app.register(adminRoutes);
   await app.register(chatRoutes);
   await app.register(notebookRoutes);
   await app.register(youtubeRoutes); // Register before sourceRoutes to avoid :id conflict
@@ -26,3 +28,4 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(preferenceRoutes);
   await app.register(cleanupRoutes);
 }
+
