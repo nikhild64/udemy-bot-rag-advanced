@@ -18,21 +18,25 @@ export class SourceLoaderFactory {
   ): ISourceLoader {
     const typeStr = (type || sourceInput?.type || '').toString().toUpperCase();
     const url = sourceInput?.fileUrl || sourceInput?.metadata?.url || '';
+    const mimeType = (sourceInput?.mimeType || '').toString().toLowerCase();
+    const fileName = [sourceInput?.storagePath, sourceInput?.fileUrl, sourceInput?.metadata?.fileName]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
 
-    logger.debug({ typeStr, url }, 'Resolving SourceLoader for ingestion');
-
-    if (typeStr === 'WEBSITE' || typeStr === 'HTML' || url.includes('http://') || url.includes('https://')) {
-      if (typeStr !== 'YOUTUBE' && !url.includes('youtube.com') && !url.includes('youtu.be')) {
-        return new WebsiteLoader(storageService ? { storageService } : {});
-      }
-    }
+    logger.debug({ typeStr, url, mimeType }, 'Resolving SourceLoader for ingestion');
 
     if (typeStr === 'YOUTUBE' || url.includes('youtube.com') || url.includes('youtu.be')) {
       return new YouTubeLoader(storageService ? { storageService } : {});
     }
 
+    // File type and MIME metadata take precedence over a public HTTPS URL.
+    // Uploaded PDFs commonly have an HTTPS public storage URL, but must still
+    // be downloaded as binary data and passed through PdfExtractor.
     if (
       typeStr === 'PDF' ||
+      mimeType.includes('pdf') ||
+      fileName.includes('.pdf') ||
       typeStr === 'TEXT' ||
       typeStr === 'TXT' ||
       typeStr === 'VTT' ||
@@ -43,6 +47,10 @@ export class SourceLoaderFactory {
       sourceInput?.storagePath
     ) {
       return new FileSourceLoader(storageService);
+    }
+
+    if (typeStr === 'WEBSITE' || typeStr === 'HTML' || url.includes('http://') || url.includes('https://')) {
+      return new WebsiteLoader(storageService ? { storageService } : {});
     }
 
     // Default fallback to FileSourceLoader if storage path is present or unknown file type

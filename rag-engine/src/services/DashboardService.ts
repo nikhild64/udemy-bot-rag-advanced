@@ -48,7 +48,7 @@ export class DashboardService {
         take: 5,
         include: {
           _count: {
-            select: { sources: { where: { status: { in: ['Queued', 'Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'] as any } } }, messages: true },
+            select: { sources: true, messages: true },
           },
         },
       }),

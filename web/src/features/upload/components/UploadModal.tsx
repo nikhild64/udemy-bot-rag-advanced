@@ -24,7 +24,7 @@ export function UploadModal() {
   const [mode, setMode] = useState<Mode>('file');
 
   // File state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   // URL state
   const [urlInput, setUrlInput] = useState('');
@@ -40,7 +40,7 @@ export function UploadModal() {
   const [dragActive, setDragActive] = useState(false);
 
   const resetState = () => {
-    setSelectedFile(null);
+    setSelectedFiles([]);
     setUrlInput('');
     setTextTitle('');
     setTextContent('');
@@ -54,22 +54,36 @@ export function UploadModal() {
     setOpen(false);
   };
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = (files: FileList | File[]) => {
     const allowed = ['.pdf', '.txt', '.vtt', '.srt', '.zip'];
-    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!allowed.includes(ext)) {
-      setErrorMessage(`Unsupported file format "${ext}". Supported: PDF (.pdf), Plain Text (.txt), VTT / Transcripts (.vtt, .srt), or ZIP archives (.zip)`);
-      return;
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    Array.from(files).forEach((file) => {
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (!allowed.includes(ext)) {
+        invalidFiles.push(file.name);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (invalidFiles.length > 0) {
+      setErrorMessage(`Unsupported format for: ${invalidFiles.join(', ')}. Supported: PDF (.pdf), Plain Text (.txt), VTT / Transcripts (.vtt, .srt), or ZIP archives (.zip)`);
+    } else {
+      setErrorMessage(null);
     }
-    setErrorMessage(null);
-    setSelectedFile(file);
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files);
     }
   };
 
@@ -81,31 +95,35 @@ export function UploadModal() {
       setUploadProgress(30);
 
       if (mode === 'file') {
-        if (!selectedFile) return;
-
-        const ext = '.' + selectedFile.name.split('.').pop()?.toLowerCase();
-        let sourceType = 'TXT';
-        if (ext === '.pdf') {
-          sourceType = 'PDF';
-        } else if (ext === '.vtt' || ext === '.srt' || ext === '.zip') {
-          sourceType = 'VTT';
-        } else {
-          sourceType = 'TXT';
-        }
-
-        const source = await sourcesApi.createSource(activeNotebookId, {
-          type: sourceType as any,
-          title: selectedFile.name,
-          displayName: selectedFile.name,
-          size: selectedFile.size,
-          mimeType: selectedFile.type || 'application/octet-stream',
-          status: 'PendingUpload',
-        });
+        if (selectedFiles.length === 0) return;
 
         setStep('uploading');
-        setUploadProgress(70);
+        let completedCount = 0;
 
-        await sourcesApi.uploadSourceFile(source.id, selectedFile);
+        for (const file of selectedFiles) {
+          const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+          let sourceType = 'TXT';
+          if (ext === '.pdf') {
+            sourceType = 'PDF';
+          } else if (ext === '.vtt' || ext === '.srt' || ext === '.zip') {
+            sourceType = 'VTT';
+          } else {
+            sourceType = 'TXT';
+          }
+
+          const source = await sourcesApi.createSource(activeNotebookId, {
+            type: sourceType as any,
+            title: file.name,
+            displayName: file.name,
+            size: file.size,
+            mimeType: file.type || 'application/octet-stream',
+            status: 'PendingUpload',
+          });
+
+          await sourcesApi.uploadSourceFile(source.id, file);
+          completedCount++;
+          setUploadProgress(Math.round((completedCount / selectedFiles.length) * 100));
+        }
       } else if (mode === 'url') {
         const urls = urlInput
           .split(/[\n,]+/)
@@ -157,7 +175,7 @@ export function UploadModal() {
     step === 'creating' ||
     step === 'uploading' ||
     step === 'completed' ||
-    (mode === 'file' && !selectedFile) ||
+    (mode === 'file' && selectedFiles.length === 0) ||
     (mode === 'url' && !urlInput.trim()) ||
     (mode === 'text' && !textContent.trim());
 
@@ -236,9 +254,10 @@ export function UploadModal() {
                 onClick={() => {
                   const input = document.createElement('input');
                   input.type = 'file';
+                  input.multiple = true;
                   input.accept = '.pdf,.txt,.vtt,.srt,.zip';
                   input.onchange = (e: any) => {
-                    if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
+                    if (e.target.files?.length) handleFileSelect(e.target.files);
                   };
                   input.click();
                 }}
@@ -257,22 +276,26 @@ export function UploadModal() {
               </div>
             )}
 
-            {selectedFile && step !== 'completed' && (
-              <div className="p-3 bg-muted/40 border border-border rounded-lg flex items-center justify-between">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <FileText className="w-5 h-5 text-primary shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">{selectedFile.name}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                    </p>
+            {selectedFiles.length > 0 && step !== 'completed' && (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {selectedFiles.map((file, idx) => (
+                  <div key={idx} className="p-3 bg-muted/40 border border-border rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <FileText className="w-5 h-5 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {(file.size / (1024 * 1024)).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+                    {step === 'idle' && (
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
-                </div>
-                {step === 'idle' && (
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={resetState}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
+                ))}
               </div>
             )}
           </>

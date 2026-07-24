@@ -21,7 +21,15 @@ export class FileSourceLoader implements ISourceLoader {
       typeof (source.metadata as any).rawText === 'string' &&
       (source.metadata as any).rawText.length > 0;
 
-    if (!source.storagePath && !source.fileUrl && !hasRawText) {
+    // A stored rawText value is derived data. When the source still has a file
+    // reference, always reload the file so stale/failed extraction output cannot
+    // become the input for every subsequent retry.
+    const hasLoadableFileReference = Boolean(
+      source.storagePath || (source.fileUrl && !/^https?:\/\//i.test(source.fileUrl)),
+    );
+    const canUseRawTextFallback = hasRawText && !hasLoadableFileReference;
+
+    if (!source.storagePath && !source.fileUrl && !canUseRawTextFallback) {
       throw new SourceLoaderError(
         `File source '${source.id}' is missing a storagePath, fileUrl, or rawText content`,
       );
@@ -31,7 +39,7 @@ export class FileSourceLoader implements ISourceLoader {
     let content: Buffer;
 
     try {
-      if (hasRawText) {
+      if (canUseRawTextFallback) {
         content = Buffer.from((source.metadata as any).rawText, 'utf-8');
       } else if (filePath && (await this.isLocalFile(filePath))) {
         content = await fs.readFile(filePath);

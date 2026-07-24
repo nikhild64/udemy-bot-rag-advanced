@@ -27,6 +27,18 @@ describe('SourceLoaderFactory', () => {
     expect(urlLoader).toBeInstanceOf(WebsiteLoader);
   });
 
+  it('should instantiate FileSourceLoader for uploaded PDFs with public HTTPS URLs', () => {
+    const uploadedPdfLoader = SourceLoaderFactory.getLoader('PDF', {
+      type: 'PDF',
+      fileUrl: 'https://storage.example.com/uploads/document.pdf',
+      storagePath: 'uploads/user/notebook/source/document.pdf',
+      mimeType: 'application/pdf',
+    });
+
+    expect(uploadedPdfLoader).toBeInstanceOf(FileSourceLoader);
+    expect(uploadedPdfLoader).not.toBeInstanceOf(WebsiteLoader);
+  });
+
   it('should instantiate YouTubeLoader for YOUTUBE or youtube.com URLs', () => {
     const ytLoader = SourceLoaderFactory.getLoader('YOUTUBE');
     expect(ytLoader).toBeInstanceOf(YouTubeLoader);

@@ -219,7 +219,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
           </div>
         )}
 
-        {(url || metadata?.url) && !videoId && (
+        {(url || metadata?.url) && !videoId && type !== 'PDF' && (
           <Button
             variant="outline"
             size="sm"
@@ -258,7 +258,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
             <div className="bg-card p-6 sm:p-8 rounded-xl border border-border shadow-xs space-y-4">
               <div className="border-b border-border/60 pb-3 flex items-center justify-between">
                 <span className="text-xs font-mono font-semibold text-primary uppercase tracking-wider">
-                  Extracted Web Content
+                  {type === 'WEBSITE' ? 'Extracted Web Content' : type === 'PDF' ? 'Extracted Document Text' : ['YOUTUBE', 'VIDEO', 'AUDIO', 'VTT'].includes(type) ? 'Transcript' : 'Extracted Content'}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {rawText.split(/\s+/).length} words
@@ -278,7 +278,7 @@ export function SourceViewer({ citation, sourceId, timestamp }: SourceViewerProp
               Preview is not available for this source type within the viewer. 
               <br />Please open the original link.
             </p>
-            {(url || metadata?.url) && (
+            {(url || metadata?.url) && type !== 'PDF' && (
               <Button size="sm" className="gap-2" onClick={() => openOriginalWebsite(url || metadata?.url)}>
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Visit Original Website</span>

@@ -50,7 +50,7 @@ export function DashboardView({
       const res = await apiClient.get<any>('/api/dashboard/summary');
       setData(res);
     } catch (err: any) {
-      logger.error({ err }, 'Failed to load dashboard summary');
+      console.error('Failed to load dashboard summary', err);
       setError(err?.message || 'Unable to connect to the backend server');
     } finally {
       setLoading(false);

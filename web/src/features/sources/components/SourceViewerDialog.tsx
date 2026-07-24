@@ -3,7 +3,7 @@ import { Source } from '@/shared/types';
 import { SourceViewer } from './SourceViewer';
 import { FileText, Video, Music, FileCode, HardDrive, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface SourceViewerDialogProps {
   isOpen: boolean;
@@ -16,6 +16,7 @@ interface SourceViewerDialogProps {
 export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, initialTimestamp }: SourceViewerDialogProps) {
   const [activeSourceId, setActiveSourceId] = useState(initialSourceId);
   const [activeTimestamp, setActiveTimestamp] = useState<string | undefined>(initialTimestamp);
+  const activeSourceRef = useRef<HTMLButtonElement>(null);
 
   // Update active source if initialSourceId changes or dialog opens
   useEffect(() => {
@@ -24,6 +25,13 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
     }
     setActiveTimestamp(initialTimestamp);
   }, [initialSourceId, initialTimestamp, isOpen]);
+
+  // Scroll active source into view
+  useEffect(() => {
+    if (isOpen && activeSourceRef.current) {
+      activeSourceRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [activeSourceId, isOpen]);
 
   const getFileIcon = (source: Source) => {
     const mime = source.mimeType?.toLowerCase() || '';
@@ -72,6 +80,7 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
                 return (
                   <button
                     key={src.id}
+                    ref={isActive ? activeSourceRef : null}
                     onClick={() => setActiveSourceId(src.id)}
                     className={cn(
                       "flex items-center gap-3 p-3 rounded-lg text-left transition-all duration-200 border w-full",

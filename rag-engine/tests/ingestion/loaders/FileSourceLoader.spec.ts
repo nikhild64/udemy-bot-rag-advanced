@@ -57,6 +57,19 @@ describe('FileSourceLoader', () => {
     expect(rawContent.content.toString()).toBe('mock pdf content');
   });
 
+  it('should prefer the source file over stale derived rawText', async () => {
+    const rawContent = await loader.load({
+      id: 'src-stale-text-1',
+      notebookId: 'nb-1',
+      type: 'PDF',
+      title: 'PDF with stale extraction',
+      storagePath: 'remote/test.pdf',
+      metadata: { rawText: '-- 1 of 43 --\n\n-- 2 of 43 --' },
+    });
+
+    expect(rawContent.content.toString()).toBe('mock pdf content');
+  });
+
   it('should throw SourceLoaderError when missing storagePath and fileUrl', async () => {
     await expect(
       loader.load({

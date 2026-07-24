@@ -55,7 +55,14 @@ export class ReIndexOrchestrator {
     }
 
     // 3. Reset Status and Process metadata
-    const { chunksCount, embeddingsCount, error, failedAt, ...restMetadata } = (source.metadata as Record<string, any>) || {};
+    const metadata = (source.metadata as Record<string, any>) || {};
+    const canReloadOriginal = Boolean(
+      source.storagePath || (source.fileUrl && !/^https?:\/\//i.test(source.fileUrl)),
+    );
+    const { chunksCount, embeddingsCount, error, failedAt, ...restMetadata } = metadata;
+    if (canReloadOriginal) {
+      delete restMetadata.rawText;
+    }
     
     const updatedMetadata = {
       ...restMetadata,
