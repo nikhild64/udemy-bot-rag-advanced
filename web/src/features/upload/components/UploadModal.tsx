@@ -15,6 +15,18 @@ import { cn } from '@/lib/utils';
 type Mode = 'file' | 'url' | 'text';
 type UploadStep = 'idle' | 'creating' | 'uploading' | 'completed' | 'error';
 
+function generateTitleFromText(rawText: string): string {
+  if (!rawText || !rawText.trim()) return 'Untitled Note';
+  const cleanText = rawText.trim().replace(/^[\s#*>\-\d.]+/gm, '').trim();
+  const firstLine = (cleanText.split('\n').find((line) => line.trim().length > 0) || rawText).trim();
+  if (!firstLine) return 'Untitled Note';
+  const words = firstLine.split(/\s+/).slice(0, 7).join(' ');
+  if (words.length > 45) {
+    return words.slice(0, 42).trim() + '...';
+  }
+  return words.length < firstLine.length ? `${words}...` : words;
+}
+
 export function UploadModal() {
   const isOpen = useUIStore((s) => s.uploadModalOpen);
   const setOpen = useUIStore((s) => s.setUploadModalOpen);
@@ -144,7 +156,7 @@ export function UploadModal() {
           return;
         }
 
-        const displayTitle = textTitle.trim() || 'Pasted Note';
+        const displayTitle = textTitle.trim() || generateTitleFromText(textContent);
 
         await sourcesApi.createSource(activeNotebookId, {
           type: 'TEXT',
@@ -229,7 +241,7 @@ export function UploadModal() {
           )}
         >
           <Type className="w-4 h-4 text-emerald-400" />
-          <span>Pasted Plain Text</span>
+          <span>Plain Text / Note</span>
         </button>
       </div>
 
@@ -322,12 +334,15 @@ export function UploadModal() {
         {mode === 'text' && (
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-semibold text-slate-300 mb-1 block">Note Title *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-300">Note Title</label>
+                <span className="text-[10px] text-slate-400">Optional — auto-generated if left blank</span>
+              </div>
               <input
                 type="text"
                 value={textTitle}
                 onChange={(e) => setTextTitle(e.target.value)}
-                placeholder="e.g. Meeting Transcript / Key Takeaways"
+                placeholder="e.g. Meeting Transcript / Key Takeaways (Optional)"
                 className="w-full rounded-xl border border-slate-800 bg-slate-900 p-3 text-xs text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
               />
             </div>

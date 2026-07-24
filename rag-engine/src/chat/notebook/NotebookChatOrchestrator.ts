@@ -1,11 +1,13 @@
 import { performance } from 'node:perf_hooks';
-import { MessageRole } from '@prisma/client';
+import { MessageRole, Source } from '@prisma/client';
 import { NotebookService } from '@/services/NotebookService';
 import { MessageService } from '@/services/MessageService';
+import { SourceService } from '@/services/SourceService';
 import { RetrievalOrchestrator } from '@/retrieval/notebook/RetrievalOrchestrator';
 import { NotebookPromptBuilder } from './NotebookPromptBuilder';
 import { ChatProvider, ChatProviderOptions } from '@/core/contracts/chat-provider.contract';
 import { ChatProviderFactory } from '@/providers/chat/ChatProviderFactory';
+import { ChatRole } from '@/types';
 import { ValidationError, AppError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 import {
@@ -20,6 +22,7 @@ export class NotebookChatOrchestrator {
   private readonly retrievalOrchestrator: RetrievalOrchestrator;
   private readonly promptBuilder: NotebookPromptBuilder;
   private readonly chatProvider: ChatProvider;
+  private readonly sourceService: SourceService;
 
   constructor(
     notebookService?: NotebookService,
@@ -27,12 +30,14 @@ export class NotebookChatOrchestrator {
     retrievalOrchestrator?: RetrievalOrchestrator,
     promptBuilder?: NotebookPromptBuilder,
     chatProvider?: ChatProvider,
+    sourceService?: SourceService,
   ) {
     this.notebookService = notebookService ?? new NotebookService();
     this.messageService = messageService ?? new MessageService();
     this.retrievalOrchestrator = retrievalOrchestrator ?? new RetrievalOrchestrator();
     this.promptBuilder = promptBuilder ?? new NotebookPromptBuilder();
     this.chatProvider = chatProvider ?? ChatProviderFactory.create();
+    this.sourceService = sourceService ?? new SourceService();
   }
 
   /**
@@ -269,6 +274,62 @@ export class NotebookChatOrchestrator {
         data: { message: err instanceof Error ? err.message : 'Notebook chat streaming failed' },
       };
     }
+  }
+
+  /**
+   * Generate 3-4 LLM-based contextual suggested questions for a Notebook.
+   */
+  public async generateSuggestedQuestions(notebookId: string, userId: string): Promise<string[]> {
+    try {
+      const notebook = await this.notebookService.getNotebook(notebookId, userId);
+      const history = await this.messageService.getNotebookMessages(notebookId, userId, 6);
+
+      let contextPrompt = '';
+      if (history.length > 0) {
+        const conversationText = history
+          .map((msg) => `${msg.role.toUpperCase()}: ${msg.content.slice(0, 300)}`)
+          .join('\n');
+        contextPrompt = `Notebook: ${notebook.title}\nRecent Conversation:\n${conversationText}\n\nBased on this conversation and notebook sources, generate 3 to 4 concise, high-value follow-up questions the user might ask next.`;
+      } else {
+        const sourcesResult = await this.sourceService.listSources(notebookId, userId, { limit: 5 });
+        const sources = sourcesResult.data || [];
+        const sourceTitles = sources
+          .map((s: Source) => s.displayName || s.title || (s.metadata as any)?.originalName || s.type)
+          .filter(Boolean)
+          .join(', ');
+        contextPrompt = `Notebook Title: ${notebook.title}\nKnowledge Sources: ${sourceTitles || 'Uploaded documents'}\n\nBased on these knowledge sources, generate 3 to 4 concise, intriguing initial questions the user can ask about these topics.`;
+      }
+
+      const systemPrompt = `You are a helpful study assistant. Output ONLY a valid JSON array of 3 to 4 short question strings (max 12 words per question). Do not include markdown formatting, preambles, or explanations. Example output: ["What are the main concepts?", "How does this compare to traditional models?", "Can you summarize the key findings?"]`;
+
+      const response = await this.chatProvider.generateResponse(
+        [
+          { role: ChatRole.SYSTEM, content: systemPrompt },
+          { role: ChatRole.USER, content: contextPrompt },
+        ],
+        { task: 'chat', maxTokens: 250, temperature: 0.7 }
+      );
+
+      const raw = response.message.content.trim();
+      const jsonMatch = raw.match(/\[\s*".*?"\s*\]/s) || [raw];
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+          .map((q: any) => String(q).trim())
+          .filter((q: string) => q.length > 0)
+          .slice(0, 4);
+      }
+    } catch (err) {
+      logger.warn({ notebookId, err }, 'Failed to generate LLM suggested questions, falling back to default suggestions');
+    }
+
+    return [
+      'Summarize the key themes across my sources',
+      'What are the most important insights from this notebook?',
+      'Explain the core concepts and definitions mentioned',
+      'Synthesize the main arguments and conclusions',
+    ];
   }
 
   private validateOptions(options: NotebookChatOptions): void {

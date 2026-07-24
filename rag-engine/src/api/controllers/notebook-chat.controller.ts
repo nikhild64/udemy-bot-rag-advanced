@@ -162,3 +162,26 @@ export async function deleteNotebookMessageController(
     message: `Deleted message and ${Math.max(0, deletedCount - 1)} subsequent messages`,
   });
 }
+
+export async function getSuggestedQuestionsController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = request.auth?.userId || (request as any).userId;
+  if (!userId) {
+    throw new UnauthorizedError('Unauthorized');
+  }
+
+  const { notebookId, id } = request.params as { notebookId?: string; id?: string };
+  const targetNotebookId = notebookId || id;
+  if (!targetNotebookId) {
+    throw new ValidationError('Notebook ID is required');
+  }
+
+  const orchestrator: NotebookChatOrchestrator =
+    request.server.notebookChatOrchestrator || new NotebookChatOrchestrator();
+
+  const questions = await orchestrator.generateSuggestedQuestions(targetNotebookId, userId);
+
+  await reply.status(200).send({ questions });
+}

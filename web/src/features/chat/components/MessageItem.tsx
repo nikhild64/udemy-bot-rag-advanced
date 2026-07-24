@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { Message } from '@/shared/types';
 import { MarkdownRenderer } from '@/components/markdown-renderer';
 import { CitationCard } from './CitationCard';
@@ -16,8 +17,10 @@ interface MessageItemProps {
 }
 
 export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
+  const { user } = useUser();
   const [copied, setCopied] = useState(false);
   const isAssistant = message.role?.toLowerCase() === 'assistant';
+  const userName = user?.firstName || user?.fullName || 'You';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content);
@@ -29,26 +32,32 @@ export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
   return (
     <div
       className={cn(
-        'group relative flex gap-3 p-4 rounded-2xl transition-colors',
-        isAssistant ? 'bg-card/70 border border-border/70 shadow-2xs' : 'bg-primary/5 ml-8 border border-primary/10'
+        'group relative flex gap-2.5 p-3 sm:p-3.5 rounded-xl transition-colors',
+        isAssistant ? 'bg-card/70 border border-border/70 shadow-2xs' : 'bg-primary/5 ml-4 sm:ml-6 border border-primary/10'
       )}
     >
       {/* Avatar */}
       <div
         className={cn(
-          'w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold shadow-xs',
+          'w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold shadow-2xs mt-0.5 overflow-hidden',
           isAssistant ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground border border-border'
         )}
       >
-        {isAssistant ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
+        {isAssistant ? (
+          <Bot className="w-3.5 h-3.5" />
+        ) : user?.imageUrl ? (
+          <img src={user.imageUrl} alt={userName} className="w-full h-full object-cover" />
+        ) : (
+          <User className="w-3.5 h-3.5" />
+        )}
       </div>
 
       {/* Message Content */}
-      <div className="flex-1 min-w-0 space-y-3">
+      <div className="flex-1 min-w-0 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-foreground">
-              {isAssistant ? 'Notebook AI' : 'You'}
+              {isAssistant ? 'Notebook AI' : userName}
             </span>
             <span className="text-[10px] text-muted-foreground">
               {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -110,9 +119,9 @@ export function MessageItem({ message, onRetry, onDelete }: MessageItemProps) {
               <Sparkles className="w-3.5 h-3.5 text-primary" />
               <span>Citations ({message.citations.length})</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {message.citations.map((citation, idx) => (
-                <CitationCard key={idx} citation={citation} index={idx} />
+                <CitationCard key={idx} citation={citation} index={idx} allCitations={message.citations} />
               ))}
             </div>
           </div>

@@ -24,25 +24,25 @@ export function ChatContainer() {
 
   const hasSources = sources.length > 0;
 
-  const NON_READY_STATUSES = [
+  const NON_READY_STATUSES: SourceStatus[] = [
     'PendingUpload', 'Uploading', 'Uploaded', 'Queued',
     'Downloading', 'Extracting', 'Normalizing', 'Chunking',
-    'Embedding', 'Indexing', 'Pending', 'Processing',
-  ] as const;
+    'Embedding', 'Indexing', 'Processing',
+  ];
 
   // Block chat if ANY source is still being processed
   const processingSource = sources.find((s) =>
-    NON_READY_STATUSES.includes(s.status as any)
+    NON_READY_STATUSES.includes(s.status)
   );
   const isIndexingSources = !!processingSource;
 
   // Chat is only available when there are sources AND none are still processing
   const allSourcesReady = hasSources && !isIndexingSources;
-  const hasReadySources = allSourcesReady && sources.some((s) => s.status === 'Ready' || (s.status as string) === 'Indexed');
+  const hasReadySources = allSourcesReady && sources.some((s) => s.status === 'Ready');
 
   const { data: liveStatus } = useSourceStatusQuery(
     processingSource?.id || '',
-    (processingSource?.status as SourceStatus) || 'Queued'
+    processingSource?.status || 'Queued'
   );
 
   const currentStatus = liveStatus?.status || processingSource?.status || 'Processing';
@@ -51,7 +51,7 @@ export function ChatContainer() {
   const statusLabel =
     progress > 0 && progress < 100
       ? `${currentStatus} (${progress}%)`
-      : currentStatus !== 'Ready' && currentStatus !== 'Indexed'
+      : currentStatus !== 'Ready'
       ? `${currentStatus} in progress...`
       : 'Processing & Indexing...';
 
@@ -191,6 +191,7 @@ export function ChatContainer() {
         ) : (
           /* Active Chat Message List */
           <MessageList
+            notebookId={activeNotebookId}
             messages={messages}
             isStreaming={isStreaming}
             streamingContent={streamingContent}
@@ -201,9 +202,9 @@ export function ChatContainer() {
         )}
 
         {/* Input Form Footer */}
-        <div className="p-4 border-t border-[#2B2B2B] bg-[#1A1A1A]/80 backdrop-blur-md">
-          <div className="max-w-3xl mx-auto space-y-2">
-            <div className={`relative chat-input-box p-1 ${!hasReadySources ? 'opacity-60 cursor-not-allowed bg-[#141414]' : ''}`}>
+        <div className="p-3 sm:p-3.5 border-t border-[#2B2B2B] bg-[#1A1A1A]/90 backdrop-blur-md">
+          <div className="max-w-3xl mx-auto space-y-1.5">
+            <div className={`relative chat-input-box p-0.5 ${!hasReadySources ? 'opacity-60 cursor-not-allowed bg-[#141414]' : ''}`}>
               <textarea
                 ref={textareaRef}
                 value={inputQuery}
@@ -217,17 +218,17 @@ export function ChatContainer() {
                     ? 'Processing sources... Chat will be enabled when indexing completes.'
                     : 'Ask a question about your notebook sources...'
                 }
-                rows={2}
-                className="w-full resize-none bg-transparent p-3 pr-12 text-sm text-white placeholder-[#A9A9A9] focus:outline-none min-h-[50px] max-h-[160px] disabled:cursor-not-allowed"
+                rows={1}
+                className="w-full resize-none bg-transparent py-2.5 px-3 pr-11 text-xs sm:text-sm text-white placeholder-[#A9A9A9] focus:outline-none min-h-[42px] max-h-[140px] disabled:cursor-not-allowed"
               />
 
               <button
-                className="chat-send-btn absolute right-3 bottom-3 h-8 w-8 flex items-center justify-center disabled:opacity-40"
+                className="chat-send-btn absolute right-2.5 bottom-2 h-7 w-7 flex items-center justify-center disabled:opacity-40"
                 onClick={handleSend}
                 disabled={!inputQuery.trim() || isStreaming || !hasReadySources}
                 title={!hasReadySources ? 'Knowledge sources required' : 'Send Message'}
               >
-                {!hasReadySources ? <Lock className="w-3.5 h-3.5" /> : <Send className="w-4 h-4" />}
+                {!hasReadySources ? <Lock className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" />}
               </button>
             </div>
 

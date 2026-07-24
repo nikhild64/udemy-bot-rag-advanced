@@ -4,6 +4,7 @@ import {
   postNotebookChatStreamController,
   getNotebookMessagesController,
   deleteNotebookMessageController,
+  getSuggestedQuestionsController,
 } from '../controllers/notebook-chat.controller';
 import {
   generatePodcastController,
@@ -48,6 +49,18 @@ export async function notebookChatRoutes(app: FastifyInstance): Promise<void> {
     '/api/v1/notebooks/:id/messages',
     { preHandler: [requireAuth] },
     getNotebookMessagesController,
+  );
+
+  // Suggested questions
+  app.get(
+    '/api/notebooks/:notebookId/suggested-questions',
+    { preHandler: [requireAuth] },
+    getSuggestedQuestionsController,
+  );
+  app.get(
+    '/api/v1/notebooks/:id/suggested-questions',
+    { preHandler: [requireAuth] },
+    getSuggestedQuestionsController,
   );
 
   // Delete message and all subsequent messages

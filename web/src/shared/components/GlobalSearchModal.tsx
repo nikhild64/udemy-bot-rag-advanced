@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, BookOpen, FileText, MessageSquare, Loader2, X, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '@/shared/api/client';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export function GlobalSearchModal({ isOpen, onClose }: GlobalSearchModalProps) {
         const res = await apiClient.get<any>(`/api/search?q=${encodeURIComponent(query.trim())}`);
         setResults(res);
       } catch (err) {
-        logger.error({ err }, 'Search failed');
+        console.error('Search failed', err);
       } finally {
         setLoading(false);
       }

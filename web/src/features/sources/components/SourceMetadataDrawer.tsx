@@ -4,6 +4,7 @@ import React from 'react';
 import { X, FileText, HardDrive, Calendar, Database, CheckCircle } from 'lucide-react';
 import { Source } from '@/shared/types';
 import { Button } from '@/components/ui/button';
+import { sourcesApi } from '../api/sources.api';
 
 interface SourceMetadataDrawerProps {
   source: Source | null;
@@ -21,7 +22,7 @@ export function SourceMetadataDrawer({ source, isOpen, onClose }: SourceMetadata
         window.open(info.downloadUrl, '_blank');
       }
     } catch (e) {
-      logger.error({ err: e }, 'Download failed');
+      console.error('Download failed', e);
     }
   };
 

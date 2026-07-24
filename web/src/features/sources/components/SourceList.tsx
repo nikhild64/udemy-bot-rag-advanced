@@ -8,6 +8,7 @@ import { SourceViewerDialog } from './SourceViewerDialog';
 import { PodcastScriptDialog, PodcastScript } from './PodcastScriptDialog';
 import { LearningPathDialog, LearningPath } from './LearningPathDialog';
 import { Upload, FilePlus, FolderKanban, Sparkles, Radio, GitCommit, ChevronRight, Loader2, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -22,6 +23,7 @@ export function SourceList() {
   // ── Dialog modal states ──
   const [podcastOpen, setPodcastOpen] = useState(false);
   const [learningPathOpen, setLearningPathOpen] = useState(false);
+  const [confirmReindexAllOpen, setConfirmReindexAllOpen] = useState(false);
 
   const { data: sources, isLoading, isError, error } = useSourcesQuery(activeNotebookId);
   const { data: artifacts } = useNotebookArtifactsQuery(activeNotebookId);
@@ -135,7 +137,7 @@ export function SourceList() {
               size="sm"
               variant="outline"
               className="h-7 px-2 text-xs flex items-center gap-1 border-dashed text-muted-foreground hover:text-foreground"
-              onClick={handleReindexAll}
+              onClick={() => setConfirmReindexAllOpen(true)}
               disabled={reindexMutation.isPending}
               title="Reindex All Sources"
             >
@@ -257,6 +259,43 @@ export function SourceList() {
         learningPath={pathData}
         onSelectSource={handleSelectSourceFromPath}
       />
+
+      {/* Custom Re-index All Sources Confirmation Dialog */}
+      <Dialog open={confirmReindexAllOpen} onOpenChange={setConfirmReindexAllOpen}>
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="flex items-center gap-2 text-primary text-base font-semibold">
+            <RefreshCw className="w-5 h-5 shrink-0 text-primary" />
+            <span>Re-index All Knowledge Sources</span>
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
+            Are you sure you want to re-index all <span className="font-semibold text-foreground">{sources?.length || 0} knowledge sources</span> in this notebook?
+            Re-indexing will re-extract text, re-chunk documents, and update vector search embeddings. Your existing chat history will be preserved.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0 mt-4">
+          <Button variant="outline" size="sm" onClick={() => setConfirmReindexAllOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+            disabled={reindexMutation.isPending}
+            onClick={() => {
+              handleReindexAll();
+              setConfirmReindexAllOpen(false);
+            }}
+          >
+            {reindexMutation.isPending ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Triggering...
+              </span>
+            ) : (
+              'Re-index All'
+            )}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

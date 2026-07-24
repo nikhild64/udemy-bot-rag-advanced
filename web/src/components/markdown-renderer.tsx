@@ -42,7 +42,7 @@ export function MarkdownRenderer({
   const processedContent = preprocessContent(content, chunks)
 
   return (
-    <div className="prose prose-neutral dark:prose-invert max-w-none text-foreground/90 font-sans">
+    <div className="prose prose-neutral dark:prose-invert max-w-none text-foreground/90 font-sans text-sm leading-relaxed prose-p:my-1.5 prose-p:leading-relaxed prose-headings:mt-3 prose-headings:mb-1.5 prose-headings:font-semibold prose-headings:text-foreground prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5 prose-pre:my-2 prose-blockquote:my-2 prose-hr:my-2">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         urlTransform={(url) => url}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Source } from '@/shared/types';
 import { cn } from '@/lib/utils';
 import {
@@ -12,6 +13,8 @@ import {
 } from '../hooks/useSources';
 import { SourceStatusBadge } from './SourceStatusBadge';
 import { SourceMetadataDrawer } from './SourceMetadataDrawer';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   FileText,
   FileCode,
@@ -27,8 +30,8 @@ import {
   Download,
   Loader2,
   Globe,
+  AlertTriangle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { sourcesApi } from '../api/sources.api';
@@ -41,6 +44,7 @@ interface SourceItemProps {
 
 export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps) {
   const [metadataDrawerOpen, setMetadataDrawerOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const { data: liveStatus } = useSourceStatusQuery(source.id, source.status);
   const deleteMutation = useDeleteSourceMutation(notebookId);
@@ -191,21 +195,21 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
               )}
 
               <DropdownMenuItem
-                disabled={reindexMutation.isPending || isQueuedOrProcessing}
-                onClick={() => reindexMutation.mutate(source.id)}
+                className={cn(reindexMutation.isPending || isQueuedOrProcessing ? "pointer-events-none opacity-50" : "")}
+                onClick={reindexMutation.isPending || isQueuedOrProcessing ? undefined : () => reindexMutation.mutate(source.id)}
               >
                 {reindexMutation.isPending ? (
-                  <Loader2 className="w-3.5 h-3.5 mr-2 text-cyan-400 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 mr-2 text-primary animate-spin" />
                 ) : (
-                  <RefreshCw className="w-3.5 h-3.5 mr-2 text-cyan-400" />
+                  <RefreshCw className="w-3.5 h-3.5 mr-2 text-primary" />
                 )}
                 <span>{reindexMutation.isPending ? 'Re-indexing...' : 'Re-index'}</span>
               </DropdownMenuItem>
 
               {currentStatus === 'Failed' && (
                 <DropdownMenuItem
-                  disabled={retryMutation.isPending}
-                  onClick={() => retryMutation.mutate(source.id)}
+                  className={cn(retryMutation.isPending ? "pointer-events-none opacity-50" : "")}
+                  onClick={retryMutation.isPending ? undefined : () => retryMutation.mutate(source.id)}
                 >
                   {retryMutation.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 mr-2 text-amber-400 animate-spin" />
@@ -218,8 +222,8 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
 
               {(isQueuedOrProcessing) && (
                 <DropdownMenuItem
-                  disabled={cancelMutation.isPending}
-                  onClick={() => cancelMutation.mutate(source.id)}
+                  className={cn(cancelMutation.isPending ? "pointer-events-none opacity-50" : "")}
+                  onClick={cancelMutation.isPending ? undefined : () => cancelMutation.mutate(source.id)}
                 >
                   {cancelMutation.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 mr-2 text-amber-400 animate-spin" />
@@ -232,8 +236,8 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
 
               <DropdownMenuItem
                 destructive
-                disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate(source.id)}
+                className={cn(deleteMutation.isPending ? "pointer-events-none opacity-50" : "")}
+                onClick={deleteMutation.isPending ? undefined : () => setConfirmDeleteOpen(true)}
               >
                 {deleteMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
@@ -246,8 +250,6 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
             </div>
           </div>
         </div>
-
-        {/* Embedded YouTube Video Preview Removed to use SourceViewerDialog instead */}
 
         {/* Progress Bar for Queued / Processing */}
         {(isQueuedOrProcessing || currentStatus === 'Deleting') && (
@@ -272,6 +274,43 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
         isOpen={metadataDrawerOpen}
         onClose={() => setMetadataDrawerOpen(false)}
       />
+
+      {/* Custom Delete Source Confirmation Dialog */}
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="flex items-center gap-2 text-destructive text-base font-semibold">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            <span>Delete Knowledge Source</span>
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
+            Are you sure you want to delete <span className="font-semibold text-foreground">"{source.displayName || source.title}"</span>?
+            This will permanently remove the source file and all its indexed vector embeddings. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0 mt-4">
+          <Button variant="outline" size="sm" onClick={() => setConfirmDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              deleteMutation.mutate(source.id);
+              setConfirmDeleteOpen(false);
+            }}
+          >
+            {deleteMutation.isPending ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Deleting...
+              </span>
+            ) : (
+              'Delete Source'
+            )}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </>
   );
 }

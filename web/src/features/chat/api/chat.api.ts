@@ -47,4 +47,9 @@ export const chatApi = {
       `/api/notebooks/${notebookId}/messages/${messageId}`,
     );
   },
+
+  getSuggestedQuestions: async (notebookId: string): Promise<string[]> => {
+    const res = await apiClient.get<{ questions: string[] }>(`/api/notebooks/${notebookId}/suggested-questions`);
+    return res?.questions || [];
+  },
 };
