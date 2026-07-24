@@ -18,13 +18,35 @@ export function setAuthTokenGetter(getter: TokenGetter) {
   tokenGetter = getter;
 }
 
+export function getAuthTokenGetter(): TokenGetter | null {
+  return tokenGetter;
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 
 async function getHeaders(customHeaders: Record<string, string> = {}): Promise<Record<string, string>> {
   const headers: Record<string, string> = { ...customHeaders };
+
+  // Wait up to 1.5s if tokenGetter is not set yet (e.g. during initial app hydration)
+  if (!tokenGetter) {
+    let waits = 0;
+    while (!tokenGetter && waits < 15) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      waits++;
+    }
+  }
+
   if (tokenGetter) {
     try {
-      const token = await tokenGetter();
+      let token = await tokenGetter();
+      // Retry token retrieval if token is momentarily null during session initialization/refresh
+      let retries = 0;
+      while (!token && retries < 4) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        token = await tokenGetter();
+        retries++;
+      }
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }

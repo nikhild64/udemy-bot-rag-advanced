@@ -1,7 +1,7 @@
 export interface NotebookRetrievalOptions {
   notebookId: string;
-  userId: string;
-  query: string;
+  userId?: string | undefined;
+  query?: string | undefined;
   topK?: number | undefined;
   candidateLimit?: number | undefined;
   similarityThreshold?: number | undefined;

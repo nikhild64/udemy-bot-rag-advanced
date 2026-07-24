@@ -1,14 +1,36 @@
 import { ChatRequest, ChatResponse } from "@/types/api"
+import { getAuthTokenGetter } from "@/shared/api/client"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
 
+async function resolveAuthToken(providedToken?: string | null): Promise<string | null> {
+  if (providedToken) return providedToken;
+
+  const tokenGetter = getAuthTokenGetter();
+  if (!tokenGetter) return null;
+
+  try {
+    let token = await tokenGetter();
+    let retries = 0;
+    while (!token && retries < 4) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      token = await tokenGetter();
+      retries++;
+    }
+    return token;
+  } catch {
+    return null;
+  }
+}
+
 export async function submitChatQuery(request: ChatRequest, token?: string | null): Promise<ChatResponse> {
+  const authToken = await resolveAuthToken(token);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   }
   
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`
   }
 
   const response = await fetch(`${API_URL}/chat`, {
@@ -38,12 +60,13 @@ export async function streamChatQuery(
   signal?: AbortSignal,
   token?: string | null
 ): Promise<void> {
+  const authToken = await resolveAuthToken(token);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   }
   
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`
   }
 
   const response = await fetch(`${API_URL}/chat/stream`, {

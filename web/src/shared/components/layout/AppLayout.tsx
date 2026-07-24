@@ -33,7 +33,13 @@ export function AppLayout({
   const settingsModalOpen = useUIStore((s) => s.settingsModalOpen);
   const setSettingsModalOpen = useUIStore((s) => s.setSettingsModalOpen);
 
-  // Set up token getter for API client as soon as auth is ready
+  // Set up token getter for API client immediately as soon as auth is ready
+  if (isLoaded && isSignedIn) {
+    setAuthTokenGetter(async () => {
+      return getToken();
+    });
+  }
+
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       setAuthTokenGetter(async () => {

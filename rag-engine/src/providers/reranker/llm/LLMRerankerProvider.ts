@@ -186,7 +186,7 @@ Candidate Passages
 
         // Try index-based ID (idx-ref-0 or number 0..batch.length)
         const match = rawChunkId.match(/^(?:idx-ref-)?(\d+)$/);
-        if (match) {
+        if (match && match[1] !== undefined) {
           const idx = parseInt(match[1], 10);
           if (idx >= 0 && idx < batch.length && batch[idx] !== undefined) {
             matchedId = this.getChunkId(batch[idx]!);

@@ -5,6 +5,7 @@ import { NotebookService } from '@/services/NotebookService';
 import { SourceService } from '@/services/SourceService';
 import { audioStorageService } from '@/services/audio-storage.service';
 import { TTSServiceFactory } from '@/services/tts.service';
+import { DenseNotebookRetriever } from '@/retrieval/notebook/DenseNotebookRetriever';
 import { UnauthorizedError, ValidationError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 import fs from 'fs';
@@ -13,7 +14,11 @@ import fs from 'fs';
 // Shared helpers
 // ─────────────────────────────────────────────
 
-async function buildNotebookSourceContext(notebookId: string, userId: string): Promise<string> {
+async function buildNotebookSourceContext(
+  notebookId: string,
+  userId: string,
+  queryPrompt: string = 'key concepts main topics overview summary',
+): Promise<string> {
   const sourceService = new SourceService();
   const sources = await sourceService.listSources(notebookId, userId);
 
@@ -26,6 +31,39 @@ async function buildNotebookSourceContext(notebookId: string, userId: string): P
     return 'No indexed sources available.';
   }
 
+  // Attempt vector search retrieval from Qdrant via DenseNotebookRetriever
+  try {
+    const retriever = new DenseNotebookRetriever();
+    const retrievedChunks = await retriever.retrieve(queryPrompt, {
+      notebookId,
+      userId,
+      query: queryPrompt,
+      candidateLimit: 15,
+    });
+
+    if (retrievedChunks && retrievedChunks.length > 0) {
+      logger.info(
+        { notebookId, chunkCount: retrievedChunks.length },
+        '[Generate] Retrieved vector search chunks for context',
+      );
+      const formattedChunks = retrievedChunks
+        .map((chunk, i) => {
+          const title = (chunk.metadata?.sourceTitle || chunk.metadata?.title || 'Source Chunk') as string;
+          const location = chunk.metadata?.pageNumber ? ` (Page ${chunk.metadata.pageNumber})` : '';
+          return `[Excerpt ${i + 1}] Source: "${title}"${location}\nContent: ${chunk.text}`;
+        })
+        .join('\n\n');
+
+      return formattedChunks;
+    }
+  } catch (err: any) {
+    logger.warn(
+      { err: err.message, notebookId },
+      '[Generate] Vector retrieval failed for context — falling back to source metadata',
+    );
+  }
+
+  // Metadata Fallback
   return readySources
     .map(
       (s: any, i: number) =>
@@ -177,7 +215,7 @@ export async function generatePodcastController(
   (async () => {
     try {
       logger.info({ notebookId, userId }, '[Generate] Background podcast generation started');
-      const sourceContext = await buildNotebookSourceContext(notebookId, userId);
+      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title);
       const userPrompt = `Notebook: "${notebook.title}"\n\nSource Knowledge Base:\n${sourceContext}\n\nInstructions:\nCreate a captivating podcast episode that starts with a warm welcome and an intriguing real-life scenario or fact. Progressively increase the difficulty from foundational concepts to advanced technical nuances. Ensure a natural collaborative conversation between Alex and Jamie that covers all key takeaways from the sources.`;
 
       const chatProvider = ChatProviderFactory.create();
@@ -340,7 +378,7 @@ export async function generateLearningPathController(
   (async () => {
     try {
       logger.info({ notebookId, userId }, '[Generate] Background learning path generation started');
-      const sourceContext = await buildNotebookSourceContext(notebookId, userId);
+      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title);
       const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Sources:\n${sourceContext}\n\nGenerate a progressive learning path that guides someone from beginner to confident in the topics covered by these sources.`;
 
       const chatProvider = ChatProviderFactory.create();

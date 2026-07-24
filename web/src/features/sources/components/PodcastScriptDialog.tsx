@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, Radio, Play, Pause, ChevronDown, ChevronUp, Mic, Volume2, Sparkles, Minimize2, Maximize2, X, Gauge } from 'lucide-react';
@@ -247,6 +248,131 @@ function CanvasWaveform({
 }
 
 // ─────────────────────────────────────────────────────────────
+// Silky-Smooth Liquid Bezier Mini Background Waveform
+// ─────────────────────────────────────────────────────────────
+
+function MiniBackgroundWaveform({
+  activeSpeaker,
+  isPlaying,
+  playbackRate,
+}: {
+  activeSpeaker: 'Alex' | 'Jamie';
+  isPlaying: boolean;
+  playbackRate: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const isAlexSpeaking = activeSpeaker === 'Alex' && isPlaying;
+  const isJamieSpeaking = activeSpeaker === 'Jamie' && isPlaying;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let t = 0;
+
+    const render = () => {
+      t += 0.015 * (isPlaying ? playbackRate : 0.5);
+      const width = canvas.width;
+      const height = canvas.height;
+      const midY = height / 2;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const drawWave = (
+        isSpeaking: boolean,
+        strokeColor: string,
+        glowColor: string,
+        seed: number,
+        offsetY: number,
+      ) => {
+        ctx.save();
+        const maxAmp = isSpeaking ? 16 : isPlaying ? 5 : 2;
+        const speed = isSpeaking ? 1.6 : 0.7;
+        const numPoints = 24;
+
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = isSpeaking ? 10 : 3;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = isSpeaking ? 2.5 : 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const pts: { x: number; y: number }[] = [];
+        for (let i = 0; i <= numPoints; i++) {
+          const progress = i / numPoints;
+          const x = progress * width;
+          const envelope = Math.sin(progress * Math.PI);
+
+          const wave1 = Math.sin(t * speed + progress * Math.PI * 4 + seed);
+          const wave2 = Math.cos(t * speed * 0.8 - progress * Math.PI * 2 + seed * 1.5);
+
+          const verticalDisplacement = (wave1 * 0.7 + wave2 * 0.3) * maxAmp * envelope;
+          const y = offsetY - verticalDisplacement;
+
+          pts.push({ x, y });
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p1 = pts[i];
+          const p2 = pts[i + 1];
+          const midX = (p1.x + p2.x) / 2;
+          const midY = (p1.y + p2.y) / 2;
+          ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+        }
+
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.stroke();
+        ctx.restore();
+      };
+
+      // Draw Jamie Wave (Amber)
+      drawWave(
+        isJamieSpeaking,
+        isJamieSpeaking ? 'rgba(245, 158, 11, 0.75)' : 'rgba(245, 158, 11, 0.25)',
+        '#F59E0B',
+        2.5,
+        midY + 1,
+      );
+
+      // Draw Alex Wave (Blue)
+      drawWave(
+        isAlexSpeaking,
+        isAlexSpeaking ? 'rgba(59, 130, 246, 0.75)' : 'rgba(59, 130, 246, 0.25)',
+        '#3B82F6',
+        0,
+        midY - 1,
+      );
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [activeSpeaker, isPlaying, isAlexSpeaking, isJamieSpeaking, playbackRate]);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl opacity-40 group-hover/minitile:opacity-60 transition-opacity duration-300">
+      <canvas
+        ref={canvasRef}
+        width={450}
+        height={80}
+        className="w-full h-full block"
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main Dialog Component
 // ─────────────────────────────────────────────────────────────
 
@@ -263,6 +389,11 @@ export function PodcastScriptDialog({
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [voices, setVoices] = useState<{ alexVoice: SpeechSynthesisVoice | null; jamieVoice: SpeechSynthesisVoice | null }>({
     alexVoice: null,
@@ -529,73 +660,104 @@ export function PodcastScriptDialog({
 
   if (!isOpen) return null;
 
+  const miniTileContent = isMinimized && script ? (
+    <div
+      onClick={() => setIsMinimized(false)}
+      className="fixed bottom-6 right-6 z-[9999] group/minitile bg-[#121216]/95 backdrop-blur-xl border border-white/15 shadow-[0_8px_32px_rgba(0,0,0,0.8)] rounded-2xl p-3.5 flex items-center gap-3.5 text-white max-w-md w-full animate-in slide-in-from-bottom-5 duration-300 overflow-hidden cursor-pointer hover:border-amber-500/40 hover:shadow-amber-500/10 transition-all"
+    >
+      {/* Animated Liquid Waveform Canvas Background */}
+      <MiniBackgroundWaveform
+        activeSpeaker={currentSpeaker}
+        isPlaying={isPlaying}
+        playbackRate={playbackRate}
+      />
+
+      {/* Interactive Controls & Content Layer */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          togglePlay();
+        }}
+        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 shadow-lg z-10 ${
+          isPlaying
+            ? currentSpeaker === 'Alex'
+              ? 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/40'
+              : 'bg-amber-500 text-black hover:bg-amber-400 shadow-amber-500/40'
+            : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/40'
+        }`}
+      >
+        {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+      </button>
+
+      <div className="min-w-0 flex-1 z-10">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-semibold text-white truncate drop-shadow">{script.title}</p>
+          {isPlaying && (
+            <span
+              className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold shrink-0 ${
+                currentSpeaker === 'Alex'
+                  ? 'bg-blue-500/25 text-blue-300 border border-blue-500/30'
+                  : 'bg-amber-500/25 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              {currentSpeaker}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-white/70 truncate italic mt-0.5 font-medium">
+          &ldquo;{script.lines[activeLineIndex]?.text || ''}&rdquo;
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-1.5 shrink-0 z-10" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={handleCycleSpeed}
+          className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/10 text-[10px] font-mono text-amber-400 font-semibold transition-all hover:scale-105"
+        >
+          {playbackRate}x
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMinimized(false);
+          }}
+          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white transition-all hover:scale-105"
+          title="Expand Studio"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMinimized(false);
+            onClose();
+          }}
+          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white transition-all hover:scale-105"
+          title="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       {audioElement}
-      {isMinimized && script ? (
-        <div className="fixed bottom-6 right-6 z-[100] bg-[#141414]/95 backdrop-blur-md border border-[#2B2B2B] shadow-2xl rounded-2xl p-3.5 flex items-center gap-3.5 text-white max-w-md w-full animate-in slide-in-from-bottom-5 duration-300">
-          <button
-            onClick={togglePlay}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 shadow-md ${
-              isPlaying
-                ? currentSpeaker === 'Alex'
-                  ? 'bg-blue-600 text-white hover:bg-blue-500'
-                  : 'bg-amber-500 text-black hover:bg-amber-400'
-                : 'bg-blue-600 text-white hover:bg-blue-500'
-            }`}
-          >
-            {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <p className="text-xs font-semibold text-white truncate">{script.title}</p>
-              {isPlaying && (
-                <span
-                  className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold shrink-0 ${
-                    currentSpeaker === 'Alex' ? 'bg-blue-500/20 text-blue-400' : 'bg-amber-500/20 text-amber-400'
-                  }`}
-                >
-                  {currentSpeaker}
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-[#A9A9A9] truncate italic mt-0.5">
-              &ldquo;{script.lines[activeLineIndex]?.text || ''}&rdquo;
-            </p>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={handleCycleSpeed}
-              className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-[10px] font-mono text-amber-400"
-            >
-              {playbackRate}x
-            </button>
-            <button
-              onClick={() => setIsMinimized(false)}
-              className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-white"
-              title="Expand Studio"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                setIsMinimized(false);
-                onClose();
-              }}
-              className="p-1 rounded-lg hover:bg-white/10 text-[#A9A9A9] hover:text-white"
-              title="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      ) : (
+      {miniTileContent && isMounted ? createPortal(miniTileContent, document.body) : miniTileContent}
+      {!isMinimized && (
         <Dialog
           open={isOpen}
-          onOpenChange={(open) => !open && onClose()}
+          onOpenChange={(open) => {
+            if (!open) {
+              if (isPlaying) {
+                setIsMinimized(true);
+              } else {
+                onClose();
+              }
+            }
+          }}
           contentClassName="max-w-2xl w-full bg-[#121212] border border-[#262626] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col"
         >
       {/* ── Header ── */}
