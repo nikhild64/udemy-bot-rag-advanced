@@ -7,6 +7,9 @@ import { RetrievalOrchestrator } from '@/retrieval/notebook/RetrievalOrchestrato
 import { NotebookPromptBuilder } from './NotebookPromptBuilder';
 import { ChatProvider, ChatProviderOptions } from '@/core/contracts/chat-provider.contract';
 import { ChatProviderFactory } from '@/providers/chat/ChatProviderFactory';
+import { InputGuardService } from '@/guardrails/input/InputGuardService';
+import { OutputGuardService } from '@/guardrails/output/OutputGuardService';
+import { guardrailsConfig } from '@/config/guardrails';
 import { ChatRole } from '@/types';
 import { ValidationError, AppError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
@@ -23,6 +26,8 @@ export class NotebookChatOrchestrator {
   private readonly promptBuilder: NotebookPromptBuilder;
   private readonly chatProvider: ChatProvider;
   private readonly sourceService: SourceService;
+  private readonly inputGuardService: InputGuardService;
+  private readonly outputGuardService: OutputGuardService;
 
   constructor(
     notebookService?: NotebookService,
@@ -31,6 +36,8 @@ export class NotebookChatOrchestrator {
     promptBuilder?: NotebookPromptBuilder,
     chatProvider?: ChatProvider,
     sourceService?: SourceService,
+    inputGuardService?: InputGuardService,
+    outputGuardService?: OutputGuardService,
   ) {
     this.notebookService = notebookService ?? new NotebookService();
     this.messageService = messageService ?? new MessageService();
@@ -38,6 +45,8 @@ export class NotebookChatOrchestrator {
     this.promptBuilder = promptBuilder ?? new NotebookPromptBuilder();
     this.chatProvider = chatProvider ?? ChatProviderFactory.create();
     this.sourceService = sourceService ?? new SourceService();
+    this.inputGuardService = inputGuardService ?? new InputGuardService(guardrailsConfig);
+    this.outputGuardService = outputGuardService ?? new OutputGuardService(guardrailsConfig);
   }
 
   /**
@@ -47,6 +56,10 @@ export class NotebookChatOrchestrator {
     const totalStart = performance.now();
 
     this.validateOptions(options);
+
+    // 0. Input Guardrails Check
+    const sanitizedInput = await this.inputGuardService.validateAndSanitize({ query: options.query });
+    options.query = sanitizedInput.query;
 
     const { notebookId, userId, query } = options;
     logger.info({ notebookId, userId, query }, 'Starting notebook chat pipeline execution');
@@ -176,6 +189,10 @@ export class NotebookChatOrchestrator {
     try {
       this.validateOptions(options);
 
+      // 0. Input Guardrails Check
+      const sanitizedInput = await this.inputGuardService.validateAndSanitize({ query: options.query });
+      options.query = sanitizedInput.query;
+
       const { notebookId, userId, query } = options;
       logger.info({ notebookId, userId, query }, 'Starting notebook streaming chat execution');
 
@@ -235,6 +252,17 @@ export class NotebookChatOrchestrator {
         }
       }
       const completionDurationMs = Math.round(performance.now() - startCompletion);
+
+      // 6b. Output Guardrails Check
+      try {
+        await this.outputGuardService.validateAndSanitize({
+          message: { role: ChatRole.ASSISTANT, content: fullAnswerText },
+        });
+      } catch (err) {
+        logger.warn({ notebookId, err }, 'Output guardrails rejected the streamed response');
+        yield { type: 'error', data: { message: 'The generated response violated safety policies.' } };
+        return;
+      }
 
       // 7. Save Assistant Message AFTER successful stream completion
       const assistantMessage = await this.messageService.createMessage({
