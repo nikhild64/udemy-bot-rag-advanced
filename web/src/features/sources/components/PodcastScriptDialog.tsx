@@ -761,18 +761,18 @@ export function PodcastScriptDialog({
           contentClassName="max-w-2xl w-full max-h-[92dvh] bg-[#121212] border border-[#262626] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col"
         >
       {/* ── Header ── */}
-      <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#262626] shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+      <DialogHeader className="px-3.5 sm:px-6 pt-3.5 sm:pt-5 pb-3 sm:pb-4 border-b border-[#262626] shrink-0">
+        <div className="flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="p-1.5 sm:p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
               <Radio className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
             </div>
-            <div className="min-w-0">
-              <DialogTitle className="text-sm sm:text-base font-semibold text-white leading-tight truncate">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-xs sm:text-base font-semibold text-white leading-tight truncate">
                 {isGenerating ? 'Synthesizing Podcast…' : (script?.title || 'AI Audio Studio')}
               </DialogTitle>
               {script?.synopsis && !isGenerating && (
-                <p className="text-[11px] sm:text-xs text-[#A9A9A9] mt-0.5 leading-relaxed max-w-md line-clamp-1">
+                <p className="text-[10px] sm:text-xs text-[#A9A9A9] mt-0.5 leading-relaxed line-clamp-1">
                   {script.synopsis}
                 </p>
               )}
@@ -781,34 +781,23 @@ export function PodcastScriptDialog({
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {script && !isGenerating && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsMinimized(true)}
-                  className="h-8 text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50 px-2 sm:px-3"
-                  title="Run in Background Mini Player Mode"
-                >
-                  <Minimize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Background Mode</span>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleDownload}
-                  className="h-8 w-8 p-0 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50"
-                  title="Download Transcript (.txt)"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsMinimized(true)}
+                className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-amber-500/50 px-2 sm:px-3"
+                title="Run in Background Mini Player Mode"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Background Mode</span>
+              </Button>
             )}
           </div>
         </div>
       </DialogHeader>
 
       {/* ── Audio Studio Content ── */}
-      <div className="p-6 space-y-5 bg-gradient-to-b from-[#181818] to-[#121212]">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 bg-gradient-to-b from-[#181818] to-[#121212] overflow-y-auto flex-1 min-h-0">
         {/* Waveform Canvas with Integrated Play Button Overlay & Speed Toggle */}
         <CanvasWaveform
           activeSpeaker={currentSpeaker}
