@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { SignInButton, SignUpButton } from '@clerk/nextjs';
-import { Brain, Database, Zap, Layers, ArrowRight, Check, UploadCloud, Cpu, Sparkles, BookOpen, FileText, HardDrive, Activity } from 'lucide-react';
+import { Brain, Database, Zap, Layers, ArrowRight, Check, UploadCloud, Cpu, Sparkles, BookOpen, FileText, HardDrive, Activity, MessageSquare, Headphones, Route } from 'lucide-react';
+import { Logo } from '@/shared/components/Logo';
 
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -342,12 +343,11 @@ export function LandingPage() {
         <header className={`nav ${scrolled ? 'is-scrolled' : ''}`}>
           <div className="nav__inner">
             <div className="nav__brand">
-              <Brain className="w-5 h-5" />
-              ChaibookLM
+              <Logo size="lg" />
             </div>
             <nav className="nav__center">
               <a href="#features" className="nav__link">Features</a>
-              <a href="#quick-tiles" className="nav__link">Quick Info Tiles</a>
+              <a href="#quick-tiles" className="nav__link">Study Suite</a>
               <a href="#methodology" className="nav__link">Methodology</a>
               <a href="#pricing" className="nav__link">Pricing</a>
             </nav>
@@ -422,86 +422,86 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* Quick Info Tiles Section */}
+        {/* Interactive Study Suite Section */}
         <section id="quick-tiles" className="tiles-wrapper">
           <div className="section-header">
-            <div className="section-header__tag">Dashboard Intelligence</div>
-            <h2 className="section-header__title">Real-Time Quick Info Tiles</h2>
+            <div className="section-header__tag">INTERACTIVE STUDY SUITE</div>
+            <h2 className="section-header__title">Transform Raw Materials into Masterclass Knowledge</h2>
             <p className="section-header__desc">
-              Monitor your active knowledge library at a glance with real-time metrics on notebooks, sources, vector storage, and processing pipelines.
+              Go beyond simple file storage. ChaibookLM turns your documents, notes, and videos into interactive chat, synthetic podcasts, guided learning paths, and active recall flashcards.
             </p>
           </div>
 
           <div className="tiles-grid">
-            {/* Tile 1: Notebooks */}
+            {/* Tile 1: Grounded AI Chat */}
             <article className="tile-card">
               <div>
                 <div className="tile-card__header">
-                  <div className="tile-card__icon"><BookOpen className="w-4 h-4" /></div>
-                  <span className="tile-card__badge">Workspaces</span>
+                  <div className="tile-card__icon"><MessageSquare className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">RAG Chat</span>
                 </div>
-                <h3 className="tile-card__title">Notebooks Tile</h3>
+                <h3 className="tile-card__title">Grounded AI Chat</h3>
                 <p className="tile-card__desc">
-                  Displays active knowledge workspaces, favorited notebooks, and plan tier quota usage.
+                  Ask complex questions about your documents, PDFs, and video lectures. Receive accurate, hallucination-free answers backed by direct source quotes.
                 </p>
               </div>
-              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Active & Favorites</span>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Direct Citations</span>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Smooth Streaming</span>
               </div>
             </article>
 
-            {/* Tile 2: Sources */}
+            {/* Tile 2: Audio & Podcast */}
             <article className="tile-card">
               <div>
                 <div className="tile-card__header">
-                  <div className="tile-card__icon"><FileText className="w-4 h-4" /></div>
-                  <span className="tile-card__badge">Ingestion</span>
+                  <div className="tile-card__icon"><Headphones className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Audio Suite</span>
                 </div>
-                <h3 className="tile-card__title">Sources Tile</h3>
+                <h3 className="tile-card__title">AI Audio & Podcasts</h3>
                 <p className="tile-card__desc">
-                  Live tracking of uploaded PDFs, DOCX files, web URLs, Markdown notes, and YouTube video transcripts.
+                  Convert entire notebooks or document collections into engaging synthetic podcasts and audio overviews to listen and learn hands-free anywhere.
                 </p>
               </div>
-              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Indexed Documents</span>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Synthetic Hosts</span>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Notebook Audio</span>
               </div>
             </article>
 
-            {/* Tile 3: Storage */}
+            {/* Tile 3: Learning Paths */}
             <article className="tile-card">
               <div>
                 <div className="tile-card__header">
-                  <div className="tile-card__icon"><HardDrive className="w-4 h-4" /></div>
-                  <span className="tile-card__badge">Memory</span>
+                  <div className="tile-card__icon"><Route className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Masterclass</span>
                 </div>
-                <h3 className="tile-card__title">Storage Used Tile</h3>
+                <h3 className="tile-card__title">Learning Paths</h3>
                 <p className="tile-card__desc">
-                  Calculates real-time document payload size and vector embedding storage footprint in Qdrant.
+                  Automatically generate structured, topic-by-topic study roadmaps with sequential modules, key concepts, and milestone progress tracking.
                 </p>
               </div>
-              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Bytes & Vector Size</span>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Guided Roadmaps</span>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Concept Modules</span>
               </div>
             </article>
 
-            {/* Tile 4: Processing Jobs */}
+            {/* Tile 4: Flashcards */}
             <article className="tile-card">
               <div>
                 <div className="tile-card__header">
-                  <div className="tile-card__icon"><Activity className="w-4 h-4" /></div>
-                  <span className="tile-card__badge">Pipeline</span>
+                  <div className="tile-card__icon"><Sparkles className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Active Recall</span>
                 </div>
-                <h3 className="tile-card__title">Processing Jobs Tile</h3>
+                <h3 className="tile-card__title">Smart Flashcards</h3>
                 <p className="tile-card__desc">
-                  Monitors active chunking and embedding operations, plus automated resource cleanup status.
+                  Master difficult topics faster with auto-generated flashcards. Practice active recall with interactive flipping, self-grading, and review decks.
                 </p>
               </div>
-              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
-                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Active & Failed Jobs</span>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Interactive Flip</span>
+                <span style={{ fontSize: '0.6875rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'var(--color-paper-3)', color: 'var(--color-ink-2)', border: '1px solid var(--color-rule)' }}>Self Grading</span>
               </div>
             </article>
           </div>
@@ -604,7 +604,7 @@ export function LandingPage() {
 
         {/* Ft1 Footer */}
         <footer className="foot-mast">
-          <p className="wordmark"><Brain className="w-4 h-4" /> ChaibookLM</p>
+          <div className="wordmark"><Logo size="md" /></div>
           <p className="tagline">The product development system for knowledge.</p>
           <p className="links">
             Privacy <span>·</span> Terms <span>·</span> Security
