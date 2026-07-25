@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { SignInButton, SignUpButton } from '@clerk/nextjs';
-import { Brain, Database, Zap, Layers, ArrowRight, Check, UploadCloud, Cpu, Sparkles } from 'lucide-react';
+import { Brain, Database, Zap, Layers, ArrowRight, Check, UploadCloud, Cpu, Sparkles, BookOpen, FileText, HardDrive, Activity } from 'lucide-react';
 
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -201,8 +201,51 @@ export function LandingPage() {
           font-size: 1.25rem; font-weight: 600; color: var(--color-ink);
           margin: 0 0 var(--space-xs) 0; letter-spacing: -0.01em;
         }
-        .bento__desc {
-          font-size: 0.9375rem; color: var(--color-ink-2); line-height: 1.6; margin: 0;
+        /* Quick Info Tiles Section */
+        .tiles-wrapper {
+          max-width: var(--page-max); margin: 0 auto; padding: var(--space-2xl) var(--page-gutter) var(--space-3xl) var(--page-gutter);
+          border-top: var(--rule-hair) solid var(--color-rule);
+          scroll-margin-top: 80px;
+        }
+        .tiles-grid {
+          display: grid; gap: var(--space-md); grid-template-columns: 1fr;
+        }
+        @media (min-width: 640px) {
+          .tiles-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (min-width: 1024px) {
+          .tiles-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        .tile-card {
+          background: var(--color-paper-2); border: 1px solid var(--color-rule);
+          border-radius: var(--radius-card); padding: var(--space-lg);
+          display: flex; flex-direction: column; justify-content: space-between;
+          position: relative; transition: border-color var(--dur-short), transform var(--dur-short);
+        }
+        .tile-card:hover {
+          border-color: color-mix(in oklch, var(--color-rule) 40%, var(--color-accent));
+          transform: translateY(-2px);
+        }
+        .tile-card__header {
+          display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-md);
+        }
+        .tile-card__icon {
+          width: 36px; height: 36px; border-radius: 8px;
+          background: color-mix(in oklch, var(--color-accent) 12%, var(--color-paper-3));
+          border: 1px solid color-mix(in oklch, var(--color-accent) 25%, transparent);
+          display: flex; align-items: center; justify-content: center;
+          color: var(--color-accent);
+        }
+        .tile-card__badge {
+          font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+          padding: 0.2rem 0.5rem; border-radius: 999px; background: var(--color-paper-3);
+          color: var(--color-accent); border: 1px solid var(--color-rule);
+        }
+        .tile-card__title {
+          font-size: 1.05rem; font-weight: 600; color: var(--color-ink); margin: 0 0 0.35rem 0;
+        }
+        .tile-card__desc {
+          font-size: 0.84375rem; color: var(--color-ink-2); line-height: 1.5; margin: 0;
         }
 
         /* Methodology Section */
@@ -304,6 +347,7 @@ export function LandingPage() {
             </div>
             <nav className="nav__center">
               <a href="#features" className="nav__link">Features</a>
+              <a href="#quick-tiles" className="nav__link">Quick Info Tiles</a>
               <a href="#methodology" className="nav__link">Methodology</a>
               <a href="#pricing" className="nav__link">Pricing</a>
             </nav>
@@ -374,6 +418,91 @@ export function LandingPage() {
               <p className="bento__desc">
                 Organize knowledge into dedicated notebooks. Access quick global search and full keyboard navigation (`Cmd+K`) anytime.
               </p>
+            </article>
+          </div>
+        </section>
+
+        {/* Quick Info Tiles Section */}
+        <section id="quick-tiles" className="tiles-wrapper">
+          <div className="section-header">
+            <div className="section-header__tag">Dashboard Intelligence</div>
+            <h2 className="section-header__title">Real-Time Quick Info Tiles</h2>
+            <p className="section-header__desc">
+              Monitor your active knowledge library at a glance with real-time metrics on notebooks, sources, vector storage, and processing pipelines.
+            </p>
+          </div>
+
+          <div className="tiles-grid">
+            {/* Tile 1: Notebooks */}
+            <article className="tile-card">
+              <div>
+                <div className="tile-card__header">
+                  <div className="tile-card__icon"><BookOpen className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Workspaces</span>
+                </div>
+                <h3 className="tile-card__title">Notebooks Tile</h3>
+                <p className="tile-card__desc">
+                  Displays active knowledge workspaces, favorited notebooks, and plan tier quota usage.
+                </p>
+              </div>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Active & Favorites</span>
+              </div>
+            </article>
+
+            {/* Tile 2: Sources */}
+            <article className="tile-card">
+              <div>
+                <div className="tile-card__header">
+                  <div className="tile-card__icon"><FileText className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Ingestion</span>
+                </div>
+                <h3 className="tile-card__title">Sources Tile</h3>
+                <p className="tile-card__desc">
+                  Live tracking of uploaded PDFs, DOCX files, web URLs, Markdown notes, and YouTube video transcripts.
+                </p>
+              </div>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Indexed Documents</span>
+              </div>
+            </article>
+
+            {/* Tile 3: Storage */}
+            <article className="tile-card">
+              <div>
+                <div className="tile-card__header">
+                  <div className="tile-card__icon"><HardDrive className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Memory</span>
+                </div>
+                <h3 className="tile-card__title">Storage Used Tile</h3>
+                <p className="tile-card__desc">
+                  Calculates real-time document payload size and vector embedding storage footprint in Qdrant.
+                </p>
+              </div>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Bytes & Vector Size</span>
+              </div>
+            </article>
+
+            {/* Tile 4: Processing Jobs */}
+            <article className="tile-card">
+              <div>
+                <div className="tile-card__header">
+                  <div className="tile-card__icon"><Activity className="w-4 h-4" /></div>
+                  <span className="tile-card__badge">Pipeline</span>
+                </div>
+                <h3 className="tile-card__title">Processing Jobs Tile</h3>
+                <p className="tile-card__desc">
+                  Monitors active chunking and embedding operations, plus automated resource cleanup status.
+                </p>
+              </div>
+              <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--color-rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)' }}>Key Metric</span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-accent)' }}>Active & Failed Jobs</span>
+              </div>
             </article>
           </div>
         </section>
