@@ -259,10 +259,10 @@ export function PdfHighlightViewer({
 
     lineMap.forEach((line) => {
       highlightLines.push({
-        left: line.minX,
-        top: line.top,
-        width: line.maxX - line.minX,
-        height: line.height,
+        left: (line.minX / pageViewport.width) * 100,
+        top: (line.top / pageViewport.height) * 100,
+        width: ((line.maxX - line.minX) / pageViewport.width) * 100,
+        height: (line.height / pageViewport.height) * 100,
       });
     });
   }
@@ -332,7 +332,7 @@ export function PdfHighlightViewer({
       </div>
 
       {/* PDF View Canvas Container */}
-      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-auto p-6 flex justify-center bg-slate-950/80">
+      <div ref={containerRef} className="relative flex-1 min-h-0 overflow-auto p-4 sm:p-6 flex flex-col items-center bg-slate-950/80">
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 z-20 text-slate-300 space-y-2">
             <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
@@ -340,9 +340,9 @@ export function PdfHighlightViewer({
           </div>
         )}
 
-        <div className="relative shadow-2xl rounded-sm overflow-hidden bg-white h-fit">
+        <div className="relative shadow-2xl rounded-sm overflow-hidden bg-white max-w-full h-fit flex shrink-0">
           {/* Main Canvas */}
-          <canvas ref={canvasRef} className="block max-w-full" />
+          <canvas ref={canvasRef} className="block w-full h-auto max-w-full object-contain" />
 
           {/* Continuous Line Highlighter Overlay */}
           {highlightLines.length > 0 && (
@@ -353,10 +353,10 @@ export function PdfHighlightViewer({
                   ref={idx === 0 ? highlightRef : null}
                   className="absolute bg-yellow-300/40 dark:bg-yellow-400/35 rounded-[2px] pointer-events-auto"
                   style={{
-                    left: `${line.left}px`,
-                    top: `${line.top}px`,
-                    width: `${line.width}px`,
-                    height: `${line.height}px`,
+                    left: `${line.left}%`,
+                    top: `${line.top}%`,
+                    width: `${line.width}%`,
+                    height: `${line.height}%`,
                   }}
                 />
               ))}

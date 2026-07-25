@@ -15,6 +15,7 @@ export interface LearningSourceRef {
   sourceId?: string;
   excerpt?: string;
   timestamp?: string;
+  instructions?: string;
 }
 
 export interface LearningStep {
@@ -103,7 +104,7 @@ function StepCard({
   step: LearningStep;
   isLast: boolean;
   activeSelectedSource?: LearningSourceRef | null;
-  onSelectSource?: (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string) => void;
+  onSelectSource?: (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string, instructions?: string) => void;
 }) {
   const color = STEP_COLORS[(step.order - 1) % STEP_COLORS.length];
 
@@ -165,6 +166,8 @@ function StepCard({
                   const displayTs = isFullDocOrVideo ? null : tsRaw;
                   const title = rawTitle && rawTitle.trim().length > 0 ? rawTitle : (displayTs || 'Knowledge Source');
 
+                  const instructions = typeof src === 'object' && src.instructions ? src.instructions : undefined;
+
                   const isSelected =
                     activeSelectedSource &&
                     ((sourceId && activeSelectedSource.sourceId === sourceId) ||
@@ -176,27 +179,39 @@ function StepCard({
                       type="button"
                       data-source-id={sourceId}
                       data-source-title={title}
-                      onClick={() => onSelectSource?.(title, tsRaw, sourceId, excerpt)}
+                      onClick={() => onSelectSource?.(title, tsRaw, sourceId, excerpt, instructions)}
                       className={cn(
-                        "group/src flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all duration-200 text-xs cursor-pointer w-full min-w-0 max-w-full overflow-hidden",
+                        "group/src flex flex-col gap-1.5 px-3 py-2.5 rounded-lg border text-left transition-all duration-200 cursor-pointer w-full min-w-0 max-w-full overflow-hidden",
                         isSelected
                           ? "bg-cyan-500/25 border-cyan-400 text-cyan-200 ring-1 ring-cyan-400/50 shadow-md"
                           : "bg-white/5 hover:bg-cyan-500/15 border-white/10 hover:border-cyan-500/40"
                       )}
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-                        <BookOpen className={`w-3.5 h-3.5 ${color.text} shrink-0 group-hover/src:scale-110 transition-transform`} />
-                        <span className="font-medium text-white/90 group-hover/src:text-cyan-300 truncate">
-                          {title}
-                        </span>
+                      <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                          <BookOpen className={`w-3.5 h-3.5 ${color.text} shrink-0 group-hover/src:scale-110 transition-transform`} />
+                          <span className="font-medium text-white/90 group-hover/src:text-cyan-300 truncate text-xs">
+                            {title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {displayTs && displayTs !== title && (
+                            <span className="shrink-0 max-w-[130px] sm:max-w-[160px] truncate px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
+                              <Clock className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">{displayTs}</span>
+                            </span>
+                          )}
+                          <ExternalLink className="w-3.5 h-3.5 text-[#A9A9A9] group-hover/src:text-cyan-400 shrink-0 opacity-70 group-hover/src:opacity-100 transition-opacity ml-1" />
+                        </div>
                       </div>
-                      {displayTs && displayTs !== title && (
-                        <span className="shrink-0 max-w-[130px] sm:max-w-[160px] truncate px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5 shrink-0" />
-                          <span className="truncate">{displayTs}</span>
-                        </span>
+                      {instructions && (
+                        <p className={cn(
+                          "text-[11px] leading-relaxed line-clamp-2 pr-4 pl-5",
+                          isSelected ? "text-cyan-100/90" : "text-[#A9A9A9] group-hover/src:text-[#C9C9C9]"
+                        )}>
+                          {instructions}
+                        </p>
                       )}
-                      <ExternalLink className="w-3.5 h-3.5 text-[#A9A9A9] group-hover/src:text-cyan-400 shrink-0 opacity-70 group-hover/src:opacity-100 transition-opacity ml-1" />
                     </button>
                   );
                 })}
@@ -229,8 +244,8 @@ export function LearningPathDialog({
     }
   }, [isOpen]);
 
-  const handleSourceClick = (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string) => {
-    setActiveSelectedSource({ title: sourceTitle, timestamp, sourceId, excerpt });
+  const handleSourceClick = (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string, instructions?: string) => {
+    setActiveSelectedSource({ title: sourceTitle, timestamp, sourceId, excerpt, instructions });
     onSelectSource?.(sourceTitle, timestamp, sourceId, excerpt);
   };
 
@@ -497,6 +512,7 @@ export function LearningPathDialog({
                         sourceId: resolvedSourceId,
                         excerpt: activeSelectedSource.excerpt,
                         timestamp: activeSelectedSource.timestamp,
+                        instructions: activeSelectedSource.instructions,
                       }
                     : undefined
                 }

@@ -75,6 +75,7 @@ export interface Citation {
   endTime?: number;
   score?: number;
   similarityScore?: number;
+  instructions?: string;
 }
 
 export interface Message {

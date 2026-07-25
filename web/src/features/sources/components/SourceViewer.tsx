@@ -41,11 +41,12 @@ export function parseTimestampToSeconds(ts?: string | number | null): number {
     return hours * 3600 + minutes * 60 + seconds;
   }
 
-  // Remove brackets e.g. "[02:15]" -> "02:15"
-  const cleaned = str.replace(/[\[\]]/g, '').trim();
+  // Remove brackets and parentheses e.g. "[02:15]" or "(02:15)" -> "02:15"
+  const cleaned = str.replace(/[\[\]\(\)]/g, '').trim();
 
   // Take start time if range like "02:15 - 03:00" or "02:15 → 03:00" or "02:15 to 03:00"
-  const firstPart = cleaned.split(/[\s\-→\u2192to]+/)[0]?.trim() || '';
+  // Handles hyphen (-), en-dash (–), em-dash (—), arrow (→), or "to"
+  const firstPart = cleaned.split(/[\s\-–—→\u2192to]+/i)[0]?.trim() || '';
 
   const parts = firstPart.split(':').map(p => parseInt(p, 10));
   if (parts.some(isNaN)) return 0;
@@ -73,13 +74,32 @@ export function findExcerptMatch(excerpt?: string | null, sourceText?: string | 
   // 1. Clean the excerpt (strip leading timestamps e.g. [01:23], quotes, etc.)
   let cleanExcerpt = excerpt.trim();
   
-  // Remove leading bracketed timestamps like "[01:23] " or "[01:23 - 02:45] " or "01:23 "
-  cleanExcerpt = cleanExcerpt.replace(/^(?:\[?\d{1,2}:\d{2}(?::\d{2})?(?:\s*-\s*\d{1,2}:\d{2}(?::\d{2})?)?\]?\s*)*/i, '');
+  // Remove leading bracketed or parenthesized timestamps like "[01:23] ", "(01:23)", etc.
+  cleanExcerpt = cleanExcerpt.replace(/^(?:[\[\(]?\d{1,2}:\d{2}(?::\d{2})?(?:\s*-\s*\d{1,2}:\d{2}(?::\d{2})?)?[\]\)]?\s*)*/i, '');
   
   // Remove leading/trailing quotation marks if present
   cleanExcerpt = cleanExcerpt.replace(/^[“"']|[”"']$/g, '').trim();
 
-  if (!cleanExcerpt || cleanExcerpt.length < 2) return null;
+  if (!cleanExcerpt || cleanExcerpt.length < 2) {
+    // If the excerpt was just a timestamp (so it got fully stripped), try to find that timestamp in the source text!
+    const originalTrimmed = excerpt.trim();
+    if (/^[\[\(]?\d/.test(originalTrimmed)) {
+      // Just extract the first time-like string to search for (e.g. "01:23")
+      const timeMatch = originalTrimmed.match(/\d{1,2}:\d{2}(?::\d{2})?/);
+      if (timeMatch) {
+        const timeStr = timeMatch[0];
+        const tsIdx = sourceText.indexOf(timeStr);
+        if (tsIdx >= 0) {
+          return {
+            start: tsIdx,
+            end: tsIdx + timeStr.length,
+            matchedText: sourceText.slice(tsIdx, tsIdx + timeStr.length),
+          };
+        }
+      }
+    }
+    return null;
+  }
 
   const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -123,7 +143,16 @@ export function findExcerptMatch(excerpt?: string | null, sourceText?: string | 
     };
   }
 
-  // Attempt 2: Normalized whitespace & smart quotes mapping match
+  // Attempt 2: Normalized whitespace, smart quotes, & remove timestamps mapping match
+  const timeRegex = /(?:\[|\()?\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{3})?\b(?:\]|\))?(?:\s*(?:-->|-|–|—|to)\s*(?:\[|\()?\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{3})?\b(?:\]|\))?)?/gi;
+  const ignoreIndices = new Set<number>();
+  let timeMatch;
+  while ((timeMatch = timeRegex.exec(sourceText)) !== null) {
+    for (let k = timeMatch.index; k < timeMatch.index + timeMatch[0].length; k++) {
+      ignoreIndices.add(k);
+    }
+  }
+
   const normalizedChars: string[] = [];
   const posMap: number[] = [];
   const endPosMap: number[] = [];
@@ -131,8 +160,9 @@ export function findExcerptMatch(excerpt?: string | null, sourceText?: string | 
 
   for (let i = 0; i < sourceText.length; i++) {
     const char = sourceText[i];
-    const isSpace = /\s/.test(char);
-    const normChar = char.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+    const isIgnored = ignoreIndices.has(i);
+    const isSpace = isIgnored || /\s/.test(char);
+    const normChar = isIgnored ? ' ' : char.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
 
     if (isSpace) {
       if (!inSpace) {
@@ -152,7 +182,9 @@ export function findExcerptMatch(excerpt?: string | null, sourceText?: string | 
   }
 
   const normalizedSource = normalizedChars.join('');
+  timeRegex.lastIndex = 0;
   const normalizedExcerpt = cleanExcerpt
+    .replace(timeRegex, ' ')
     .replace(/\s+/g, ' ')
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
@@ -276,7 +308,7 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
     currentCitation?.content ||
     currentCitation?.snippet ||
     (currentCitation as any)?.text ||
-    (typeof timestamp === 'string' && !/^(?:\d{1,2}:\d{2}|page\s*\d+|p\.\s*\d+)/i.test(timestamp.trim()) ? timestamp : '') ||
+    (typeof timestamp === 'string' ? timestamp : '') ||
     '';
   const rawText = viewData?.rawText || '';
   const match = rawExcerpt && rawText ? findExcerptMatch(rawExcerpt, rawText) : null;
@@ -315,7 +347,7 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
   const { type, url, metadata } = viewData || {};
   const extractedPageFromTs = typeof timestamp === 'string'
     ? (() => {
-        const m = timestamp.match(/(?:page|p\.)\s*(\d+)/i);
+        const m = timestamp.match(/(?:pages?|p\.)\s*(\d+)/i);
         return m ? parseInt(m[1], 10) : undefined;
       })()
     : undefined;
@@ -533,6 +565,13 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
                           <p className="text-[11px] leading-snug text-muted-foreground line-clamp-2 font-sans opacity-90">
                             “{citExcerpt}”
                           </p>
+                        )}
+                        {(cit as any).instructions && (
+                          <div className="mt-1 pt-1 border-t border-border/40">
+                            <p className="text-[10px] leading-relaxed text-foreground/80 font-medium font-sans">
+                              {(cit as any).instructions}
+                            </p>
+                          </div>
                         )}
                       </button>
                     );

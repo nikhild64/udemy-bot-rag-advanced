@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react';
-import { useSourcesQuery, useNotebookArtifactsQuery, useGeneratePodcastMutation, useGenerateLearningPathMutation, useGenerateFlashcardsMutation, useReindexSourceMutation } from '../hooks/useSources';
+import { useSourcesQuery, useNotebookArtifactsQuery, useGeneratePodcastMutation, useGenerateLearningPathMutation, useGenerateFlashcardsMutation, useReindexSourceMutation, useDeleteSourceMutation } from '../hooks/useSources';
 import { useUIStore } from '@/shared/lib/store';
 import { SourceItem } from './SourceItem';
 import { SourceViewerDialog } from './SourceViewerDialog';
@@ -9,7 +9,7 @@ import { PodcastScriptDialog, PodcastScript } from './PodcastScriptDialog';
 import { LearningPathDialog, LearningPath } from './LearningPathDialog';
 import { FlashcardsDialog, FlashcardSet } from './FlashcardsDialog';
 import { GenerationConfigDialog, ArtifactType, GenerationConfig } from './GenerationConfigDialog';
-import { Upload, FilePlus, FolderKanban, Sparkles, Radio, GitCommit, Layers, ChevronRight, Loader2, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { Upload, FilePlus, FolderKanban, Sparkles, Radio, GitCommit, Layers, ChevronRight, Loader2, CheckCircle, RefreshCw, AlertCircle, Trash2 } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +30,7 @@ export function SourceList() {
   const [learningPathOpen, setLearningPathOpen] = useState(false);
   const [flashcardsOpen, setFlashcardsOpen] = useState(false);
   const [confirmReindexAllOpen, setConfirmReindexAllOpen] = useState(false);
+  const [confirmDeleteAllOpen, setConfirmDeleteAllOpen] = useState(false);
   const [proRequiredOpen, setProRequiredOpen] = useState(false);
   const [proFeatureName, setProFeatureName] = useState('Re-creating AI Artifacts');
 
@@ -45,6 +46,7 @@ export function SourceList() {
   const learningPathMutation = useGenerateLearningPathMutation();
   const flashcardsMutation = useGenerateFlashcardsMutation();
   const reindexMutation = useReindexSourceMutation(activeNotebookId);
+  const deleteMutation = useDeleteSourceMutation(activeNotebookId);
 
   const handleOpenViewer = (sourceId: string) => {
     setSelectedSourceId(sourceId);
@@ -256,11 +258,20 @@ export function SourceList() {
   const areAllSourcesReady = hasSources && !isAnySourceProcessing;
 
   const handleReindexAll = () => {
-    if (!sources) return;
-    for (const source of sources) {
-      if (source.status === 'Ready' || (source.status as string) === 'Indexed' || source.status === 'Failed') {
-        reindexMutation.mutate(source.id);
-      }
+    if (sources && sources.length > 0) {
+      sources.forEach((source) => {
+        if (source.status === 'Ready' || (source.status as string) === 'Indexed' || source.status === 'Failed') {
+          reindexMutation.mutate(source.id);
+        }
+      });
+    }
+  };
+
+  const handleDeleteAll = () => {
+    if (sources && sources.length > 0) {
+      sources.forEach((source) => {
+        deleteMutation.mutate(source.id);
+      });
     }
   };
 
@@ -283,6 +294,18 @@ export function SourceList() {
           </h3>
         </div>
         <div className="flex items-center gap-1.5">
+          {hasSources && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs flex items-center gap-1 border-dashed text-destructive hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
+              onClick={() => setConfirmDeleteAllOpen(true)}
+              disabled={deleteMutation.isPending}
+              title="Delete All Sources"
+            >
+              <Trash2 className={`w-3.5 h-3.5 ${deleteMutation.isPending ? 'animate-pulse' : ''}`} />
+            </Button>
+          )}
           {hasSources && areAllSourcesReady && (
             <Button
               size="sm"
@@ -362,6 +385,8 @@ export function SourceList() {
             <PodcastTile
               status={podcastStatus}
               isGenerating={isPodcastGenerating}
+              progress={podcastArtifact?.progress}
+              phase={podcastArtifact?.phase}
               onClick={handlePodcastClick}
               onRefresh={handlePodcastRefresh}
               disabled={!areAllSourcesReady}
@@ -371,6 +396,8 @@ export function SourceList() {
             <LearningTimelineTile
               status={pathStatus}
               isGenerating={isPathGenerating}
+              progress={pathArtifact?.progress}
+              phase={pathArtifact?.phase}
               onClick={handleLearningPathClick}
               onRefresh={handleLearningPathRefresh}
               disabled={!areAllSourcesReady}
@@ -380,6 +407,8 @@ export function SourceList() {
             <FlashcardsTile
               status={flashcardsStatus}
               isGenerating={isFlashcardsGenerating}
+              progress={flashcardsArtifact?.progress}
+              phase={flashcardsArtifact?.phase}
               onClick={handleFlashcardsClick}
               onRefresh={handleFlashcardsRefresh}
               disabled={!areAllSourcesReady}
@@ -491,6 +520,44 @@ export function SourceList() {
           </Button>
         </DialogFooter>
       </Dialog>
+
+      {/* Custom Delete All Sources Confirmation Dialog */}
+      <Dialog open={confirmDeleteAllOpen} onOpenChange={setConfirmDeleteAllOpen}>
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="flex items-center gap-2 text-destructive text-base font-semibold">
+            <Trash2 className="w-5 h-5 shrink-0 text-destructive" />
+            <span>Delete All Knowledge Sources</span>
+          </DialogTitle>
+          <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
+            Are you sure you want to delete all <span className="font-semibold text-foreground">{sources?.length || 0} knowledge sources</span> in this notebook?
+            This action cannot be undone and will permanently delete all extracted text, chunks, and embeddings.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:gap-0 mt-4">
+          <Button variant="outline" size="sm" onClick={() => setConfirmDeleteAllOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="font-medium"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              handleDeleteAll();
+              setConfirmDeleteAllOpen(false);
+            }}
+          >
+            {deleteMutation.isPending ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Deleting...
+              </span>
+            ) : (
+              'Delete All'
+            )}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
@@ -502,12 +569,16 @@ export function SourceList() {
 function PodcastTile({
   status,
   isGenerating,
+  progress,
+  phase,
   onClick,
   onRefresh,
   disabled,
 }: {
   status: string;
   isGenerating: boolean;
+  progress?: number;
+  phase?: string;
   onClick: () => void;
   onRefresh: (e: React.MouseEvent) => void;
   disabled?: boolean;
@@ -537,14 +608,12 @@ function PodcastTile({
           ? 'bg-red-500/10 text-red-400'
           : 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-black'
       }`}>
-        {isGenerating ? (
-          <Loader2 className="w-4 h-4 stroke-[2] animate-spin" />
-        ) : isDone ? (
+        {isDone ? (
           <CheckCircle className="w-4 h-4 stroke-[2]" />
         ) : isFailed ? (
           <AlertCircle className="w-4 h-4 stroke-[2]" />
         ) : (
-          <Radio className="w-4 h-4 stroke-[2]" />
+          <Radio className={`w-4 h-4 stroke-[2] ${isGenerating ? 'animate-pulse' : ''}`} />
         )}
       </div>
 
@@ -573,15 +642,28 @@ function PodcastTile({
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-          {isGenerating
-            ? "Creating Alex & Jamie's podcast audio in background…"
-            : isDone
-            ? 'Podcast ready & saved — click to listen or read transcript'
-            : isFailed
-            ? 'Generation failed. Click refresh icon to retry.'
-            : 'Synthesize an interactive AI audio episode summarizing key concepts'}
-        </p>
+        {isGenerating ? (
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            <div className="flex justify-between items-center text-[10px] uppercase font-bold text-amber-500 tracking-wider">
+              <span>{phase || "Starting pipeline..."}</span>
+              <span>{progress || 0}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-border/80 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-amber-500 transition-all duration-500 ease-out"
+                style={{ width: `${progress || 5}%` }} 
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+            {isDone
+              ? 'Podcast ready & saved — click to listen or read transcript'
+              : isFailed
+              ? 'Generation failed. Click refresh icon to retry.'
+              : 'Synthesize an interactive AI audio episode summarizing key concepts'}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -590,12 +672,16 @@ function PodcastTile({
 function LearningTimelineTile({
   status,
   isGenerating,
+  progress,
+  phase,
   onClick,
   onRefresh,
   disabled,
 }: {
   status: string;
   isGenerating: boolean;
+  progress?: number;
+  phase?: string;
   onClick: () => void;
   onRefresh: (e: React.MouseEvent) => void;
   disabled?: boolean;
@@ -625,14 +711,12 @@ function LearningTimelineTile({
           ? 'bg-red-500/10 text-red-400'
           : 'bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-black'
       }`}>
-        {isGenerating ? (
-          <Loader2 className="w-4 h-4 stroke-[2] animate-spin" />
-        ) : isDone ? (
+        {isDone ? (
           <CheckCircle className="w-4 h-4 stroke-[2]" />
         ) : isFailed ? (
           <AlertCircle className="w-4 h-4 stroke-[2]" />
         ) : (
-          <GitCommit className="w-4 h-4 stroke-[2]" />
+          <GitCommit className={`w-4 h-4 stroke-[2] ${isGenerating ? 'animate-pulse' : ''}`} />
         )}
       </div>
 
@@ -661,15 +745,28 @@ function LearningTimelineTile({
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-          {isGenerating
-            ? 'Structuring your learning roadmap in background…'
-            : isDone
-            ? 'Roadmap ready & saved — click to view or download'
-            : isFailed
-            ? 'Generation failed. Click refresh icon to retry.'
-            : 'Generate a step-by-step chronological roadmap from your sources'}
-        </p>
+        {isGenerating ? (
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            <div className="flex justify-between items-center text-[10px] uppercase font-bold text-cyan-500 tracking-wider">
+              <span>{phase || "Starting pipeline..."}</span>
+              <span>{progress || 0}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-border/80 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-cyan-500 transition-all duration-500 ease-out"
+                style={{ width: `${progress || 5}%` }} 
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+            {isDone
+              ? 'Roadmap ready & saved — click to view or download'
+              : isFailed
+              ? 'Generation failed. Click refresh icon to retry.'
+              : 'Generate a step-by-step chronological roadmap from your sources'}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -678,12 +775,16 @@ function LearningTimelineTile({
 function FlashcardsTile({
   status,
   isGenerating,
+  progress,
+  phase,
   onClick,
   onRefresh,
   disabled,
 }: {
   status: string;
   isGenerating: boolean;
+  progress?: number;
+  phase?: string;
   onClick: () => void;
   onRefresh: (e: React.MouseEvent) => void;
   disabled?: boolean;
@@ -715,14 +816,12 @@ function FlashcardsTile({
             : 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white'
         }`}
       >
-        {isGenerating ? (
-          <Loader2 className="w-4 h-4 stroke-[2] animate-spin" />
-        ) : isDone ? (
+        {isDone ? (
           <CheckCircle className="w-4 h-4 stroke-[2]" />
         ) : isFailed ? (
           <AlertCircle className="w-4 h-4 stroke-[2]" />
         ) : (
-          <Layers className="w-4 h-4 stroke-[2]" />
+          <Layers className={`w-4 h-4 stroke-[2] ${isGenerating ? 'animate-pulse' : ''}`} />
         )}
       </div>
 
@@ -759,15 +858,28 @@ function FlashcardsTile({
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-          {isGenerating
-            ? 'Generating interactive flashcards in background…'
-            : isDone
-            ? 'Flashcard deck ready — click to practice active recall'
-            : isFailed
-            ? 'Generation failed. Click refresh icon to retry.'
-            : 'Generate a deck of interactive study flashcards for active recall'}
-        </p>
+        {isGenerating ? (
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            <div className="flex justify-between items-center text-[10px] uppercase font-bold text-purple-500 tracking-wider">
+              <span>{phase || "Starting pipeline..."}</span>
+              <span>{progress || 0}%</span>
+            </div>
+            <div className="h-1.5 w-full bg-border/80 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-purple-500 transition-all duration-500 ease-out"
+                style={{ width: `${progress || 5}%` }} 
+              />
+            </div>
+          </div>
+        ) : (
+          <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+            {isDone
+              ? 'Flashcard deck ready — click to practice active recall'
+              : isFailed
+              ? 'Generation failed. Click refresh icon to retry.'
+              : 'Generate a deck of interactive study flashcards for active recall'}
+          </p>
+        )}
       </div>
     </div>
   );

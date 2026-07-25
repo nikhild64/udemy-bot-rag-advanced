@@ -293,6 +293,39 @@ Output JSON Schema:
   ]
 }`;
 
+
+// ─────────────────────────────────────────────
+// Artifact Progress Helper
+// ─────────────────────────────────────────────
+
+async function updateArtifactProgress(
+  notebookId: string,
+  userId: string,
+  artifactKey: 'podcast' | 'learningPath' | 'flashcards',
+  progress: number,
+  phase: string
+) {
+  try {
+    const notebookService = new NotebookService();
+    const latestNotebook = await notebookService.getNotebook(notebookId, userId);
+    const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
+    const artifact = latestSettings[artifactKey] || {};
+    await notebookService.updateNotebook(notebookId, userId, {
+      settings: {
+        ...latestSettings,
+        [artifactKey]: {
+          ...artifact,
+          progress,
+          phase,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (err) {
+    logger.warn({ err, notebookId, artifactKey }, '[Generate] Failed to update artifact progress');
+  }
+}
+
 export async function generatePodcastController(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -354,7 +387,11 @@ export async function generatePodcastController(
   (async () => {
     try {
       logger.info({ notebookId, userId, podcastLength, hasInstructions: !!instructions }, '[Generate] Background podcast generation started');
+      await updateArtifactProgress(notebookId, userId, 'podcast', 10, 'Analyzing knowledge sources...');
+      
       const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+
+      await updateArtifactProgress(notebookId, userId, 'podcast', 40, 'Scripting the debate...');
 
       let turnCountGuidance = 'Produce 20–32 dialogue turns.';
       if (podcastLength === 'short') {
@@ -383,6 +420,7 @@ export async function generatePodcastController(
       const ttsProvider = (process.env.TTS_PROVIDER || 'web_speech').toLowerCase();
       if (ttsProvider !== 'web_speech') {
         try {
+          await updateArtifactProgress(notebookId, userId, 'podcast', 70, 'Synthesizing audio waves...');
           const ttsService = TTSServiceFactory.create();
           logger.info({ notebookId, ttsProvider }, '[Generate] Starting audio synthesis — READY will be set after MP3 is complete');
           const ttsResult = await ttsService.generateFullPodcastAudio(podcastData.lines);
@@ -402,6 +440,7 @@ export async function generatePodcastController(
         }
       }
 
+      await updateArtifactProgress(notebookId, userId, 'podcast', 100, 'Ready!');
       const latestNotebook = await notebookService.getNotebook(notebookId, userId);
       const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
       await notebookService.updateNotebook(notebookId, userId, {
@@ -411,6 +450,8 @@ export async function generatePodcastController(
             status: 'READY',
             data: podcastData,
             error: null,
+            progress: 100,
+            phase: 'Ready!',
             updatedAt: new Date().toISOString(),
           },
         },
@@ -456,8 +497,9 @@ Rules:
    - "title": exact source title matching one of the available sources
    - "sourceId": exact Source ID string matching the excerpt's Source ID
    - "excerpt": 1-2 sentence verbatim passage directly copied from the source content that supports this step
-   - "timestamp": specific excerpt location, page number, section header, or timestamp range (e.g. "Page 4–8", "Section 2.1", "05:12–14:30", "Chapter 3"). NEVER output generic phrases like "Full Video" or "Full Document". Always cite specific page numbers, section headers, or timestamp ranges from the source excerpts.
-4. Calculate realistic, practical study hours per step based on actual material depth. For a multi-day timeframe (e.g. 3 days or 7 days), divide time practically across days (e.g. 1.5–3 focused study hours per day proportional to content complexity). Do NOT unrealistically assign 8+ hours a day to small or introductory concepts.
+   - "timestamp": specific excerpt location, page number, section header, or timestamp range. For videos, you MUST cite large, comprehensive timestamp blocks (e.g., "05:12–45:30", "12:00–55:00") that cover the entire topic in-depth, rather than tiny 2-3 minute clips. Do not use generic phrases like "Full Video".
+   - "instructions": 1-2 sentences of practical advice on how to consume this source (e.g., "Watch from 05:12 to 45:30 to understand the core concepts", or "Read the 'Installation' and 'Setup' sections", or "Read pages 4 to 8 for the full theory").
+4. Calculate realistic study times for each step that accurately reflect the depth of the materials you cited. Since you are citing large, comprehensive video segments or multiple chapters, the \`estimatedDuration\` should reflect this deeper study time (e.g., "1-2 hours"). Do not assign tiny 5-minute durations.
 5. The path should have 4–8 steps total.
 6. ONLY return valid JSON — no markdown fences, no extra text. Ensure all quotes inside JSON property values are properly escaped.
 
@@ -477,7 +519,8 @@ Output format (strict JSON):
           "title": "Source title here",
           "sourceId": "Source ID string",
           "excerpt": "Verbatim quote snippet from source",
-          "timestamp": "Page 4–8"
+          "timestamp": "05:12–45:30",
+          "instructions": "Helpful advice on what exactly to watch or read here."
         }
       ],
       "keyOutcomes": ["Outcome 1", "Outcome 2"]
@@ -541,7 +584,10 @@ export async function generateLearningPathController(
   (async () => {
     try {
       logger.info({ notebookId, userId, timelineDays, hasInstructions: !!instructions }, '[Generate] Background learning path generation started');
+      await updateArtifactProgress(notebookId, userId, 'learningPath', 10, 'Analyzing knowledge sources...');
       const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+
+      await updateArtifactProgress(notebookId, userId, 'learningPath', 50, 'Structuring the curriculum...');
 
       const customReq = instructions ? `\n\nSpecific User Target Focus Area:\n"${instructions}"\nPrioritize topics matching this request.` : '';
 
@@ -559,6 +605,7 @@ export async function generateLearningPathController(
       const raw = response.message.content.trim();
       const learningPathData = parseLlmJsonResponse(raw);
 
+      await updateArtifactProgress(notebookId, userId, 'learningPath', 100, 'Ready!');
       const latestNotebook = await notebookService.getNotebook(notebookId, userId);
       const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
       await notebookService.updateNotebook(notebookId, userId, {
@@ -568,6 +615,8 @@ export async function generateLearningPathController(
             status: 'READY',
             data: learningPathData,
             error: null,
+            progress: 100,
+            phase: 'Ready!',
             updatedAt: new Date().toISOString(),
           },
         },
@@ -685,7 +734,10 @@ export async function generateFlashcardsController(
   (async () => {
     try {
       logger.info({ notebookId, userId, count, hasInstructions: !!instructions }, '[Generate] Background flashcards generation started');
+      await updateArtifactProgress(notebookId, userId, 'flashcards', 10, 'Analyzing knowledge sources...');
       const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+
+      await updateArtifactProgress(notebookId, userId, 'flashcards', 50, 'Extracting key concepts...');
 
       const customReq = instructions ? `\n\nSpecific User Target Focus Area:\n"${instructions}"\nEnsure generated flashcards prioritize and test knowledge around this request.` : '';
 
@@ -703,6 +755,7 @@ export async function generateFlashcardsController(
       const raw = response.message.content.trim();
       const flashcardData = parseLlmJsonResponse(raw);
 
+      await updateArtifactProgress(notebookId, userId, 'flashcards', 100, 'Ready!');
       const latestNotebook = await notebookService.getNotebook(notebookId, userId);
       const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
       await notebookService.updateNotebook(notebookId, userId, {
@@ -712,6 +765,8 @@ export async function generateFlashcardsController(
             status: 'READY',
             data: flashcardData,
             error: null,
+            progress: 100,
+            phase: 'Ready!',
             updatedAt: new Date().toISOString(),
           },
         },

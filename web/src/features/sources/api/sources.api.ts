@@ -68,9 +68,9 @@ export const sourcesApi = {
   },
 
   getNotebookArtifacts: async (notebookId: string): Promise<{
-    podcast: { status: string; data: any; error?: string; updatedAt?: string };
-    learningPath: { status: string; data: any; error?: string; updatedAt?: string };
-    flashcards: { status: string; data: any; error?: string; updatedAt?: string };
+    podcast: { status: string; data: any; error?: string; updatedAt?: string; progress?: number; phase?: string };
+    learningPath: { status: string; data: any; error?: string; updatedAt?: string; progress?: number; phase?: string };
+    flashcards: { status: string; data: any; error?: string; updatedAt?: string; progress?: number; phase?: string };
   }> => {
     return apiClient.get(`/api/notebooks/${notebookId}/artifacts`);
   },
