@@ -70,6 +70,7 @@ export const sourcesApi = {
   getNotebookArtifacts: async (notebookId: string): Promise<{
     podcast: { status: string; data: any; error?: string; updatedAt?: string };
     learningPath: { status: string; data: any; error?: string; updatedAt?: string };
+    flashcards: { status: string; data: any; error?: string; updatedAt?: string };
   }> => {
     return apiClient.get(`/api/notebooks/${notebookId}/artifacts`);
   },
@@ -80,5 +81,15 @@ export const sourcesApi = {
 
   generateLearningPath: async (notebookId: string, force: boolean = false): Promise<{ status: string; result?: any }> => {
     return apiClient.post(`/api/notebooks/${notebookId}/generate/learning-path`, { force });
+  },
+
+  generateFlashcards: async (
+    notebookId: string,
+    options?: { force?: boolean; count?: number }
+  ): Promise<{ status: string; result?: any }> => {
+    return apiClient.post(`/api/notebooks/${notebookId}/generate/flashcards`, {
+      force: options?.force ?? false,
+      count: options?.count ?? 15,
+    });
   },
 };

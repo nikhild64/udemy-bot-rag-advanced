@@ -18,7 +18,7 @@ import fs from 'fs';
 async function buildNotebookSourceContext(
   notebookId: string,
   userId: string,
-  queryPrompt: string = 'key concepts main topics overview summary',
+  notebookTitle: string = '',
 ): Promise<string> {
   const sourceService = new SourceService();
   const sources = await sourceService.listSources(notebookId, userId);
@@ -32,35 +32,54 @@ async function buildNotebookSourceContext(
     return 'No indexed sources available.';
   }
 
-  // Attempt vector search retrieval from Qdrant via DenseNotebookRetriever
+  // Combine notebook title and source display titles for context-rich vector queries
+  const sourceTitles = readySources
+    .map((s: any) => s.displayName || s.title)
+    .filter(Boolean)
+    .join(' ');
+  const baseContextQuery = `${notebookTitle} ${sourceTitles}`.trim();
+
+  // Multi-query parallel retrieval targeting 3 complementary semantic perspectives
+  const query1 = `${baseContextQuery} key concepts core definitions overview summary main ideas`.trim();
+  const query2 = `${baseContextQuery} technical details architecture workflow step by step mechanics`.trim();
+  const query3 = `${baseContextQuery} important takeaways trade-offs edge cases examples insights`.trim();
+
   try {
     const retriever = new DenseNotebookRetriever();
-    const retrievedChunks = await retriever.retrieve(queryPrompt, {
-      notebookId,
-      userId,
-      query: queryPrompt,
-      candidateLimit: 15,
+    const [results1, results2, results3] = await Promise.all([
+      retriever.retrieve(query1, { notebookId, userId, query: query1, candidateLimit: 12 }),
+      retriever.retrieve(query2, { notebookId, userId, query: query2, candidateLimit: 12 }),
+      retriever.retrieve(query3, { notebookId, userId, query: query3, candidateLimit: 12 }),
+    ]);
+
+    // Merge and deduplicate by chunkId
+    const chunkMap = new Map<string, any>();
+    [...results1, ...results2, ...results3].forEach((chunk) => {
+      if (chunk && chunk.chunkId && !chunkMap.has(chunk.chunkId)) {
+        chunkMap.set(chunk.chunkId, chunk);
+      }
     });
 
-    if (retrievedChunks && retrievedChunks.length > 0) {
+    const uniqueChunks = Array.from(chunkMap.values());
+
+    if (uniqueChunks.length > 0) {
       logger.info(
-        { notebookId, chunkCount: retrievedChunks.length },
-        '[Generate] Retrieved vector search chunks for context',
+        { notebookId, totalDeduplicatedChunks: uniqueChunks.length },
+        '[Generate] Multi-query vector retrieval completed successfully',
       );
-      const formattedChunks = retrievedChunks
+
+      return uniqueChunks
         .map((chunk, i) => {
-          const title = (chunk.metadata?.sourceTitle || chunk.metadata?.title || 'Source Chunk') as string;
-          const location = chunk.metadata?.pageNumber ? ` (Page ${chunk.metadata.pageNumber})` : '';
+          const title = (chunk.metadata?.sourceTitle || chunk.sourceName || chunk.metadata?.title || 'Source Chunk') as string;
+          const location = chunk.page ? ` (Page ${chunk.page})` : chunk.metadata?.pageNumber ? ` (Page ${chunk.metadata.pageNumber})` : '';
           return `[Excerpt ${i + 1}] Source: "${title}"${location}\nContent: ${chunk.text}`;
         })
         .join('\n\n');
-
-      return formattedChunks;
     }
   } catch (err: any) {
     logger.warn(
       { err: err.message, notebookId },
-      '[Generate] Vector retrieval failed for context — falling back to source metadata',
+      '[Generate] Multi-query vector retrieval failed — falling back to source metadata',
     );
   }
 
@@ -93,12 +112,14 @@ export async function getNotebookArtifactsController(
   const settings = (notebook.settings as Record<string, any>) || {};
   const podcast = settings.podcast || { status: 'IDLE', data: null, error: null };
   const learningPath = settings.learningPath || { status: 'IDLE', data: null, error: null };
+  const flashcards = settings.flashcards || { status: 'IDLE', data: null, error: null };
   const ttsProvider = (process.env.TTS_PROVIDER || 'web_speech').toLowerCase();
 
   return reply.status(200).send({
     ttsProvider,
     podcast,
     learningPath,
+    flashcards,
   });
 }
 
@@ -446,6 +467,147 @@ export async function generateLearningPathController(
         });
       } catch (updateErr) {
         logger.error({ updateErr, notebookId }, '[Generate] Failed to update learningPath FAILED status');
+      }
+    }
+  })();
+
+  return reply.status(200).send({ status: 'GENERATING' });
+}
+
+// ─────────────────────────────────────────────
+// Flashcards Generator (Async Background Queue)
+// ─────────────────────────────────────────────
+
+const FLASHCARDS_SYSTEM_PROMPT = `You are a master educator specializing in effective learning techniques like spaced repetition and active recall.
+
+Your task is to generate a set of high-quality study flashcards based strictly on the provided notebook sources.
+
+Rules:
+1. Generate clear, concise, and engaging flashcards covering key concepts, definitions, architecture, key trade-offs, and critical insights.
+2. Each flashcard must have a "front" (Question / Prompt / Concept) and a "back" (Clear, complete Answer / Explanation).
+3. Attach a category/tag to each card (e.g. "Concept", "Definition", "Architecture", "Best Practice").
+4. Provide an optional brief "hint" for cards where helpful.
+5. Generate the exact number of flashcards requested by the user prompt.
+6. ONLY return valid JSON — no markdown code fences, no extra text.
+
+Output JSON Schema:
+{
+  "title": "Flashcard Set Title",
+  "description": "Short description of what key knowledge this deck tests",
+  "cards": [
+    {
+      "id": 1,
+      "front": "Clear question or core prompt",
+      "back": "Comprehensive yet concise answer explaining the concept",
+      "category": "Concept",
+      "hint": "Optional clue or intuition hint"
+    }
+  ]
+}`;
+
+export async function generateFlashcardsController(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const userId = request.auth?.userId || (request as any).userId;
+  if (!userId) throw new UnauthorizedError('Unauthorized');
+
+  const { notebookId } = request.params as { notebookId: string };
+  if (!notebookId) throw new ValidationError('Notebook ID is required');
+
+  const body = (request.body as { force?: boolean; count?: number }) || {};
+  const force = !!body.force;
+  const count = body.count && body.count > 0 ? body.count : 15;
+
+  // Non-Pro entitlement check for forced re-creation
+  if (force) {
+    const userRepository = new PrismaUserRepository();
+    const user = await userRepository.findById(userId);
+    if (!user?.isPro) {
+      throw new ForbiddenError('Re-creating AI artifacts requires a PRO account.');
+    }
+  }
+
+  const notebookService = new NotebookService();
+  const notebook = await notebookService.getNotebook(notebookId, userId);
+
+  const settings = (notebook.settings as Record<string, any>) || {};
+  const currentCards = settings.flashcards;
+
+  // Return existing result if READY and not forced
+  if (currentCards?.status === 'READY' && currentCards?.data && !force) {
+    return reply.status(200).send({ status: 'READY', result: currentCards.data });
+  }
+
+  // Return GENERATING if already in progress and not forced
+  if (currentCards?.status === 'GENERATING' && !force) {
+    return reply.status(200).send({ status: 'GENERATING' });
+  }
+
+  // Update DB status to GENERATING
+  const updatedSettings = {
+    ...settings,
+    flashcards: {
+      status: 'GENERATING',
+      data: currentCards?.data || null,
+      error: null,
+      updatedAt: new Date().toISOString(),
+    },
+  };
+  await notebookService.updateNotebook(notebookId, userId, { settings: updatedSettings });
+
+  // Spawn background generation
+  (async () => {
+    try {
+      logger.info({ notebookId, userId, count }, '[Generate] Background flashcards generation started');
+      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title);
+      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Knowledge Base Sources:\n${sourceContext}\n\nGenerate exactly ${count} interactive study flashcards covering key definitions, core concepts, edge cases, and insights from these sources.`;
+
+      const chatProvider = ChatProviderFactory.create();
+      const response = await chatProvider.generateResponse(
+        [
+          { role: ChatRole.SYSTEM, content: FLASHCARDS_SYSTEM_PROMPT },
+          { role: ChatRole.USER, content: userPrompt },
+        ],
+        { task: 'chat', maxTokens: 3500 },
+      );
+
+      const raw = response.message.content.trim();
+      const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      const flashcardData = JSON.parse(cleaned);
+
+      const latestNotebook = await notebookService.getNotebook(notebookId, userId);
+      const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
+      await notebookService.updateNotebook(notebookId, userId, {
+        settings: {
+          ...latestSettings,
+          flashcards: {
+            status: 'READY',
+            data: flashcardData,
+            error: null,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      });
+      logger.info({ notebookId, cardCount: flashcardData?.cards?.length }, '[Generate] Background flashcards generation completed successfully');
+    } catch (err: any) {
+      logger.error({ err, notebookId }, '[Generate] Background flashcards generation failed');
+      try {
+        const latestNotebook = await notebookService.getNotebook(notebookId, userId);
+        const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
+        await notebookService.updateNotebook(notebookId, userId, {
+          settings: {
+            ...latestSettings,
+            flashcards: {
+              status: 'FAILED',
+              data: null,
+              error: err.message || 'Generation failed',
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        });
+      } catch (updateErr) {
+        logger.error({ updateErr, notebookId }, '[Generate] Failed to update flashcards FAILED status');
       }
     }
   })();

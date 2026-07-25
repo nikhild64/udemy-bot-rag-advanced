@@ -1,13 +1,14 @@
 "use client"
 
 import { useState } from 'react';
-import { useSourcesQuery, useNotebookArtifactsQuery, useGeneratePodcastMutation, useGenerateLearningPathMutation, useReindexSourceMutation } from '../hooks/useSources';
+import { useSourcesQuery, useNotebookArtifactsQuery, useGeneratePodcastMutation, useGenerateLearningPathMutation, useGenerateFlashcardsMutation, useReindexSourceMutation } from '../hooks/useSources';
 import { useUIStore } from '@/shared/lib/store';
 import { SourceItem } from './SourceItem';
 import { SourceViewerDialog } from './SourceViewerDialog';
 import { PodcastScriptDialog, PodcastScript } from './PodcastScriptDialog';
 import { LearningPathDialog, LearningPath } from './LearningPathDialog';
-import { Upload, FilePlus, FolderKanban, Sparkles, Radio, GitCommit, ChevronRight, Loader2, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { FlashcardsDialog, FlashcardSet } from './FlashcardsDialog';
+import { Upload, FilePlus, FolderKanban, Sparkles, Radio, GitCommit, Layers, ChevronRight, Loader2, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +28,7 @@ export function SourceList() {
   // ── Dialog modal states ──
   const [podcastOpen, setPodcastOpen] = useState(false);
   const [learningPathOpen, setLearningPathOpen] = useState(false);
+  const [flashcardsOpen, setFlashcardsOpen] = useState(false);
   const [confirmReindexAllOpen, setConfirmReindexAllOpen] = useState(false);
   const [proRequiredOpen, setProRequiredOpen] = useState(false);
   const [proFeatureName, setProFeatureName] = useState('Re-creating AI Artifacts');
@@ -36,6 +38,7 @@ export function SourceList() {
 
   const podcastMutation = useGeneratePodcastMutation();
   const learningPathMutation = useGenerateLearningPathMutation();
+  const flashcardsMutation = useGenerateFlashcardsMutation();
   const reindexMutation = useReindexSourceMutation(activeNotebookId);
 
   const handleOpenViewer = (sourceId: string) => {
@@ -53,6 +56,11 @@ export function SourceList() {
   const pathStatus = pathArtifact?.status || 'IDLE';
   const pathData = pathArtifact?.data as LearningPath | null;
   const isPathGenerating = pathStatus === 'GENERATING' || learningPathMutation.isPending;
+
+  const flashcardsArtifact = artifacts?.flashcards;
+  const flashcardsStatus = flashcardsArtifact?.status || 'IDLE';
+  const flashcardsData = flashcardsArtifact?.data as FlashcardSet | null;
+  const isFlashcardsGenerating = flashcardsStatus === 'GENERATING' || flashcardsMutation.isPending;
 
   // ── Podcast Actions ──
   const handlePodcastClick = () => {
@@ -94,6 +102,32 @@ export function SourceList() {
     }
     if (!activeNotebookId || isPathGenerating) return;
     learningPathMutation.mutate({ notebookId: activeNotebookId, force: true });
+  };
+
+  // ── Flashcards Actions ──
+  const handleFlashcardsClick = () => {
+    if (!activeNotebookId) return;
+    if (flashcardsStatus === 'READY' && flashcardsData) {
+      setFlashcardsOpen(true);
+    } else if (!isFlashcardsGenerating) {
+      flashcardsMutation.mutate({ notebookId: activeNotebookId, count: 15 });
+    }
+  };
+
+  const handleFlashcardsRefresh = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!userProfile?.isPro) {
+      setProFeatureName('Re-creating Flashcards');
+      setProRequiredOpen(true);
+      return;
+    }
+    if (!activeNotebookId || isFlashcardsGenerating) return;
+    flashcardsMutation.mutate({ notebookId: activeNotebookId, force: true, count: 15 });
+  };
+
+  const handleFlashcardsRegenerate = (count: number) => {
+    if (!activeNotebookId || isFlashcardsGenerating) return;
+    flashcardsMutation.mutate({ notebookId: activeNotebookId, force: true, count });
   };
 
   const handleSelectSourceFromPath = (sourceTitle: string, timestamp?: string) => {
@@ -240,6 +274,15 @@ export function SourceList() {
               onRefresh={handleLearningPathRefresh}
               disabled={!areAllSourcesReady}
             />
+
+            {/* ── Study Flashcards Tile ── */}
+            <FlashcardsTile
+              status={flashcardsStatus}
+              isGenerating={isFlashcardsGenerating}
+              onClick={handleFlashcardsClick}
+              onRefresh={handleFlashcardsRefresh}
+              disabled={!areAllSourcesReady}
+            />
           </div>
         </div>
       )}
@@ -274,6 +317,15 @@ export function SourceList() {
         isGenerating={isPathGenerating}
         learningPath={pathData}
         onSelectSource={handleSelectSourceFromPath}
+      />
+
+      {/* Flashcards Dialog */}
+      <FlashcardsDialog
+        isOpen={flashcardsOpen}
+        onClose={() => setFlashcardsOpen(false)}
+        isGenerating={isFlashcardsGenerating}
+        flashcardSet={flashcardsData}
+        onRegenerate={handleFlashcardsRegenerate}
       />
 
       {/* Pro Entitlement Required Dialog */}
@@ -497,6 +549,104 @@ function LearningTimelineTile({
             : isFailed
             ? 'Generation failed. Click refresh icon to retry.'
             : 'Generate a step-by-step chronological roadmap from your sources'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function FlashcardsTile({
+  status,
+  isGenerating,
+  onClick,
+  onRefresh,
+  disabled,
+}: {
+  status: string;
+  isGenerating: boolean;
+  onClick: () => void;
+  onRefresh: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+}) {
+  const isDone = status === 'READY';
+  const isFailed = status === 'FAILED';
+
+  return (
+    <div
+      onClick={disabled ? undefined : onClick}
+      className={`group relative flex items-start gap-3 p-3 rounded-xl border border-border/50 bg-card/40 transition-all duration-200 text-left shadow-xs ${
+        isGenerating ? 'opacity-80' : ''
+      } ${
+        disabled
+          ? 'opacity-50 cursor-not-allowed grayscale-[0.5]'
+          : 'hover:bg-card/90 hover:border-purple-500/50 hover:shadow-md cursor-pointer'
+      }`}
+    >
+      <div
+        className={`p-2 rounded-lg transition-colors shrink-0 ${
+          disabled
+            ? 'bg-muted text-muted-foreground'
+            : isGenerating
+            ? 'bg-purple-500/20 text-purple-400'
+            : isDone
+            ? 'bg-emerald-500/10 text-emerald-400'
+            : isFailed
+            ? 'bg-red-500/10 text-red-400'
+            : 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white'
+        }`}
+      >
+        {isGenerating ? (
+          <Loader2 className="w-4 h-4 stroke-[2] animate-spin" />
+        ) : isDone ? (
+          <CheckCircle className="w-4 h-4 stroke-[2]" />
+        ) : isFailed ? (
+          <AlertCircle className="w-4 h-4 stroke-[2]" />
+        ) : (
+          <Layers className="w-4 h-4 stroke-[2]" />
+        )}
+      </div>
+
+      <div className="space-y-0.5 min-w-0 flex-1">
+        <div
+          className={`text-xs font-semibold transition-colors flex items-center justify-between ${
+            isGenerating
+              ? 'text-purple-400'
+              : isDone
+              ? 'text-emerald-400'
+              : isFailed
+              ? 'text-red-400'
+              : 'text-foreground group-hover:text-purple-400'
+          }`}
+        >
+          <span>
+            {isGenerating ? 'Creating Cards…' : isDone ? 'Study Flashcards' : isFailed ? 'Generation Failed' : 'Study Flashcards'}
+          </span>
+
+          <div className="flex items-center gap-1">
+            {(isDone || isFailed) && !disabled && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                title="Re-generate Flashcards"
+                className="p-1 rounded-md text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+            )}
+            {!isGenerating && !disabled && (
+              <ChevronRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-purple-400" />
+            )}
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+          {isGenerating
+            ? 'Generating interactive flashcards in background…'
+            : isDone
+            ? 'Flashcard deck ready — click to practice active recall'
+            : isFailed
+            ? 'Generation failed. Click refresh icon to retry.'
+            : 'Generate a deck of interactive study flashcards for active recall'}
         </p>
       </div>
     </div>

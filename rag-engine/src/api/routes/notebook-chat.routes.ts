@@ -9,6 +9,7 @@ import {
 import {
   generatePodcastController,
   generateLearningPathController,
+  generateFlashcardsController,
   getNotebookArtifactsController,
   getPodcastAudioStreamController,
 } from '../controllers/generate.controller';
@@ -91,6 +92,13 @@ export async function notebookChatRoutes(app: FastifyInstance): Promise<void> {
     '/api/notebooks/:notebookId/generate/learning-path',
     { preHandler: [requireAuth] },
     generateLearningPathController,
+  );
+
+  // Generate interactive flashcards from notebook sources
+  app.post(
+    '/api/notebooks/:notebookId/generate/flashcards',
+    { preHandler: [requireAuth] },
+    generateFlashcardsController,
   );
 
   // Stream stored local podcast audio MP3

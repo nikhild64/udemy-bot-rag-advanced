@@ -187,7 +187,10 @@ export function useNotebookArtifactsQuery(notebookId: string | null) {
     refetchInterval: (query) => {
       const data = query.state.data;
       if (!data) return false;
-      const isGenerating = data.podcast?.status === 'GENERATING' || data.learningPath?.status === 'GENERATING';
+      const isGenerating =
+        data.podcast?.status === 'GENERATING' ||
+        data.learningPath?.status === 'GENERATING' ||
+        data.flashcards?.status === 'GENERATING';
       return isGenerating ? 2000 : false;
     },
   });
@@ -261,6 +264,41 @@ export function useGenerateLearningPathMutation() {
         learningPath: { status: 'FAILED', data: null, error: err.message || 'Generation failed' },
       }));
       toast.error(err.message || 'Failed to generate learning path');
+    },
+  });
+}
+
+export function useGenerateFlashcardsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ notebookId, force, count }: { notebookId: string; force?: boolean; count?: number }) =>
+      sourcesApi.generateFlashcards(notebookId, { force, count }),
+    onMutate: async ({ notebookId }) => {
+      queryClient.setQueryData(['notebookArtifacts', notebookId], (old: any) => ({
+        ...old,
+        flashcards: { status: 'GENERATING', data: old?.flashcards?.data || null, error: null },
+      }));
+    },
+    onSuccess: (res, variables) => {
+      if (res.status === 'READY' && res.result) {
+        queryClient.setQueryData(['notebookArtifacts', variables.notebookId], (old: any) => ({
+          ...old,
+          flashcards: { status: 'READY', data: res.result, error: null },
+        }));
+      } else {
+        queryClient.setQueryData(['notebookArtifacts', variables.notebookId], (old: any) => ({
+          ...old,
+          flashcards: { status: res.status || 'GENERATING', data: old?.flashcards?.data || null, error: null },
+        }));
+      }
+      queryClient.invalidateQueries({ queryKey: ['notebookArtifacts', variables.notebookId] });
+    },
+    onError: (err: any, variables) => {
+      queryClient.setQueryData(['notebookArtifacts', variables.notebookId], (old: any) => ({
+        ...old,
+        flashcards: { status: 'FAILED', data: null, error: err.message || 'Generation failed' },
+      }));
+      toast.error(err.message || 'Failed to generate flashcards');
     },
   });
 }

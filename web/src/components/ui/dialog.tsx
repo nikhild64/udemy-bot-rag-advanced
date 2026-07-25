@@ -5,6 +5,8 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+import { createPortal } from "react-dom"
+
 interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -13,9 +15,15 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onOpenChange, children, contentClassName }: DialogProps) {
-  if (!open) return null
+  const [mounted, setMounted] = React.useState(false)
 
-  return (
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!open || !mounted) return null
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
@@ -24,7 +32,8 @@ export function Dialog({ open, onOpenChange, children, contentClassName }: Dialo
       <div className={cn("z-50 w-full max-w-lg p-4 sm:p-6 bg-card border border-border rounded-xl shadow-2xl animate-in zoom-in-95 duration-200 max-h-[calc(100dvh-2rem)] overflow-y-auto", contentClassName)}>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
