@@ -49,7 +49,7 @@ export function DashboardView({
 
   const handleCreateNotebook = () => {
     const totalCount = data?.stats?.totalNotebooks ?? 0;
-    if (!userProfile?.isPro && totalCount >= 2) {
+    if (!userProfile?.isPro && totalCount >= 1) {
       setNotebookLimitModalOpen(true);
     } else {
       onCreateNotebook();

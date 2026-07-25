@@ -19,12 +19,12 @@ export function NotebookLimitModal() {
           <div>
             <DialogTitle className="text-base font-bold text-foreground">Notebook Limit Reached</DialogTitle>
             <span className="inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider text-amber-500 font-semibold mt-0.5">
-              Free Tier Limit: 2 Notebooks
+              Free Tier Limit: 1 Notebook
             </span>
           </div>
         </div>
         <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-          You have reached the maximum allowed limit of <span className="font-semibold text-foreground">2 notebooks</span> for free tier accounts.
+          You have reached the maximum allowed limit of <span className="font-semibold text-foreground">1 notebook</span> for free tier accounts.
         </DialogDescription>
       </DialogHeader>
 

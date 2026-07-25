@@ -40,7 +40,7 @@ export function CreateNotebookModal() {
 
   const onSubmit = (data: CreateNotebookFormValues) => {
     const activeCount = (notebooks || []).filter((nb) => !nb.isArchived).length;
-    if (!userProfile?.isPro && activeCount >= 2) {
+    if (!userProfile?.isPro && activeCount >= 1) {
       setOpen(false);
       setNotebookLimitModalOpen(true);
       return;

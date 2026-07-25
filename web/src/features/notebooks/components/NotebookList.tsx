@@ -41,7 +41,7 @@ export function NotebookList({ isMobile }: NotebookListProps) {
   const handleCreateClick = () => {
     if (isMobile) setMobileSidebarOpen(false);
     const activeCount = (notebooks || []).filter((nb) => !nb.isArchived).length;
-    if (!userProfile?.isPro && activeCount >= 2) {
+    if (!userProfile?.isPro && activeCount >= 1) {
       setNotebookLimitModalOpen(true);
     } else {
       setCreateNotebookModalOpen(true);

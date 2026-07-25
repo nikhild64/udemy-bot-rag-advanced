@@ -22,15 +22,15 @@ export class NotebookService {
     logger.info({ userId, title }, 'Creating notebook');
     const user = await this.userRepository.findOrCreate({ id: userId });
 
-    // Non-Pro user notebook count restriction (Max 2 active notebooks)
+    // Non-Pro user notebook count restriction (Max 1 active notebook)
     if (!user.isPro) {
       const activeNotebooks = await this.notebookRepository.findMany({
         userId,
         isArchived: false,
         limit: 100,
       });
-      if (activeNotebooks.data.length >= 2) {
-        throw new ForbiddenError('Free account notebook limit reached (max 2 notebooks). Contact admin to increase the limit.');
+      if (activeNotebooks.data.length >= 1) {
+        throw new ForbiddenError('Free account notebook limit reached (max 1 notebook). Contact admin to increase the limit.');
       }
     }
 

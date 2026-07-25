@@ -567,7 +567,7 @@ export function LandingPage() {
                 </div>
                 <p className="pricing-card__desc">Ideal for students, researchers, and personal learning.</p>
                 <ul className="pricing-card__list">
-                  <li className="pricing-card__item"><Check className="w-4 h-4" /> Up to 2 Notebooks per user</li>
+                  <li className="pricing-card__item"><Check className="w-4 h-4" /> 1 Notebook (Free Tier)</li>
                   <li className="pricing-card__item"><Check className="w-4 h-4" /> Full Document & Web URL Ingestion</li>
                   <li className="pricing-card__item"><Check className="w-4 h-4" /> YouTube Transcript Parsing</li>
                   <li className="pricing-card__item"><Check className="w-4 h-4" /> Grounded RAG with Direct Citations</li>
