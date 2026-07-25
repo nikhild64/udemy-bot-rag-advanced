@@ -121,20 +121,6 @@ export function MessageList({
                 </div>
               )}
             </div>
-
-            {streamingCitations.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-border/40">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  <span>Found Citations ({streamingCitations.length})</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {streamingCitations.map((citation, idx) => (
-                    <CitationCard key={idx} citation={citation} index={idx} />
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
