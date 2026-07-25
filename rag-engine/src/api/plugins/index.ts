@@ -11,7 +11,7 @@ import { serializerCompiler, validatorCompiler, jsonSchemaTransform } from 'fast
 import { diPlugin } from './di.plugin';
 import { requestLoggerPlugin } from './request-logger.plugin';
 import { config } from '../../config';
-import { clerkPlugin } from '@clerk/fastify';
+import { clerkAuthPlugin } from './clerk.plugin';
 
 /**
  * Centralized plugin registration
@@ -140,9 +140,6 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
   // Register Dependency Injection
   await app.register(diPlugin);
 
-  // Register Clerk Authentication globally
-  await app.register(clerkPlugin, {
-    publishableKey: config.auth.publishableKey,
-    secretKey: config.auth.secretKey,
-  });
+  // Register Clerk Authentication safely (skipping public/health check paths)
+  await app.register(clerkAuthPlugin);
 }

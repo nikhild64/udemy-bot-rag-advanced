@@ -27,7 +27,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   }
 
   // Fallback: Parse sub claim directly from Bearer JWT header if getAuth didn't populate userId
-  if ((!auth || !auth.userId) && request.headers.authorization) {
+  if ((!auth || !auth.userId) && request.headers?.authorization) {
     const authHeader = request.headers.authorization;
     if (authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7).trim();
@@ -52,7 +52,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
     logger.warn(
       {
         path: request.url,
-        hasAuthHeader: !!request.headers.authorization,
+        hasAuthHeader: !!request.headers?.authorization,
         authObj: auth,
       },
       '[Auth] requireAuth rejected request — missing or invalid user ID',
