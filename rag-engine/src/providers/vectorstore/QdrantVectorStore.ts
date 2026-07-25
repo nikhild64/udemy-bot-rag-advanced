@@ -144,7 +144,7 @@ export class QdrantVectorStore implements VectorStore {
     });
 
     const startTime = Date.now();
-    const BATCH_SIZE = 500;
+    const BATCH_SIZE = 100;
 
     try {
       for (let i = 0; i < points.length; i += BATCH_SIZE) {

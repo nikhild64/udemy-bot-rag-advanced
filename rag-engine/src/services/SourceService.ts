@@ -6,10 +6,12 @@ import { NotFoundError, ValidationError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 import { SourceDeletionOrchestrator } from '../ingestion/orchestrator/SourceDeletionOrchestrator';
 import { ReIndexOrchestrator } from '../ingestion/orchestrator/ReIndexOrchestrator';
+import { IngestionQueue } from '@/infrastructure/queue/IngestionQueue';
 
 export class SourceService {
   private readonly deletionOrchestrator: SourceDeletionOrchestrator;
   private readonly reindexOrchestrator: ReIndexOrchestrator;
+  private readonly queue: IngestionQueue;
 
   constructor(
     private readonly sourceRepository: ISourceRepository = new PrismaSourceRepository(),
@@ -19,6 +21,7 @@ export class SourceService {
   ) {
     this.deletionOrchestrator = deletionOrchestrator ?? new SourceDeletionOrchestrator(this.sourceRepository, this.notebookRepository);
     this.reindexOrchestrator = reindexOrchestrator ?? new ReIndexOrchestrator(this.sourceRepository, this.notebookRepository);
+    this.queue = new IngestionQueue();
   }
 
   async createSource(
@@ -122,11 +125,18 @@ export class SourceService {
   async cancelSource(id: string, userId: string): Promise<Source> {
     const source = await this.getSource(id, userId);
     logger.info({ sourceId: id, userId }, 'Cancelling source processing');
+
+    // Update queue status immediately so the UI polling picks it up
+    await this.queue.updateProgress(id, 'Failed', 0, 'Failed', 'Cancelled by user').catch((err) => {
+      logger.warn({ sourceId: id, err }, 'Failed to update queue status on cancel');
+    });
+
     return this.sourceRepository.update(id, userId, {
       status: 'Failed',
       metadata: {
         ...((source.metadata as Record<string, any>) || {}),
         cancelledAt: new Date().toISOString(),
+        error: 'Cancelled by user',
       },
     });
   }

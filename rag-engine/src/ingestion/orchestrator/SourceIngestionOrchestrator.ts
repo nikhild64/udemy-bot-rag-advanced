@@ -58,6 +58,11 @@ export class SourceIngestionOrchestrator {
       // 1. Validation & Security Checks
       await this.updateProgress(sourceId, 'Queued', 5, 'Processing', currentJobId, notebookId);
 
+      // Check for cancellation before starting
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
+      }
+
       const source = await this.sourceRepository.findById(sourceId);
       if (!source) {
         throw new NotFoundError(`Source '${sourceId}' not found`);
@@ -137,6 +142,11 @@ export class SourceIngestionOrchestrator {
         }
       }
 
+      // Cancellation checkpoint — before download
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
+      }
+
       // 2. Download / Load Stage via SourceLoaderFactory
       await this.updateProgress(sourceId, 'Downloading', 15, 'Processing', currentJobId, notebookId);
       ingestionEvents.publish('Download Started', { jobId: currentJobId, sourceId, notebookId, stage: 'Downloading' });
@@ -152,6 +162,11 @@ export class SourceIngestionOrchestrator {
         { sourceId, loader: loader.constructor.name, rawLength, mimeType: rawContent.mimeType },
         'Loaded source content successfully via SourceLoader',
       );
+
+      // Cancellation checkpoint — before extraction
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
+      }
 
       // 3. Extraction Stage via ExtractorFactory
       await this.updateProgress(sourceId, 'Extracting', 30, 'Processing', currentJobId, notebookId);
@@ -173,6 +188,11 @@ export class SourceIngestionOrchestrator {
         details: { extractedLength: extractedText.length, title: extractedDoc.title },
       });
 
+      // Cancellation checkpoint — before normalization
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
+      }
+
       // 4. Normalization Stage
       await this.updateProgress(sourceId, 'Normalizing', 45, 'Processing', currentJobId, notebookId);
       await this.sourceRepository.updateStatus(sourceId, 'Normalizing' as any);
@@ -192,6 +212,11 @@ export class SourceIngestionOrchestrator {
       if ((source.type === 'WEBSITE' || isGenericTitle) && normalizedText.length > 50) {
         finalTitle = await this.generateAiTitle(normalizedText, finalTitle || 'Web Source');
         logger.info({ sourceId, finalTitle }, 'Generated AI title for web source');
+      }
+
+      // Cancellation checkpoint — before chunking
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
       }
 
       // 5. Chunking Stage
@@ -231,6 +256,11 @@ export class SourceIngestionOrchestrator {
 
       if (chunks.length === 0) {
         throw new IngestionError(`Extracted document resulted in 0 valid chunks for source '${sourceId}'`);
+      }
+
+      // Cancellation checkpoint — before embedding (most expensive stage)
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
       }
 
       // 6. Embedding Stage
@@ -278,6 +308,11 @@ export class SourceIngestionOrchestrator {
 
       logger.info({ sourceId, embeddedChunksCount: embeddingResult.embeddedChunks.length }, 'Generated embeddings successfully');
       ingestionEvents.publish('Embedding Completed', { jobId: currentJobId, sourceId, notebookId, stage: 'Embedding', details: { embeddingsCount: embeddingResult.embeddedChunks.length } });
+
+      // Cancellation checkpoint — before indexing
+      if (await this.isCancelled(sourceId)) {
+        return this.buildCancelledResult(sourceId, notebookId, startTime, currentJobId);
+      }
 
       // 7. Indexing Stage & Idempotency
       await this.updateProgress(sourceId, 'Indexing', 90, 'Processing', currentJobId, notebookId);
@@ -386,6 +421,9 @@ export class SourceIngestionOrchestrator {
 
       logger.error({ jobId: currentJobId, sourceId, error: errorMessage, durationMs }, 'Source Ingestion Orchestration failed');
 
+      // Clean up any partially-indexed vectors so they don't corrupt search results
+      await this.cleanupPartialVectors(sourceId);
+
       // Update Source status to Failed in DB
       try {
         const currentSource = await this.sourceRepository.findById(sourceId);
@@ -430,6 +468,79 @@ export class SourceIngestionOrchestrator {
     error?: string,
   ): Promise<void> {
     await this.queue.updateProgress(sourceId, stage, percent, statusOverride, error);
+  }
+
+  /**
+   * Check if the source has been cancelled by the user.
+   * Reads the latest source status from the DB to detect if cancelSource() was called.
+   */
+  private async isCancelled(sourceId: string): Promise<boolean> {
+    try {
+      const source = await this.sourceRepository.findById(sourceId);
+      if (!source) return false;
+
+      const meta = (source.metadata as Record<string, any>) || {};
+      // Source was cancelled if status is Failed AND metadata has cancelledAt
+      if (source.status === SourceStatus.Failed && meta.cancelledAt) {
+        logger.info({ sourceId }, 'Source ingestion cancelled by user — aborting pipeline');
+        return true;
+      }
+      return false;
+    } catch (err) {
+      logger.warn({ sourceId, err }, 'Failed to check cancellation status, continuing pipeline');
+      return false;
+    }
+  }
+
+  /**
+   * Clean up any partially-indexed vectors for a source.
+   * Uses the same filter pattern as SourceDeletionOrchestrator.
+   */
+  private async cleanupPartialVectors(sourceId: string): Promise<void> {
+    try {
+      const collectionName = config.vectorStore.userKnowledgeCollection;
+      if (typeof this.vectorStore.deleteVectorsByFilter === 'function') {
+        await this.vectorStore.deleteVectorsByFilter(collectionName, {
+          should: [
+            { key: 'sourceId', match: { value: sourceId } },
+            { key: 'lessonId', match: { value: sourceId } },
+          ],
+        });
+        logger.info({ sourceId, collectionName }, 'Cleaned up partial vectors for cancelled/failed source');
+      }
+    } catch (err) {
+      logger.warn({ sourceId, err }, 'Failed to clean up partial vectors (may not exist yet)');
+    }
+  }
+
+  /**
+   * Build a standardised cancelled result and publish events.
+   */
+  private async buildCancelledResult(
+    sourceId: string,
+    notebookId: string,
+    startTime: number,
+    jobId: string,
+  ): Promise<SourceIngestionResult> {
+    const durationMs = Date.now() - startTime;
+    logger.info({ sourceId, durationMs }, 'Source ingestion aborted — cancelled by user');
+
+    // Clean up any partially-indexed vectors
+    await this.cleanupPartialVectors(sourceId);
+
+    await this.updateProgress(sourceId, 'Failed', 0, 'Failed', jobId, notebookId, 'Cancelled by user');
+    ingestionEvents.publish('Job Failed', { jobId, sourceId, notebookId, stage: 'Failed', details: { error: 'Cancelled by user' } });
+
+    return {
+      sourceId,
+      notebookId,
+      status: SourceStatus.Failed,
+      chunksCount: 0,
+      embeddingsCount: 0,
+      durationMs,
+      success: false,
+      error: 'Cancelled by user',
+    };
   }
 
   private async updateNotebookStats(notebookId: string, userId: string): Promise<void> {

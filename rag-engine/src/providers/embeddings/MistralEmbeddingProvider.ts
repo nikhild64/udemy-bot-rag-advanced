@@ -1,6 +1,7 @@
 import { EmbeddingProvider } from '@/core/contracts/embedding-provider.contract';
 import { ConfigurationError, ProviderError } from '@/shared/errors';
 import { config } from '@/config';
+import { MistralRateLimiter } from './MistralRateLimiter';
 
 export interface MistralEmbeddingProviderOptions {
   readonly apiKey?: string;
@@ -32,6 +33,7 @@ export class MistralEmbeddingProvider implements EmbeddingProvider {
   private readonly apiUrl: string;
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
+  private readonly rateLimiter: MistralRateLimiter;
 
   constructor(options: MistralEmbeddingProviderOptions = {}) {
     this.apiKey = options.apiKey !== undefined ? options.apiKey : config.embeddings.mistralApiKey;
@@ -47,6 +49,8 @@ export class MistralEmbeddingProvider implements EmbeddingProvider {
     if (!this.modelName || !this.modelName.trim()) {
       throw new ConfigurationError('MISTRAL_EMBEDDING_MODEL is required when using Mistral embedding provider');
     }
+
+    this.rateLimiter = MistralRateLimiter.getInstance();
   }
 
   async embedSingle(text: string): Promise<number[]> {
@@ -88,6 +92,10 @@ export class MistralEmbeddingProvider implements EmbeddingProvider {
               .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
               .replace(/[\uD800-\uDFFF]/g, '')
           );
+
+          // Enforce Mistral rate limits (RPS + TPM) before each API call
+          const estimatedTokens = MistralRateLimiter.estimateTokens(sanitizedTexts);
+          await this.rateLimiter.acquire(estimatedTokens);
 
           response = await fetch(this.apiUrl, {
             method: 'POST',

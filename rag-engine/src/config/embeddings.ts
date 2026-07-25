@@ -16,6 +16,8 @@ const embeddingsSchema = z
     EMBEDDING_WAVE_DELAY_MS: z.coerce.number().int().min(0).default(0),
     EMBEDDING_TIMEOUT: z.coerce.number().int().positive().default(30000),
     MISTRAL_API_URL: z.string().default('https://api.mistral.ai/v1/embeddings'),
+    MISTRAL_RATE_LIMIT_RPS: z.coerce.number().positive().default(1),
+    MISTRAL_RATE_LIMIT_TPM: z.coerce.number().int().positive().default(20_000_000),
     EMBEDDING_DIMENSION: z.coerce.number().int().positive().default(1024),
   })
   .superRefine((data, ctx) => {
@@ -48,6 +50,8 @@ export interface EmbeddingsConfig {
   readonly timeoutMs: number;
   readonly mistralApiUrl: string;
   readonly dimension: number;
+  readonly mistralRateLimitRps: number;
+  readonly mistralRateLimitTpm: number;
 }
 
 function loadEmbeddingsConfig(): EmbeddingsConfig {
@@ -73,6 +77,8 @@ function loadEmbeddingsConfig(): EmbeddingsConfig {
     timeoutMs: result.data.EMBEDDING_TIMEOUT,
     mistralApiUrl: result.data.MISTRAL_API_URL,
     dimension: result.data.EMBEDDING_DIMENSION,
+    mistralRateLimitRps: result.data.MISTRAL_RATE_LIMIT_RPS,
+    mistralRateLimitTpm: result.data.MISTRAL_RATE_LIMIT_TPM,
   };
 }
 
