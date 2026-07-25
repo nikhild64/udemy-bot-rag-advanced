@@ -72,8 +72,10 @@ function CanvasWaveform({
     let t = 0;
 
     const render = () => {
-      // Scale time step with playbackRate for realistic visual speed
-      t += 0.015 * (isPlaying ? playbackRate : 0.5);
+      // Scale time animation step dynamically with playbackRate & play state
+      const effectiveSpeed = isPlaying ? playbackRate : 0.3;
+      t += 0.02 * effectiveSpeed;
+
       const width = canvas.width;
       const height = canvas.height;
       const midY = height / 2;
@@ -91,7 +93,7 @@ function CanvasWaveform({
       ctx.stroke();
       ctx.restore();
 
-      // Smooth Quadratic Bezier Wave Drawing Function
+      // Elastic Bezier Wave Drawing Function (Multi-Harmonic & Speed Responsive)
       const drawSmoothWaveLine = (
         isSpeaking: boolean,
         strokeColor: string,
@@ -101,14 +103,17 @@ function CanvasWaveform({
       ) => {
         ctx.save();
 
-        const maxAmp = isSpeaking ? 36 : isPlaying ? 8 : 3;
-        const speed = isSpeaking ? 1.6 : 0.7;
-        const numPoints = 28;
+        // Dynamic elastic bounce factor that pulses elastically during playback
+        const elasticPulse = isSpeaking ? (1 + 0.22 * Math.sin(t * 5 * Math.sqrt(effectiveSpeed))) : 1;
+        const speedMultiplier = 1 + (playbackRate - 1) * 0.35;
+        const maxAmp = (isSpeaking ? 38 : isPlaying ? 9 : 3) * elasticPulse * speedMultiplier;
+        const speed = (isSpeaking ? 2.2 : 0.8) * effectiveSpeed;
+        const numPoints = 36; // Increased resolution for ultra-smooth fluid curves
 
         ctx.shadowColor = glowColor;
-        ctx.shadowBlur = isSpeaking ? 16 : 4;
+        ctx.shadowBlur = isSpeaking ? 18 * speedMultiplier : 4;
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = isSpeaking ? 3.5 : 2;
+        ctx.lineWidth = isSpeaking ? 3.5 * (1 + 0.1 * Math.sin(t * 3)) : 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
@@ -116,12 +121,14 @@ function CanvasWaveform({
         for (let i = 0; i <= numPoints; i++) {
           const progress = i / numPoints;
           const x = progress * width;
-          const envelope = Math.sin(progress * Math.PI);
+          const envelope = Math.sin(progress * Math.PI); // Smooth dampening at left/right edges
 
-          const wave1 = Math.sin(t * speed + progress * Math.PI * 4 + seed);
-          const wave2 = Math.cos(t * speed * 0.8 - progress * Math.PI * 2 + seed * 1.5);
+          // Multi-harmonic elastic liquid wave superposition
+          const wave1 = Math.sin(t * speed + progress * Math.PI * (4 * speedMultiplier) + seed);
+          const wave2 = Math.cos(t * speed * 1.3 - progress * Math.PI * 3 + seed * 1.6);
+          const wave3 = Math.sin(t * speed * 2.4 + progress * Math.PI * 7 + seed * 2.8) * 0.25;
 
-          const verticalDisplacement = (wave1 * 0.7 + wave2 * 0.3) * maxAmp * envelope;
+          const verticalDisplacement = (wave1 * 0.5 + wave2 * 0.35 + wave3) * maxAmp * envelope;
           const y = offsetY - verticalDisplacement;
 
           pts.push({ x, y });
