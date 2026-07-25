@@ -17,6 +17,9 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Generate Prisma Client
+RUN pnpm prisma:generate
+
 # Build the TypeScript code
 RUN pnpm run build
 
@@ -31,9 +34,10 @@ ENV NODE_ENV=production
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy package management files
+# Copy package management files and Prisma schema
 COPY package.json pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml* ./
+COPY prisma ./prisma
 
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile
