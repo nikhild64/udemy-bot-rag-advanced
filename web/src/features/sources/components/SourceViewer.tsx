@@ -79,15 +79,47 @@ export function findExcerptMatch(excerpt?: string | null, sourceText?: string | 
   // Remove leading/trailing quotation marks if present
   cleanExcerpt = cleanExcerpt.replace(/^[“"']|[”"']$/g, '').trim();
 
-  if (!cleanExcerpt || cleanExcerpt.length < 3) return null;
+  if (!cleanExcerpt || cleanExcerpt.length < 2) return null;
 
-  // Attempt 1: Direct case-insensitive match
-  const exactStart = sourceText.toLowerCase().indexOf(cleanExcerpt.toLowerCase());
-  if (exactStart >= 0) {
+  const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Priority 1: Heading / Section Title Match in Markdown/Text
+  // Look for cleanExcerpt as a header (e.g. "# Templates", "## Templates", "\nTemplates\n", "\nTemplates:")
+  const headingRegex = new RegExp(`(?:^|\\n)\\s*(?:#{1,6}\\s*)?${escapeRegExp(cleanExcerpt)}\\s*(?:[\\n:]|$)`, 'i');
+  const headingMatch = sourceText.match(headingRegex);
+  if (headingMatch && headingMatch.index !== undefined) {
+    const matchedStr = headingMatch[0];
+    const subIdx = matchedStr.toLowerCase().indexOf(cleanExcerpt.toLowerCase());
+    const start = headingMatch.index + (subIdx >= 0 ? subIdx : 0);
     return {
-      start: exactStart,
-      end: exactStart + cleanExcerpt.length,
-      matchedText: sourceText.slice(exactStart, exactStart + cleanExcerpt.length),
+      start,
+      end: start + cleanExcerpt.length,
+      matchedText: sourceText.slice(start, start + cleanExcerpt.length),
+    };
+  }
+
+  // Priority 2: Direct case-insensitive match (Prefer body match after position 250 over top header/nav at position 0)
+  const lowerSource = sourceText.toLowerCase();
+  const lowerExcerpt = cleanExcerpt.toLowerCase();
+  const firstMatchIdx = lowerSource.indexOf(lowerExcerpt);
+
+  if (firstMatchIdx >= 0) {
+    // If first match is in the top header/nav (first 250 chars), check if there is a second match in main body
+    if (firstMatchIdx < 250 && cleanExcerpt.length < 40) {
+      const secondMatchIdx = lowerSource.indexOf(lowerExcerpt, 250);
+      if (secondMatchIdx >= 0) {
+        return {
+          start: secondMatchIdx,
+          end: secondMatchIdx + cleanExcerpt.length,
+          matchedText: sourceText.slice(secondMatchIdx, secondMatchIdx + cleanExcerpt.length),
+        };
+      }
+    }
+
+    return {
+      start: firstMatchIdx,
+      end: firstMatchIdx + cleanExcerpt.length,
+      matchedText: sourceText.slice(firstMatchIdx, firstMatchIdx + cleanExcerpt.length),
     };
   }
 
@@ -239,7 +271,13 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
   }, [viewData, modeInitialized]);
 
   const currentCitation = activeCitation || citation;
-  const rawExcerpt = currentCitation?.excerpt || currentCitation?.content || currentCitation?.snippet || (currentCitation as any)?.text || '';
+  const rawExcerpt =
+    currentCitation?.excerpt ||
+    currentCitation?.content ||
+    currentCitation?.snippet ||
+    (currentCitation as any)?.text ||
+    (typeof timestamp === 'string' && !/^(?:\d{1,2}:\d{2}|page\s*\d+|p\.\s*\d+)/i.test(timestamp.trim()) ? timestamp : '') ||
+    '';
   const rawText = viewData?.rawText || '';
   const match = rawExcerpt && rawText ? findExcerptMatch(rawExcerpt, rawText) : null;
 
@@ -275,8 +313,25 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
   }
 
   const { type, url, metadata } = viewData || {};
-  const pageNumber = currentCitation?.pageNumber || currentCitation?.page;
+  const extractedPageFromTs = typeof timestamp === 'string'
+    ? (() => {
+        const m = timestamp.match(/(?:page|p\.)\s*(\d+)/i);
+        return m ? parseInt(m[1], 10) : undefined;
+      })()
+    : undefined;
+  const pageNumber = currentCitation?.pageNumber || currentCitation?.page || extractedPageFromTs;
   const isPdf = type === 'PDF' || viewData?.mimeType === 'application/pdf';
+  const isZip =
+    type === 'ZIP' ||
+    type === 'ARCHIVE' ||
+    viewData?.mimeType?.includes('zip') ||
+    viewData?.mimeType?.includes('compressed') ||
+    (viewData?.displayName || '').toLowerCase().endsWith('.zip');
+
+  const isWebSource =
+    (type === 'WEBSITE' || type === 'URL') &&
+    !isZip &&
+    !['PDF', 'ZIP', 'ARCHIVE', 'FILE', 'AUDIO', 'VIDEO', 'DOCUMENT'].includes(String(type || '').toUpperCase());
 
   const extractVideoId = (urlStr?: string | null) => {
     if (!urlStr) return null;
@@ -349,7 +404,7 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <h3 className="font-semibold text-xs sm:text-sm line-clamp-1">{viewData?.displayName || 'Loading...'}</h3>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground">
-            {type === 'WEBSITE' && <span>Source: {getDomainName(url || metadata?.url)}</span>}
+            {isWebSource && <span>Source: {getDomainName(url || metadata?.url)}</span>}
             {pageNumber !== undefined && <span>Page {pageNumber}</span>}
             {displayTimestamp && <span>Timestamp: {displayTimestamp}</span>}
             {rawText && <span>{rawText.split(/\s+/).length} words</span>}
@@ -386,7 +441,7 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
           </div>
         )}
 
-        {(url || metadata?.url) && !videoId && type !== 'PDF' && (
+        {isWebSource && !videoId && (
           <Button
             variant="outline"
             size="sm"
@@ -491,7 +546,7 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
             <div className="h-full min-h-0 overflow-y-auto min-w-0 bg-background p-6 sm:p-8">
               <div className="mb-4 flex items-center justify-between border-b border-border/60 pb-3">
                 <span className="font-mono text-xs font-semibold uppercase tracking-wider text-primary">
-                  {type === 'WEBSITE' ? 'Extracted Web Content' : type === 'PDF' ? 'Extracted Document Text' : ['YOUTUBE', 'VIDEO', 'AUDIO', 'VTT'].includes(type) ? 'Transcript' : 'Extracted Content'}
+                  {isWebSource ? 'Extracted Web Content' : type === 'PDF' ? 'Extracted Document Text' : isZip ? 'Extracted Archive Content' : ['YOUTUBE', 'VIDEO', 'AUDIO', 'VTT'].includes(type) ? 'Transcript' : 'Extracted Content'}
                 </span>
                 <span className="text-xs text-muted-foreground">{rawText.split(/\s+/).length} words</span>
               </div>
@@ -591,10 +646,9 @@ export function SourceViewer({ citation, citations, sourceId, timestamp, classNa
               <FileText className="w-8 h-8 text-primary/40" />
             </div>
             <p className="text-sm max-w-sm">
-              Preview is not available for this source type within the viewer. 
-              <br />Please open the original link.
+              Preview is not available for this source type within the viewer.
             </p>
-            {(url || metadata?.url) && type !== 'PDF' && (
+            {isWebSource && (
               <Button size="sm" className="gap-2" onClick={() => openOriginalWebsite(url || metadata?.url)}>
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Visit Original Website</span>

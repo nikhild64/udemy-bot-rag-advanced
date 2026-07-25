@@ -199,8 +199,17 @@ export function useNotebookArtifactsQuery(notebookId: string | null) {
 export function useGeneratePodcastMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ notebookId, force }: { notebookId: string; force?: boolean }) =>
-      sourcesApi.generatePodcast(notebookId, force),
+    mutationFn: ({
+      notebookId,
+      force,
+      podcastLength,
+      instructions,
+    }: {
+      notebookId: string;
+      force?: boolean;
+      podcastLength?: string;
+      instructions?: string;
+    }) => sourcesApi.generatePodcast(notebookId, { force, podcastLength, instructions }),
     onMutate: async ({ notebookId }) => {
       // Optimistically update query cache immediately on click
       queryClient.setQueryData(['notebookArtifacts', notebookId], (old: any) => ({
@@ -235,8 +244,17 @@ export function useGeneratePodcastMutation() {
 export function useGenerateLearningPathMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ notebookId, force }: { notebookId: string; force?: boolean }) =>
-      sourcesApi.generateLearningPath(notebookId, force),
+    mutationFn: ({
+      notebookId,
+      force,
+      timelineDays,
+      instructions,
+    }: {
+      notebookId: string;
+      force?: boolean;
+      timelineDays?: string;
+      instructions?: string;
+    }) => sourcesApi.generateLearningPath(notebookId, { force, timelineDays, instructions }),
     onMutate: async ({ notebookId }) => {
       // Optimistically update query cache immediately on click
       queryClient.setQueryData(['notebookArtifacts', notebookId], (old: any) => ({
@@ -271,8 +289,17 @@ export function useGenerateLearningPathMutation() {
 export function useGenerateFlashcardsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ notebookId, force, count }: { notebookId: string; force?: boolean; count?: number }) =>
-      sourcesApi.generateFlashcards(notebookId, { force, count }),
+    mutationFn: ({
+      notebookId,
+      force,
+      count,
+      instructions,
+    }: {
+      notebookId: string;
+      force?: boolean;
+      count?: number;
+      instructions?: string;
+    }) => sourcesApi.generateFlashcards(notebookId, { force, count, instructions }),
     onMutate: async ({ notebookId }) => {
       queryClient.setQueryData(['notebookArtifacts', notebookId], (old: any) => ({
         ...old,

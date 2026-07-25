@@ -8,11 +8,11 @@ import { SourceViewerDialog } from './SourceViewerDialog';
 import { PodcastScriptDialog, PodcastScript } from './PodcastScriptDialog';
 import { LearningPathDialog, LearningPath } from './LearningPathDialog';
 import { FlashcardsDialog, FlashcardSet } from './FlashcardsDialog';
+import { GenerationConfigDialog, ArtifactType, GenerationConfig } from './GenerationConfigDialog';
 import { Upload, FilePlus, FolderKanban, Sparkles, Radio, GitCommit, Layers, ChevronRight, Loader2, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-
 import { useUserProfileQuery } from '@/shared/hooks/useUserProfile';
 import { ProRequiredModal } from '@/shared/components/ProRequiredModal';
 
@@ -32,6 +32,11 @@ export function SourceList() {
   const [confirmReindexAllOpen, setConfirmReindexAllOpen] = useState(false);
   const [proRequiredOpen, setProRequiredOpen] = useState(false);
   const [proFeatureName, setProFeatureName] = useState('Re-creating AI Artifacts');
+
+  // ── Customization Dialog state ──
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configArtifactType, setConfigArtifactType] = useState<ArtifactType | null>(null);
+  const [configForce, setConfigForce] = useState(false);
 
   const { data: sources, isLoading, isError, error } = useSourcesQuery(activeNotebookId);
   const { data: artifacts } = useNotebookArtifactsQuery(activeNotebookId);
@@ -62,13 +67,49 @@ export function SourceList() {
   const flashcardsData = flashcardsArtifact?.data as FlashcardSet | null;
   const isFlashcardsGenerating = flashcardsStatus === 'GENERATING' || flashcardsMutation.isPending;
 
+  const isAnyArtifactGenerating = isPodcastGenerating || isPathGenerating || isFlashcardsGenerating;
+
+  const openConfigDialog = (type: ArtifactType, force: boolean) => {
+    setConfigArtifactType(type);
+    setConfigForce(force);
+    setConfigDialogOpen(true);
+  };
+
+  const handleConfigSubmit = (config: GenerationConfig) => {
+    if (!activeNotebookId) return;
+    setConfigDialogOpen(false);
+
+    if (configArtifactType === 'podcast') {
+      podcastMutation.mutate({
+        notebookId: activeNotebookId,
+        force: configForce,
+        podcastLength: config.podcastLength,
+        instructions: config.instructions,
+      });
+    } else if (configArtifactType === 'learningPath') {
+      learningPathMutation.mutate({
+        notebookId: activeNotebookId,
+        force: configForce,
+        timelineDays: config.timelineDays,
+        instructions: config.instructions,
+      });
+    } else if (configArtifactType === 'flashcards') {
+      flashcardsMutation.mutate({
+        notebookId: activeNotebookId,
+        force: configForce,
+        count: config.count,
+        instructions: config.instructions,
+      });
+    }
+  };
+
   // ── Podcast Actions ──
   const handlePodcastClick = () => {
     if (!activeNotebookId) return;
     if (podcastStatus === 'READY' && podcastData) {
       setPodcastOpen(true);
     } else if (!isPodcastGenerating) {
-      podcastMutation.mutate({ notebookId: activeNotebookId });
+      openConfigDialog('podcast', false);
     }
   };
 
@@ -80,7 +121,7 @@ export function SourceList() {
       return;
     }
     if (!activeNotebookId || isPodcastGenerating) return;
-    podcastMutation.mutate({ notebookId: activeNotebookId, force: true });
+    openConfigDialog('podcast', true);
   };
 
   // ── Learning Path Actions ──
@@ -89,7 +130,7 @@ export function SourceList() {
     if (pathStatus === 'READY' && pathData) {
       setLearningPathOpen(true);
     } else if (!isPathGenerating) {
-      learningPathMutation.mutate({ notebookId: activeNotebookId });
+      openConfigDialog('learningPath', false);
     }
   };
 
@@ -101,7 +142,7 @@ export function SourceList() {
       return;
     }
     if (!activeNotebookId || isPathGenerating) return;
-    learningPathMutation.mutate({ notebookId: activeNotebookId, force: true });
+    openConfigDialog('learningPath', true);
   };
 
   // ── Flashcards Actions ──
@@ -110,7 +151,7 @@ export function SourceList() {
     if (flashcardsStatus === 'READY' && flashcardsData) {
       setFlashcardsOpen(true);
     } else if (!isFlashcardsGenerating) {
-      flashcardsMutation.mutate({ notebookId: activeNotebookId, count: 15 });
+      openConfigDialog('flashcards', false);
     }
   };
 
@@ -122,23 +163,82 @@ export function SourceList() {
       return;
     }
     if (!activeNotebookId || isFlashcardsGenerating) return;
-    flashcardsMutation.mutate({ notebookId: activeNotebookId, force: true, count: 15 });
+    openConfigDialog('flashcards', true);
   };
 
   const handleFlashcardsRegenerate = (count: number) => {
     if (!activeNotebookId || isFlashcardsGenerating) return;
-    flashcardsMutation.mutate({ notebookId: activeNotebookId, force: true, count });
+    openConfigDialog('flashcards', true);
   };
 
-  const handleSelectSourceFromPath = (sourceTitle: string, timestamp?: string) => {
+  const [selectedExcerpt, setSelectedExcerpt] = useState<string | undefined>(undefined);
+
+  const handleSelectSourceFromPath = (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string) => {
     setLearningPathOpen(false);
     if (!sources || sources.length === 0) return;
-    const search = sourceTitle.toLowerCase().trim();
-    const match = sources.find((s) => {
-      const t = (s.title || '').toLowerCase();
-      const d = (s.displayName || '').toLowerCase();
-      return t.includes(search) || d.includes(search) || search.includes(t) || search.includes(d);
-    });
+
+    let match: any;
+
+    // Stage 1: Exact Source ID Match
+    if (sourceId) {
+      match = sources.find((s) => s.id === sourceId);
+    }
+
+    // Stage 2: Exact Title / DisplayName Match
+    if (!match && sourceTitle) {
+      const search = sourceTitle.toLowerCase().trim();
+      match = sources.find((s) => {
+        const t = (s.title || '').toLowerCase().trim();
+        const d = (s.displayName || '').toLowerCase().trim();
+        return t === search || d === search;
+      });
+    }
+
+    // Stage 3: Substring / Includes Title Match
+    if (!match && sourceTitle) {
+      const search = sourceTitle.toLowerCase().trim();
+      match = sources.find((s) => {
+        const t = (s.title || '').toLowerCase().trim();
+        const d = (s.displayName || '').toLowerCase().trim();
+        return (
+          (t.length > 0 && (t.includes(search) || search.includes(t))) ||
+          (d.length > 0 && (d.includes(search) || search.includes(d)))
+        );
+      });
+    }
+
+    // Stage 4: Word Token Overlap Match (smart fuzzy matching e.g. "Angular Developer Documentation" vs "Angular Guide")
+    if (!match && sourceTitle) {
+      const tokens = sourceTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !['source', 'document', 'guide', 'web', 'file', 'pdf'].includes(w));
+
+      if (tokens.length > 0) {
+        let bestCount = 0;
+        for (const s of sources) {
+          const combined = `${s.title || ''} ${s.displayName || ''}`.toLowerCase();
+          let count = 0;
+          for (const token of tokens) {
+            if (combined.includes(token)) count++;
+          }
+          if (count > bestCount) {
+            bestCount = count;
+            match = s;
+          }
+        }
+      }
+    }
+
+    // Stage 5: Excerpt text search across sources
+    if (!match && excerpt) {
+      const lowerExcerpt = excerpt.toLowerCase().trim();
+      match = sources.find((s) => {
+        const text = (s as any).rawText?.toLowerCase() || '';
+        return text.includes(lowerExcerpt);
+      });
+    }
 
     if (match) {
       setSelectedSourceId(match.id);
@@ -146,6 +246,7 @@ export function SourceList() {
       setSelectedSourceId(sources[0].id);
     }
     setSelectedTimestamp(timestamp);
+    setSelectedExcerpt(excerpt);
     setViewerOpen(true);
   };
 
@@ -210,7 +311,7 @@ export function SourceList() {
       </div>
 
       {/* Sources List */}
-      <div className="shrink-0 max-h-[55%] overflow-y-auto space-y-2 pr-1">
+      <div className="flex-1 min-h-[80px] overflow-y-auto space-y-1.5 pr-1">
         {isLoading ? (
           <div className="space-y-2">
             <Skeleton className="h-16 w-full rounded-xl" />
@@ -230,15 +331,15 @@ export function SourceList() {
             />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center p-8 border border-dashed border-border rounded-xl text-center space-y-3 bg-muted/20">
-            <FilePlus className="w-8 h-8 text-muted-foreground/50 stroke-1" />
-            <div className="space-y-1">
+          <div className="flex flex-col items-center justify-center p-6 border border-dashed border-border rounded-xl text-center space-y-2 bg-muted/20">
+            <FilePlus className="w-7 h-7 text-muted-foreground/50 stroke-1" />
+            <div className="space-y-0.5">
               <p className="text-xs font-medium text-foreground">No sources added yet</p>
               <p className="text-[11px] text-muted-foreground max-w-[200px]">
                 Upload PDFs, Markdown documents, audio/video files, or web links to train your AI.
               </p>
             </div>
-            <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setUploadModalOpen(true)}>
+            <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => setUploadModalOpen(true)}>
               <Upload className="w-3.5 h-3.5" />
               <span>Upload Knowledge Source</span>
             </Button>
@@ -246,9 +347,9 @@ export function SourceList() {
         )}
       </div>
 
-      {/* Quick Actions Section */}
+      {/* Quick Actions Section (Always Pinned at Bottom) */}
       {hasSources && (
-        <div className="pt-3 border-t border-border/60 space-y-2.5 shrink-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="pt-2 border-t border-border/60 space-y-2 shrink-0 flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between px-1 shrink-0">
             <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -256,7 +357,7 @@ export function SourceList() {
             </h4>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 overflow-y-auto pr-0.5">
+          <div className="grid grid-cols-1 gap-1.5 overflow-y-auto max-h-[220px] sm:max-h-none pr-0.5">
             {/* ── Audio Podcast Tile ── */}
             <PodcastTile
               status={podcastStatus}
@@ -299,6 +400,7 @@ export function SourceList() {
           sources={sources}
           initialSourceId={selectedSourceId}
           initialTimestamp={selectedTimestamp}
+          initialExcerpt={selectedExcerpt}
         />
       )}
 
@@ -316,7 +418,7 @@ export function SourceList() {
         onClose={() => setLearningPathOpen(false)}
         isGenerating={isPathGenerating}
         learningPath={pathData}
-        onSelectSource={handleSelectSourceFromPath}
+        sources={sources || []}
       />
 
       {/* Flashcards Dialog */}
@@ -326,6 +428,24 @@ export function SourceList() {
         isGenerating={isFlashcardsGenerating}
         flashcardSet={flashcardsData}
         onRegenerate={handleFlashcardsRegenerate}
+      />
+
+      {/* Generation Customization Config Dialog */}
+      <GenerationConfigDialog
+        isOpen={configDialogOpen}
+        onClose={() => setConfigDialogOpen(false)}
+        artifactType={configArtifactType}
+        isForce={configForce}
+        isGenerating={
+          configArtifactType === 'podcast'
+            ? isPodcastGenerating
+            : configArtifactType === 'learningPath'
+            ? isPathGenerating
+            : configArtifactType === 'flashcards'
+            ? isFlashcardsGenerating
+            : false
+        }
+        onSubmit={handleConfigSubmit}
       />
 
       {/* Pro Entitlement Required Dialog */}
@@ -412,7 +532,7 @@ function PodcastTile({
           : isGenerating
           ? 'bg-amber-500/20 text-amber-400'
           : isDone
-          ? 'bg-emerald-500/10 text-emerald-400'
+          ? 'bg-amber-500/15 text-amber-500'
           : isFailed
           ? 'bg-red-500/10 text-red-400'
           : 'bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-black'
@@ -430,7 +550,7 @@ function PodcastTile({
 
       <div className="space-y-0.5 min-w-0 flex-1">
         <div className={`text-xs font-semibold transition-colors flex items-center justify-between ${
-          isGenerating ? 'text-amber-400' : isDone ? 'text-emerald-400' : isFailed ? 'text-red-400' : 'text-foreground group-hover:text-amber-500'
+          isGenerating ? 'text-amber-400' : isDone ? 'text-amber-500 font-bold' : isFailed ? 'text-red-400' : 'text-foreground group-hover:text-amber-500'
         }`}>
           <span>
             {isGenerating ? 'Creating Podcast…' : isDone ? 'View Podcast' : isFailed ? 'Generation Failed' : 'Audio Podcast'}
@@ -500,7 +620,7 @@ function LearningTimelineTile({
           : isGenerating
           ? 'bg-cyan-500/20 text-cyan-400'
           : isDone
-          ? 'bg-emerald-500/10 text-emerald-400'
+          ? 'bg-cyan-500/15 text-cyan-400'
           : isFailed
           ? 'bg-red-500/10 text-red-400'
           : 'bg-cyan-500/10 text-cyan-400 group-hover:bg-cyan-500 group-hover:text-black'
@@ -518,7 +638,7 @@ function LearningTimelineTile({
 
       <div className="space-y-0.5 min-w-0 flex-1">
         <div className={`text-xs font-semibold transition-colors flex items-center justify-between ${
-          isGenerating ? 'text-cyan-400' : isDone ? 'text-emerald-400' : isFailed ? 'text-red-400' : 'text-foreground group-hover:text-cyan-400'
+          isGenerating ? 'text-cyan-400' : isDone ? 'text-cyan-400 font-bold' : isFailed ? 'text-red-400' : 'text-foreground group-hover:text-cyan-400'
         }`}>
           <span>
             {isGenerating ? 'Building Path…' : isDone ? 'View Learning Path' : isFailed ? 'Generation Failed' : 'Learning Timeline'}
@@ -589,7 +709,7 @@ function FlashcardsTile({
             : isGenerating
             ? 'bg-purple-500/20 text-purple-400'
             : isDone
-            ? 'bg-emerald-500/10 text-emerald-400'
+            ? 'bg-purple-500/15 text-purple-400'
             : isFailed
             ? 'bg-red-500/10 text-red-400'
             : 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500 group-hover:text-white'
@@ -612,7 +732,7 @@ function FlashcardsTile({
             isGenerating
               ? 'text-purple-400'
               : isDone
-              ? 'text-emerald-400'
+              ? 'text-purple-400 font-bold'
               : isFailed
               ? 'text-red-400'
               : 'text-foreground group-hover:text-purple-400'

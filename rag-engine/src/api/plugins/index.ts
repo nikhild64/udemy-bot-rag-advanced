@@ -102,11 +102,11 @@ export async function registerPlugins(app: FastifyInstance): Promise<void> {
     global: true,
     max: (req) => {
       const url = req.url || '';
-      // Strict limits for chat LLM execution and file uploads
-      if (url.includes('/chat')) return 30; // 30 req/min
-      if (url.includes('/upload')) return 20; // 20 req/min
-      if (url.includes('/notebooks')) return 60; // 60 req/min
-      return 120; // 120 req/min for general API calls
+      // Generous rate limits to allow parallel background operations, batch operations & status updates
+      if (url.includes('/chat')) return 120; // 120 req/min
+      if (url.includes('/upload')) return 100; // 100 req/min
+      if (url.includes('/notebooks')) return 400; // 400 req/min
+      return 500; // 500 req/min for general API calls
     },
     timeWindow: '1 minute',
     keyGenerator: (req) => {

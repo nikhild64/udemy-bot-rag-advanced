@@ -75,21 +75,28 @@ export const sourcesApi = {
     return apiClient.get(`/api/notebooks/${notebookId}/artifacts`);
   },
 
-  generatePodcast: async (notebookId: string, force: boolean = false): Promise<{ status: string; result?: any }> => {
-    return apiClient.post(`/api/notebooks/${notebookId}/generate/podcast`, { force });
+  generatePodcast: async (
+    notebookId: string,
+    options?: { force?: boolean; podcastLength?: string; instructions?: string }
+  ): Promise<{ status: string; result?: any }> => {
+    return apiClient.post(`/api/notebooks/${notebookId}/generate/podcast`, options || {});
   },
 
-  generateLearningPath: async (notebookId: string, force: boolean = false): Promise<{ status: string; result?: any }> => {
-    return apiClient.post(`/api/notebooks/${notebookId}/generate/learning-path`, { force });
+  generateLearningPath: async (
+    notebookId: string,
+    options?: { force?: boolean; timelineDays?: string; instructions?: string }
+  ): Promise<{ status: string; result?: any }> => {
+    return apiClient.post(`/api/notebooks/${notebookId}/generate/learning-path`, options || {});
   },
 
   generateFlashcards: async (
     notebookId: string,
-    options?: { force?: boolean; count?: number }
+    options?: { force?: boolean; count?: number; instructions?: string }
   ): Promise<{ status: string; result?: any }> => {
     return apiClient.post(`/api/notebooks/${notebookId}/generate/flashcards`, {
       force: options?.force ?? false,
       count: options?.count ?? 15,
+      instructions: options?.instructions,
     });
   },
 };

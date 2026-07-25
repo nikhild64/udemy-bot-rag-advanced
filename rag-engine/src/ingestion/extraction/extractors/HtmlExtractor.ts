@@ -82,7 +82,29 @@ export class HtmlExtractor implements IExtractor {
   }
 
   private extractMainContent(htmlStr: string): string {
-    let clean = htmlStr
+    // 1. Target <main>, <article>, or [role="main"] using stack-aware tag matching if present
+    let content =
+      this.findMatchingElementContent(htmlStr, 'main') ||
+      this.findMatchingElementContent(htmlStr, 'article') ||
+      this.findMatchingElementContent(htmlStr, 'body') ||
+      htmlStr;
+
+    // Ensure extracted content isn't empty
+    if (!content || content.trim().length < 50) {
+      content = htmlStr;
+    }
+
+    // Include <h1> heading from <header> if present outside <main>
+    const headerMatch = htmlStr.match(/<header[^>]*>([\s\S]*?)<\/header>/i);
+    if (headerMatch && headerMatch[1] && !content.includes(headerMatch[1])) {
+      const h1Match = headerMatch[1].match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i);
+      if (h1Match && h1Match[1]) {
+        content = `<h1>${h1Match[1]}</h1>\n` + content;
+      }
+    }
+
+    // 2. Strip non-content elements, scripts, styles, nav, aside, footer, buttons, forms, inputs
+    let clean = content
       .replace(/<head[\s\S]*?<\/head>/gi, '')
       .replace(/<script[\s\S]*?<\/script>/gi, '')
       .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -90,9 +112,17 @@ export class HtmlExtractor implements IExtractor {
       .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
       .replace(/<svg[\s\S]*?<\/svg>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/<header[\s\S]*?<\/header>/gi, '')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+      .replace(/<aside[\s\S]*?<\/aside>/gi, '')
       .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-      .replace(/<nav[\s\S]*?<\/nav>/gi, '');
+      .replace(/<button[\s\S]*?<\/button>/gi, '')
+      .replace(/<form[\s\S]*?<\/form>/gi, '')
+      .replace(/<select[\s\S]*?<\/select>/gi, '')
+      .replace(/<input[^>]*>/gi, '');
+
+    // Strip skip-to-content anchor tags specifically
+    clean = clean.replace(/<a[^>]*class=["'][^"']*\bskip-[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '');
+    clean = clean.replace(/<a[^>]*href=["']#main[^"']*["'][^>]*>[\s\S]*?<\/a>/gi, '');
 
     // Preserve structure by mapping headings and block elements to linebreaks
     clean = clean
@@ -101,6 +131,36 @@ export class HtmlExtractor implements IExtractor {
       .replace(/<\/(p|div|tr|br|section|article|li)>/gi, '\n');
 
     return clean;
+  }
+
+  private findMatchingElementContent(html: string, tagName: string): string | null {
+    const openTagRegex = new RegExp(`<${tagName}(?:\\s[^>]*)?>`, 'i');
+    const match = openTagRegex.exec(html);
+    if (!match) return null;
+
+    const startIndex = match.index + match[0].length;
+    let depth = 1;
+    const tagRegex = new RegExp(`</?${tagName}(?:\\s[^>]*)?>`, 'gi');
+    tagRegex.lastIndex = startIndex;
+
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(html)) !== null) {
+      if (m[0].startsWith('</')) {
+        depth--;
+        if (depth === 0) {
+          return html.substring(startIndex, m.index);
+        }
+      } else {
+        depth++;
+      }
+    }
+
+    const endMatch = new RegExp(`</${tagName}>`, 'i').exec(html.substring(startIndex));
+    if (endMatch) {
+      return html.substring(startIndex, startIndex + endMatch.index);
+    }
+
+    return null;
   }
 
   private cleanText(rawHtml?: string): string {
@@ -124,15 +184,23 @@ export class HtmlExtractor implements IExtractor {
       .replace(/document\s*\.\s*(?:querySelectorAll|querySelector|getElementById|addEventListener)[\s\S]*?\)\s*;?/gi, '')
       .replace(/localStorage\s*\.\s*(?:getItem|setItem)[\s\S]*?\)\s*;?/gi, '')
       .replace(/\/\/#\s*sourceURL=.*$/gm, '')
-      .replace(/Skip to content/gi, '');
+      .replace(/\b(arrow_back|expand_more|expand_less|chevron_right|chevron_left)\b/gi, '');
 
     // Clean whitespace and paragraph linebreaks
-    text = text
+    const lines = text
       .split('\n')
       .map((line) => line.replace(/[ \t]+/g, ' ').trim())
-      .filter((line) => line.length > 0)
-      .join('\n\n');
+      .filter((line) => line.length > 0);
 
-    return text.trim();
+    // Filter out boilerplate navigation noise lines and orphan bullets
+    const filteredLines = lines.filter((line) => {
+      const lower = line.toLowerCase();
+      if (lower.includes('skip to main content') || lower.includes('skip to content')) return false;
+      if (lower === 'menu docs' || lower === 'menu' || lower === 'menu docs •' || lower.startsWith('menu docs')) return false;
+      if (line === '•' || line === '-' || line === '*') return false;
+      return true;
+    });
+
+    return filteredLines.join('\n\n').trim();
   }
 }

@@ -1,8 +1,10 @@
-'use client';
-
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, GitCommit, Clock, BookOpen, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Download, GitCommit, Clock, BookOpen, CheckCircle2, ExternalLink, X, Columns } from 'lucide-react';
+import { SourceViewer } from './SourceViewer';
+import { Source } from '@/shared/types';
+import { cn } from '@/lib/utils';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -10,6 +12,8 @@ import { Download, GitCommit, Clock, BookOpen, CheckCircle2, ExternalLink } from
 
 export interface LearningSourceRef {
   title: string;
+  sourceId?: string;
+  excerpt?: string;
   timestamp?: string;
 }
 
@@ -34,7 +38,8 @@ interface LearningPathDialogProps {
   onClose: () => void;
   isGenerating: boolean;
   learningPath: LearningPath | null;
-  onSelectSource?: (sourceTitle: string, timestamp?: string) => void;
+  sources?: Source[];
+  onSelectSource?: (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string) => void;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -92,11 +97,13 @@ const STEP_COLORS = [
 function StepCard({
   step,
   isLast,
+  activeSelectedSource,
   onSelectSource,
 }: {
   step: LearningStep;
   isLast: boolean;
-  onSelectSource?: (sourceTitle: string, timestamp?: string) => void;
+  activeSelectedSource?: LearningSourceRef | null;
+  onSelectSource?: (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string) => void;
 }) {
   const color = STEP_COLORS[(step.order - 1) % STEP_COLORS.length];
 
@@ -148,30 +155,48 @@ function StepCard({
                 <BookOpen className={`w-3 h-3 ${color.text}`} />
                 <span>Attached Knowledge Sources</span>
               </span>
-              <div className="grid grid-cols-1 gap-1.5">
+              <div className="grid grid-cols-1 gap-1.5 w-full min-w-0">
                 {step.sources.map((src, i) => {
-                  const title = typeof src === 'string' ? src : src.title;
+                  const rawTitle = typeof src === 'string' ? src : src.title;
                   const tsRaw = typeof src === 'object' && src.timestamp ? src.timestamp : undefined;
-                  const displayTs = tsRaw || 'Full Video';
+                  const sourceId = typeof src === 'object' && src.sourceId ? src.sourceId : undefined;
+                  const excerpt = typeof src === 'object' && src.excerpt ? src.excerpt : undefined;
+                  const isFullDocOrVideo = !tsRaw || /full\s*(doc|document|video)/i.test(tsRaw);
+                  const displayTs = isFullDocOrVideo ? null : tsRaw;
+                  const title = rawTitle && rawTitle.trim().length > 0 ? rawTitle : (displayTs || 'Knowledge Source');
+
+                  const isSelected =
+                    activeSelectedSource &&
+                    ((sourceId && activeSelectedSource.sourceId === sourceId) ||
+                      (title && activeSelectedSource.title === title));
 
                   return (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => onSelectSource?.(title, tsRaw)}
-                      className="group/src flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-500/40 text-left transition-all duration-200 text-xs cursor-pointer w-full"
+                      data-source-id={sourceId}
+                      data-source-title={title}
+                      onClick={() => onSelectSource?.(title, tsRaw, sourceId, excerpt)}
+                      className={cn(
+                        "group/src flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left transition-all duration-200 text-xs cursor-pointer w-full min-w-0 max-w-full overflow-hidden",
+                        isSelected
+                          ? "bg-cyan-500/25 border-cyan-400 text-cyan-200 ring-1 ring-cyan-400/50 shadow-md"
+                          : "bg-white/5 hover:bg-cyan-500/15 border-white/10 hover:border-cyan-500/40"
+                      )}
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                         <BookOpen className={`w-3.5 h-3.5 ${color.text} shrink-0 group-hover/src:scale-110 transition-transform`} />
                         <span className="font-medium text-white/90 group-hover/src:text-cyan-300 truncate">
                           {title}
                         </span>
                       </div>
-                      <span className="shrink-0 px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5" />
-                        {displayTs}
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5 text-[#A9A9A9] group-hover/src:text-cyan-400 shrink-0 opacity-70 group-hover/src:opacity-100 transition-opacity" />
+                      {displayTs && displayTs !== title && (
+                        <span className="shrink-0 max-w-[130px] sm:max-w-[160px] truncate px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{displayTs}</span>
+                        </span>
+                      )}
+                      <ExternalLink className="w-3.5 h-3.5 text-[#A9A9A9] group-hover/src:text-cyan-400 shrink-0 opacity-70 group-hover/src:opacity-100 transition-opacity ml-1" />
                     </button>
                   );
                 })}
@@ -193,8 +218,85 @@ export function LearningPathDialog({
   onClose,
   isGenerating,
   learningPath,
+  sources = [],
   onSelectSource,
 }: LearningPathDialogProps) {
+  const [activeSelectedSource, setActiveSelectedSource] = useState<LearningSourceRef | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setActiveSelectedSource(null);
+    }
+  }, [isOpen]);
+
+  const handleSourceClick = (sourceTitle: string, timestamp?: string, sourceId?: string, excerpt?: string) => {
+    setActiveSelectedSource({ title: sourceTitle, timestamp, sourceId, excerpt });
+    onSelectSource?.(sourceTitle, timestamp, sourceId, excerpt);
+  };
+
+  const resolvedSourceId = useMemo(() => {
+    if (!activeSelectedSource || !sources || sources.length === 0) return null;
+
+    // 1. Exact Source ID Match
+    if (activeSelectedSource.sourceId) {
+      const match = sources.find((s) => s.id === activeSelectedSource.sourceId);
+      if (match) return match.id;
+    }
+
+    // 2. Exact Title / DisplayName Match
+    if (activeSelectedSource.title) {
+      const search = activeSelectedSource.title.toLowerCase().trim();
+      const match = sources.find((s) => {
+        const t = (s.title || '').toLowerCase().trim();
+        const d = (s.displayName || '').toLowerCase().trim();
+        return t === search || d === search;
+      });
+      if (match) return match.id;
+    }
+
+    // 3. Substring Match
+    if (activeSelectedSource.title) {
+      const search = activeSelectedSource.title.toLowerCase().trim();
+      const match = sources.find((s) => {
+        const t = (s.title || '').toLowerCase().trim();
+        const d = (s.displayName || '').toLowerCase().trim();
+        return (
+          (t.length > 0 && (t.includes(search) || search.includes(t))) ||
+          (d.length > 0 && (d.includes(search) || search.includes(d)))
+        );
+      });
+      if (match) return match.id;
+    }
+
+    // 4. Token Overlap Match
+    if (activeSelectedSource.title) {
+      const tokens = activeSelectedSource.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !['source', 'document', 'guide', 'web', 'file', 'pdf'].includes(w));
+
+      if (tokens.length > 0) {
+        let bestCount = 0;
+        let bestMatch: Source | null = null;
+        for (const s of sources) {
+          const combined = `${s.title || ''} ${s.displayName || ''}`.toLowerCase();
+          let count = 0;
+          for (const token of tokens) {
+            if (combined.includes(token)) count++;
+          }
+          if (count > bestCount) {
+            bestCount = count;
+            bestMatch = s;
+          }
+        }
+        if (bestMatch) return bestMatch.id;
+      }
+    }
+
+    return sources[0]?.id || null;
+  }, [activeSelectedSource, sources]);
+
   const handleDownload = () => {
     if (!learningPath) return;
     const lines: string[] = [
@@ -246,88 +348,167 @@ export function LearningPathDialog({
   return (
     <Dialog
       open={isOpen}
-      onOpenChange={(open) => !open && onClose()}
-      contentClassName="max-w-2xl w-full bg-[#141414] border border-[#2B2B2B] text-white p-0 overflow-hidden rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col"
+      onOpenChange={(open) => {
+        if (!open) {
+          setActiveSelectedSource(null);
+          onClose();
+        }
+      }}
+      contentClassName={cn(
+        "bg-[#141414] border border-[#2B2B2B] text-white p-0 overflow-hidden rounded-2xl shadow-2xl flex flex-col transition-all duration-300 gap-0",
+        activeSelectedSource
+          ? "w-[calc(100%-1rem)] sm:max-w-[96vw] lg:max-w-[94vw] h-[92dvh] sm:h-[88vh]"
+          : "max-w-2xl w-full max-h-[92dvh]"
+      )}
     >
-      {/* ── Header ── */}
-      <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#2B2B2B] shrink-0">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2.5 sm:gap-3 flex-1 min-w-0">
-            <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 shrink-0 mt-0.5">
-              <GitCommit className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="min-w-0">
-              <DialogTitle className="text-sm sm:text-base font-semibold text-white leading-tight truncate">
-                {isGenerating ? 'Building Learning Path…' : (learningPath?.title || 'Learning Path')}
-              </DialogTitle>
+      <div className={cn("flex flex-1 min-h-0 overflow-hidden", activeSelectedSource ? "flex-col md:flex-row" : "flex-col")}>
+        {/* ── Left Side: Learning Path Timeline ── */}
+        <div
+          className={cn(
+            "flex flex-col min-h-0 bg-[#141414] overflow-hidden",
+            activeSelectedSource
+              ? "w-full md:w-[380px] lg:w-[420px] shrink-0 border-b md:border-b-0 md:border-r border-[#2B2B2B] h-1/2 md:h-full"
+              : "w-full flex-1"
+          )}
+        >
+          {/* Header */}
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-[#2B2B2B] shrink-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5 sm:gap-3 flex-1 min-w-0">
+                <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 shrink-0 mt-0.5">
+                  <GitCommit className="w-4 h-4 text-cyan-400" />
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-sm sm:text-base font-semibold text-white leading-tight truncate">
+                    {isGenerating ? 'Building Learning Path…' : (learningPath?.title || 'Learning Path')}
+                  </DialogTitle>
+                  {learningPath && !isGenerating && (
+                    <p className="text-xs text-[#A9A9A9] mt-1 leading-relaxed line-clamp-2">
+                      {learningPath.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {learningPath && !isGenerating && (
-                <p className="text-xs text-[#A9A9A9] mt-1 leading-relaxed">
-                  {learningPath.description}
-                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownload}
+                  className="h-8 text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-cyan-500/50 shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Download</span>
+                </Button>
               )}
             </div>
-          </div>
 
-          {learningPath && !isGenerating && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleDownload}
-              className="h-8 text-xs gap-1.5 border-[#3A3A3A] text-[#A9A9A9] hover:text-white hover:border-cyan-500/50 shrink-0"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Download
-            </Button>
-          )}
+            {/* Meta row */}
+            {isGenerating && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-cyan-400">
+                <span className="flex gap-0.5">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
+                      style={{ animationDelay: `${i * 150}ms` }}
+                    />
+                  ))}
+                </span>
+                <span>Structuring your personalised learning roadmap…</span>
+              </div>
+            )}
+
+            {learningPath && !isGenerating && (
+              <div className="mt-3 flex items-center gap-4 text-[11px] text-[#A9A9A9]">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3 h-3 text-cyan-400" />
+                  <span className="text-cyan-400">{learningPath.estimatedTotalDuration}</span>
+                  <span>estimated</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <GitCommit className="w-3 h-3 text-cyan-400" />
+                  <span>{learningPath.steps.length} steps</span>
+                </div>
+              </div>
+            )}
+          </DialogHeader>
+
+          {/* Timeline Steps Container */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+            {isGenerating && !learningPath ? (
+              <LearningPathSkeleton />
+            ) : learningPath ? (
+              <div className="relative pl-2 pb-4">
+                {learningPath.steps.map((step, i) => (
+                  <StepCard
+                    key={step.order}
+                    step={step}
+                    isLast={i === learningPath.steps.length - 1}
+                    activeSelectedSource={activeSelectedSource}
+                    onSelectSource={handleSourceClick}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        {/* Meta row */}
-        {isGenerating && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-cyan-400">
-            <span className="flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
-                  style={{ animationDelay: `${i * 150}ms` }}
-                />
-              ))}
-            </span>
-            <span>Structuring your personalised learning roadmap…</span>
-          </div>
-        )}
+        {/* ── Right Side: Split View Source Viewer ── */}
+        {activeSelectedSource && (
+          <div className="flex-1 flex flex-col bg-background min-w-0 min-h-0 overflow-hidden relative border-t md:border-t-0 border-[#2B2B2B] h-1/2 md:h-full">
+            {/* Top Bar for Source Viewer */}
+            <div className="px-3 sm:px-4 py-2.5 border-b border-border bg-card/60 flex items-center justify-between shrink-0 gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
+                <h4 className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                  {activeSelectedSource.title}
+                </h4>
+                {activeSelectedSource.timestamp && !/full\s*(doc|document|video)/i.test(activeSelectedSource.timestamp) && (
+                  <span className="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono shrink-0">
+                    {activeSelectedSource.timestamp}
+                  </span>
+                )}
+              </div>
 
-        {learningPath && !isGenerating && (
-          <div className="mt-3 flex items-center gap-4 text-[11px] text-[#A9A9A9]">
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-3 h-3 text-cyan-400" />
-              <span className="text-cyan-400">{learningPath.estimatedTotalDuration}</span>
-              <span>estimated</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActiveSelectedSource(null)}
+                  className="h-7 text-xs gap-1 px-2 text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+                  title="Close Split View"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Close Reader</span>
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <GitCommit className="w-3 h-3 text-cyan-400" />
-              <span>{learningPath.steps.length} steps</span>
-            </div>
-          </div>
-        )}
-      </DialogHeader>
 
-      {/* ── Timeline content ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 max-h-[calc(85vh-160px)] space-y-4">
-        {isGenerating && !learningPath ? (
-          <LearningPathSkeleton />
-        ) : learningPath ? (
-          <div className="relative pl-2 pb-4">
-            {learningPath.steps.map((step, i) => (
-              <StepCard
-                key={step.order}
-                step={step}
-                isLast={i === learningPath.steps.length - 1}
-                onSelectSource={onSelectSource}
+            {/* Render Source Viewer */}
+            {resolvedSourceId ? (
+              <SourceViewer
+                key={`${resolvedSourceId}-${activeSelectedSource.timestamp || ''}-${activeSelectedSource.excerpt || ''}`}
+                sourceId={resolvedSourceId}
+                timestamp={activeSelectedSource.timestamp}
+                citation={
+                  activeSelectedSource.excerpt || activeSelectedSource.timestamp
+                    ? {
+                        sourceId: resolvedSourceId,
+                        excerpt: activeSelectedSource.excerpt,
+                        timestamp: activeSelectedSource.timestamp,
+                      }
+                    : undefined
+                }
+                className="h-full max-h-none"
               />
-            ))}
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground p-6">
+                Source document not found
+              </div>
+            )}
           </div>
-        ) : null}
+        )}
       </div>
     </Dialog>
   );

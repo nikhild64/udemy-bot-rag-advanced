@@ -122,10 +122,56 @@ export function useFavoriteNotebookMutation() {
   return useMutation({
     mutationFn: ({ id, isFavorite }: { id: string; isFavorite?: boolean }) =>
       notebooksApi.favoriteNotebook(id, isFavorite),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notebooks'] });
+    onMutate: async ({ id, isFavorite }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['notebooks'] });
+      await queryClient.cancelQueries({ queryKey: ['notebook', id] });
+
+      // Snapshot previous query data for rollback
+      const previousNotebooks = queryClient.getQueryData(['notebooks']);
+      const previousNotebook = queryClient.getQueryData(['notebook', id]);
+
+      // Optimistically update 'notebooks' array query cache
+      queryClient.setQueryData(['notebooks'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((nb: any) => {
+          if (nb.id === id) {
+            const nextFav = isFavorite !== undefined ? isFavorite : !nb.isFavorite;
+            return { ...nb, isFavorite: nextFav };
+          }
+          return nb;
+        });
+      });
+
+      // Optimistically update single 'notebook' query cache
+      queryClient.setQueryData(['notebook', id], (old: any) => {
+        if (!old) return old;
+        const nextFav = isFavorite !== undefined ? isFavorite : !old.isFavorite;
+        return { ...old, isFavorite: nextFav };
+      });
+
+      return { previousNotebooks, previousNotebook };
     },
-    onError: (err: any) => {
+    onSuccess: (updatedNotebook) => {
+      if (!updatedNotebook?.id) return;
+      // Directly confirm cache with authoritative server response (no refetch race condition)
+      queryClient.setQueryData(['notebooks'], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((nb: any) => (nb.id === updatedNotebook.id ? { ...nb, ...updatedNotebook } : nb));
+      });
+      queryClient.setQueryData(['notebook', updatedNotebook.id], (old: any) => {
+        if (!old) return old;
+        return { ...old, ...updatedNotebook };
+      });
+    },
+    onError: (err: any, { id }, context: any) => {
+      // Rollback to snapshot on error
+      if (context?.previousNotebooks) {
+        queryClient.setQueryData(['notebooks'], context.previousNotebooks);
+      }
+      if (context?.previousNotebook) {
+        queryClient.setQueryData(['notebook', id], context.previousNotebook);
+      }
       toast.error(err.message || 'Failed to toggle favorite status');
     },
   });

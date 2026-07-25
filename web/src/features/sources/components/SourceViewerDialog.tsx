@@ -11,11 +11,13 @@ interface SourceViewerDialogProps {
   sources: Source[];
   initialSourceId: string;
   initialTimestamp?: string;
+  initialExcerpt?: string;
 }
 
-export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, initialTimestamp }: SourceViewerDialogProps) {
+export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, initialTimestamp, initialExcerpt }: SourceViewerDialogProps) {
   const [activeSourceId, setActiveSourceId] = useState(initialSourceId);
   const [activeTimestamp, setActiveTimestamp] = useState<string | undefined>(initialTimestamp);
+  const [activeExcerpt, setActiveExcerpt] = useState<string | undefined>(initialExcerpt);
   const activeSourceRef = useRef<HTMLButtonElement>(null);
 
   // Update active source if initialSourceId changes or dialog opens
@@ -24,7 +26,8 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
       setActiveSourceId(initialSourceId);
     }
     setActiveTimestamp(initialTimestamp);
-  }, [initialSourceId, initialTimestamp, isOpen]);
+    setActiveExcerpt(initialExcerpt);
+  }, [initialSourceId, initialTimestamp, initialExcerpt, isOpen]);
 
   // Scroll active source into view
   useEffect(() => {
@@ -47,9 +50,11 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
       title.includes('youtube') ||
       !!source.metadata?.videoId;
 
-    if (type === 'YOUTUBE' || isYouTube || mime.includes('video')) {
+    if (type === 'ZIP' || type === 'ARCHIVE' || mime.includes('zip') || mime.includes('compressed') || title.endsWith('.zip')) {
+      return <HardDrive className="w-4 h-4 text-amber-400 shrink-0" />;
+    } else if (type === 'YOUTUBE' || isYouTube || mime.includes('video')) {
       return <Video className="w-4 h-4 text-blue-400 shrink-0" />;
-    } else if (type === 'WEBSITE' || type === 'URL' || (source.metadata?.url && !isYouTube)) {
+    } else if (type === 'WEBSITE' || type === 'URL') {
       return <Globe className="w-4 h-4 text-cyan-400 shrink-0" />;
     } else if (type === 'PDF' || mime.includes('pdf') || title.endsWith('.pdf')) {
       return <FileText className="w-4 h-4 text-red-400 shrink-0" />;
@@ -85,6 +90,8 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
                 return (
                   <button
                     key={src.id}
+                    id={`source-tile-${src.id}`}
+                    data-source-id={src.id}
                     ref={isActive ? activeSourceRef : null}
                     onClick={() => setActiveSourceId(src.id)}
                     className={cn(
@@ -120,8 +127,14 @@ export function SourceViewerDialog({ isOpen, onClose, sources, initialSourceId, 
         <div className="flex-1 flex flex-col bg-background min-w-0 min-h-0 overflow-hidden">
           {activeSourceId ? (
             <SourceViewer
+              key={`${activeSourceId}-${activeTimestamp || ''}-${activeExcerpt || ''}`}
               sourceId={activeSourceId}
               timestamp={activeSourceId === initialSourceId ? activeTimestamp : undefined}
+              citation={
+                activeSourceId === initialSourceId && (activeExcerpt || activeTimestamp)
+                  ? { sourceId: activeSourceId, excerpt: activeExcerpt, timestamp: activeTimestamp }
+                  : undefined
+              }
               className="h-full max-h-none"
             />
           ) : (

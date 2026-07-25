@@ -11,12 +11,18 @@ interface DropdownMenuProps {
   className?: string
 }
 
+const DropdownMenuContext = React.createContext<{ closeMenu: () => void }>({ closeMenu: () => {} })
+
 export function DropdownMenu({ trigger, children, align = "right", className }: DropdownMenuProps) {
   const [open, setOpen] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const [coords, setCoords] = React.useState<{ top: number; left?: number; right?: number }>({ top: 0 })
   const triggerRef = React.useRef<HTMLDivElement>(null)
   const menuRef = React.useRef<HTMLDivElement>(null)
+
+  const closeMenu = React.useCallback(() => {
+    setOpen(false)
+  }, [])
 
   React.useEffect(() => {
     setMounted(true)
@@ -78,25 +84,27 @@ export function DropdownMenu({ trigger, children, align = "right", className }: 
 
   const menuElement = open && mounted ? (
     createPortal(
-      <div
-        ref={menuRef}
-        style={{
-          position: "fixed",
-          top: `${coords.top}px`,
-          ...(coords.left !== undefined ? { left: `${coords.left}px` } : {}),
-          ...(coords.right !== undefined ? { right: `${coords.right}px` } : {}),
-        }}
-        className={cn(
-          "z-[99999] min-w-[11rem] overflow-hidden rounded-xl border border-border bg-card p-1.5 text-card-foreground shadow-2xl animate-in fade-in-80 zoom-in-95 backdrop-blur-xl",
-          className
-        )}
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(false)
-        }}
-      >
-        {children}
-      </div>,
+      <DropdownMenuContext.Provider value={{ closeMenu }}>
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: `${coords.top}px`,
+            ...(coords.left !== undefined ? { left: `${coords.left}px` } : {}),
+            ...(coords.right !== undefined ? { right: `${coords.right}px` } : {}),
+          }}
+          className={cn(
+            "z-[99999] min-w-[11rem] overflow-hidden rounded-xl border border-border bg-card p-1.5 text-card-foreground shadow-2xl animate-in fade-in-80 zoom-in-95 backdrop-blur-xl",
+            className
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen(false)
+          }}
+        >
+          {children}
+        </div>
+      </DropdownMenuContext.Provider>,
       document.body
     )
   ) : null
@@ -118,6 +126,8 @@ export function DropdownMenuItem({
   destructive = false,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { destructive?: boolean }) {
+  const { closeMenu } = React.useContext(DropdownMenuContext)
+
   return (
     <div
       className={cn(
@@ -125,7 +135,10 @@ export function DropdownMenuItem({
         destructive && "text-destructive hover:bg-destructive/10 hover:text-destructive",
         className
       )}
-      onClick={onClick}
+      onClick={(e) => {
+        closeMenu()
+        onClick?.(e)
+      }}
       {...props}
     >
       {children}

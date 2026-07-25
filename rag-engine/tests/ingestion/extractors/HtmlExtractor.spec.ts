@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { HtmlExtractor } from '@/ingestion/extraction/extractors/HtmlExtractor';
-import { RawContent } from '@/ingestion/loaders/RawContent';
+import { HtmlExtractor } from '../../../src/ingestion/extraction/extractors/HtmlExtractor';
+import { RawContent } from '../../../src/ingestion/loaders/RawContent';
 
 describe('HtmlExtractor', () => {
   it('should extract title, clean text, and metadata from RawContent HTML', async () => {
@@ -56,5 +56,90 @@ describe('HtmlExtractor', () => {
     expect(doc.title).toBe('Simple Page');
     expect(doc.content).toBe('Hello World from HTML!');
     expect(doc.metadata.fileName).toBe('page.html');
+  });
+
+  it('should strip navigation menus, sidebars, buttons, and skip links from doc pages', async () => {
+    const extractor = new HtmlExtractor();
+    const docHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head><title>Angular Directives</title></head>
+        <body>
+          <a href="#main" class="skip-to-content">Skip to main content menu</a>
+          <button>menu Docs</button>
+          <aside class="sidebar">
+            <ul>
+              <li>Introduction</li>
+              <li>What is Angular?</li>
+              <li>Installation</li>
+              <li>Directives</li>
+            </ul>
+          </aside>
+          <main>
+            <h1>Directives Overview</h1>
+            <p>Directives are classes that add additional behavior to elements in Angular applications.</p>
+            <h2>Attribute Directives</h2>
+            <p>Attribute directives change the appearance or behavior of an element.</p>
+          </main>
+          <footer>Copyright 2026</footer>
+        </body>
+      </html>
+    `;
+
+    const doc = await extractor.extract(docHtml, 'text/html', 'directives.html');
+
+    expect(doc.title).toBe('Angular Directives');
+    expect(doc.content).toContain('Directives Overview');
+    expect(doc.content).toContain('Directives are classes that add additional behavior to elements in Angular applications.');
+    expect(doc.content).not.toContain('Skip to main content');
+    expect(doc.content).not.toContain('menu Docs');
+    expect(doc.content).not.toContain('• Introduction');
+    expect(doc.content).not.toContain('• What is Angular?');
+  });
+
+  it('should preserve full body/article content with nested divs without wiping main text', async () => {
+    const extractor = new HtmlExtractor();
+    const complexHtml = `
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <title>Angular Signals - Guide</title>
+        </head>
+        <body>
+          <div class="navigation-drawer">
+            <nav>
+              <ul>
+                <li>• In-depth Guides</li>
+                <li>• Build with AI</li>
+                <li>• Developer Tools</li>
+              </ul>
+            </nav>
+          </div>
+          <main class="docs-main">
+            <div class="content-container">
+              <div class="article-wrapper">
+                <h1>Angular Signals Guide</h1>
+                <p>Angular Signals is a system that granularly tracks how and where your state is used throughout an application.</p>
+                <h2>Creating a Writable Signal</h2>
+                <p>Writable signals provide an API for updating their values directly using the set or update methods.</p>
+                <div class="code-block">
+                  <code>const count = signal(0); count.set(3);</code>
+                </div>
+              </div>
+            </div>
+          </main>
+        </body>
+      </html>
+    `;
+
+    const doc = await extractor.extract(complexHtml, 'text/html', 'signals.html');
+
+    expect(doc.title).toBe('Angular Signals - Guide');
+    expect(doc.content).toContain('Angular Signals Guide');
+    expect(doc.content).toContain('Angular Signals is a system that granularly tracks how and where your state is used');
+    expect(doc.content).toContain('Writable signals provide an API for updating their values directly');
+    expect(doc.content).toContain('const count = signal(0); count.set(3);');
+    expect(doc.content).not.toContain('• In-depth Guides');
+    expect(doc.content).not.toContain('• Build with AI');
   });
 });

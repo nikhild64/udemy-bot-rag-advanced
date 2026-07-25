@@ -283,7 +283,26 @@ export class NotebookChatOrchestrator {
     try {
       const notebook = await this.notebookService.getNotebook(notebookId, userId);
       const history = await this.messageService.getNotebookMessages(notebookId, userId, 6);
+      const currentMessageCount = history.length;
 
+      // 1. Check if suggested questions are already cached in notebook.settings for this chat state
+      const settings = (notebook.settings as Record<string, any>) || {};
+      const cached = settings.suggestedQuestions;
+
+      if (
+        cached &&
+        Array.isArray(cached.questions) &&
+        cached.questions.length > 0 &&
+        cached.lastMessageCount === currentMessageCount
+      ) {
+        logger.info(
+          { notebookId, count: currentMessageCount, questionsCount: cached.questions.length },
+          '[SuggestedQuestions] Returning cached suggested questions for notebook',
+        );
+        return cached.questions;
+      }
+
+      // 2. Generate contextual suggested questions via LLM
       let contextPrompt = '';
       if (history.length > 0) {
         const conversationText = history
@@ -315,10 +334,27 @@ export class NotebookChatOrchestrator {
       const parsed = JSON.parse(jsonMatch[0]);
 
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+        const questions = parsed
           .map((q: any) => String(q).trim())
           .filter((q: string) => q.length > 0)
           .slice(0, 4);
+
+        // 3. Cache generated suggested questions into notebook.settings
+        try {
+          const updatedSettings = {
+            ...settings,
+            suggestedQuestions: {
+              questions,
+              lastMessageCount: currentMessageCount,
+              updatedAt: new Date().toISOString(),
+            },
+          };
+          await this.notebookService.updateNotebook(notebookId, userId, { settings: updatedSettings });
+        } catch (saveErr: any) {
+          logger.warn({ notebookId, err: saveErr?.message }, '[SuggestedQuestions] Failed to save questions in notebook settings');
+        }
+
+        return questions;
       }
     } catch (err) {
       logger.warn({ notebookId, err }, 'Failed to generate LLM suggested questions, falling back to default suggestions');

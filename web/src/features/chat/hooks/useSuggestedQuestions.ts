@@ -6,6 +6,6 @@ export function useSuggestedQuestionsQuery(notebookId: string | null, messagesCo
     queryKey: ['suggestedQuestions', notebookId, messagesCount],
     queryFn: () => (notebookId ? chatApi.getSuggestedQuestions(notebookId) : []),
     enabled: !!notebookId,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }

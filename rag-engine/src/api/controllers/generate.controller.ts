@@ -15,10 +15,98 @@ import fs from 'fs';
 // Shared helpers
 // ─────────────────────────────────────────────
 
+function parseLlmJsonResponse<T = any>(raw: string): T {
+  if (!raw || typeof raw !== 'string') {
+    throw new Error('Empty or invalid response from AI model');
+  }
+
+  let cleaned = raw.trim();
+
+  // Find outermost JSON brackets
+  const firstBrace = cleaned.search(/[\{\[]/);
+  const lastBrace = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  } else {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+
+  // Attempt 1: Standard JSON parse
+  try {
+    return JSON.parse(cleaned);
+  } catch (err1: any) {
+    logger.warn({ error: err1.message }, '[Generate] Initial JSON.parse failed, attempting auto-repair...');
+
+    // Attempt 2: Strip trailing commas before closing braces/brackets and invalid control chars
+    let repaired = cleaned
+      .replace(/,\s*([\}\]])/g, '$1')
+      .replace(/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+    try {
+      return JSON.parse(repaired);
+    } catch (err2: any) {
+      // Attempt 3: Escape raw unescaped linebreaks inside string values
+      const stringSanitized = repaired.replace(/(?<="[^"]*)\n(?=[^"]*")/g, '\\n');
+      try {
+        return JSON.parse(stringSanitized);
+      } catch (err3: any) {
+        // Attempt 4: Truncation Repair for truncated JSON array of objects (e.g. Flashcards / Podcast / Learning Path steps)
+        // 4a. Strip the incomplete trailing object element from an array
+        let truncatedFixed = stringSanitized.replace(/,\s*\{[^\}]*$/g, '').replace(/,\s*"[^"]*"?:?\s*"?[^"]*$/g, '');
+
+        // 4b. Balance unclosed braces & brackets
+        let openBraces = (truncatedFixed.match(/\{/g) || []).length - (truncatedFixed.match(/\}/g) || []).length;
+        let openBrackets = (truncatedFixed.match(/\[/g) || []).length - (truncatedFixed.match(/\]/g) || []).length;
+
+        while (openBrackets > 0) {
+          truncatedFixed += ']';
+          openBrackets--;
+        }
+        while (openBraces > 0) {
+          truncatedFixed += '}';
+          openBraces--;
+        }
+
+        try {
+          const parsed = JSON.parse(truncatedFixed);
+          logger.info('[Generate] Successfully auto-repaired truncated JSON response by trimming incomplete element');
+          return parsed;
+        } catch (err4: any) {
+          // 4c. Fallback: Close string quote if truncated inside string value
+          let quoteFixed = stringSanitized;
+          if ((quoteFixed.match(/"/g) || []).length % 2 !== 0) {
+            quoteFixed += '"';
+          }
+          openBraces = (quoteFixed.match(/\{/g) || []).length - (quoteFixed.match(/\}/g) || []).length;
+          openBrackets = (quoteFixed.match(/\[/g) || []).length - (quoteFixed.match(/\]/g) || []).length;
+
+          while (openBrackets > 0) {
+            quoteFixed += ']';
+            openBrackets--;
+          }
+          while (openBraces > 0) {
+            quoteFixed += '}';
+            openBraces--;
+          }
+
+          try {
+            return JSON.parse(quoteFixed);
+          } catch (err5: any) {
+            logger.error({ raw: raw.slice(0, 500), error: err5.message }, '[Generate] All JSON repair attempts failed');
+            throw err1;
+          }
+        }
+      }
+    }
+  }
+}
+
 async function buildNotebookSourceContext(
   notebookId: string,
   userId: string,
   notebookTitle: string = '',
+  customInstructions?: string,
 ): Promise<string> {
   const sourceService = new SourceService();
   const sources = await sourceService.listSources(notebookId, userId);
@@ -39,22 +127,30 @@ async function buildNotebookSourceContext(
     .join(' ');
   const baseContextQuery = `${notebookTitle} ${sourceTitles}`.trim();
 
-  // Multi-query parallel retrieval targeting 3 complementary semantic perspectives
+  // Multi-query parallel retrieval targeting complementary semantic perspectives
   const query1 = `${baseContextQuery} key concepts core definitions overview summary main ideas`.trim();
   const query2 = `${baseContextQuery} technical details architecture workflow step by step mechanics`.trim();
   const query3 = `${baseContextQuery} important takeaways trade-offs edge cases examples insights`.trim();
 
   try {
     const retriever = new DenseNotebookRetriever();
-    const [results1, results2, results3] = await Promise.all([
+    const retrievalPromises: Promise<any[]>[] = [
       retriever.retrieve(query1, { notebookId, userId, query: query1, candidateLimit: 12 }),
       retriever.retrieve(query2, { notebookId, userId, query: query2, candidateLimit: 12 }),
       retriever.retrieve(query3, { notebookId, userId, query: query3, candidateLimit: 12 }),
-    ]);
+    ];
+
+    if (customInstructions) {
+      retrievalPromises.push(
+        retriever.retrieve(customInstructions, { notebookId, userId, query: customInstructions, candidateLimit: 15 })
+      );
+    }
+
+    const queryResults = await Promise.all(retrievalPromises);
 
     // Merge and deduplicate by chunkId
     const chunkMap = new Map<string, any>();
-    [...results1, ...results2, ...results3].forEach((chunk) => {
+    queryResults.flat().forEach((chunk) => {
       if (chunk && chunk.chunkId && !chunkMap.has(chunk.chunkId)) {
         chunkMap.set(chunk.chunkId, chunk);
       }
@@ -64,15 +160,24 @@ async function buildNotebookSourceContext(
 
     if (uniqueChunks.length > 0) {
       logger.info(
-        { notebookId, totalDeduplicatedChunks: uniqueChunks.length },
+        { notebookId, totalDeduplicatedChunks: uniqueChunks.length, targetedSearch: !!customInstructions },
         '[Generate] Multi-query vector retrieval completed successfully',
       );
 
+      const sourceIdMap = new Map<string, string>();
+      readySources.forEach((s: any) => {
+        const dTitle = s.displayName || s.title || 'Knowledge Source';
+        if (s.id) sourceIdMap.set(s.id, dTitle);
+      });
+
       return uniqueChunks
         .map((chunk, i) => {
-          const title = (chunk.metadata?.sourceTitle || chunk.sourceName || chunk.metadata?.title || 'Source Chunk') as string;
+          const matchedTitle = chunk.sourceId ? sourceIdMap.get(chunk.sourceId) : undefined;
+          const rawTitle = (chunk.metadata?.sourceTitle || chunk.sourceName || chunk.metadata?.title) as string;
+          const title = (matchedTitle && matchedTitle !== 'Web Source' && matchedTitle !== 'Source Chunk') ? matchedTitle : (rawTitle && rawTitle !== 'Web Source' ? rawTitle : 'Knowledge Source');
+          const srcIdStr = chunk.sourceId ? ` (Source ID: "${chunk.sourceId}")` : '';
           const location = chunk.page ? ` (Page ${chunk.page})` : chunk.metadata?.pageNumber ? ` (Page ${chunk.metadata.pageNumber})` : '';
-          return `[Excerpt ${i + 1}] Source: "${title}"${location}\nContent: ${chunk.text}`;
+          return `[Excerpt ${i + 1}] Source: "${title}"${srcIdStr}${location}\nContent: ${chunk.text}`;
         })
         .join('\n\n');
     }
@@ -198,8 +303,10 @@ export async function generatePodcastController(
   const { notebookId } = request.params as { notebookId: string };
   if (!notebookId) throw new ValidationError('Notebook ID is required');
 
-  const body = (request.body as { force?: boolean }) || {};
+  const body = (request.body as { force?: boolean; podcastLength?: 'short' | 'medium' | 'long'; instructions?: string }) || {};
   const force = !!body.force;
+  const podcastLength = body.podcastLength || 'medium';
+  const instructions = body.instructions?.trim();
 
   // Non-Pro entitlement check for forced re-creation
   if (force) {
@@ -246,9 +353,19 @@ export async function generatePodcastController(
   // Spawn background generation
   (async () => {
     try {
-      logger.info({ notebookId, userId }, '[Generate] Background podcast generation started');
-      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title);
-      const userPrompt = `Notebook: "${notebook.title}"\n\nSource Knowledge Base:\n${sourceContext}\n\nInstructions:\nCreate a captivating podcast episode that starts with a warm welcome and an intriguing real-life scenario or fact. Progressively increase the difficulty from foundational concepts to advanced technical nuances. Ensure a natural collaborative conversation between Alex and Jamie that covers all key takeaways from the sources.`;
+      logger.info({ notebookId, userId, podcastLength, hasInstructions: !!instructions }, '[Generate] Background podcast generation started');
+      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+
+      let turnCountGuidance = 'Produce 20–32 dialogue turns.';
+      if (podcastLength === 'short') {
+        turnCountGuidance = 'Produce 10–15 dialogue turns (concise, snappy overview).';
+      } else if (podcastLength === 'long') {
+        turnCountGuidance = 'Produce 40–50 dialogue turns (deep dive with detailed technical explorations).';
+      }
+
+      const customReq = instructions ? `\n\nSpecific User Request / Target Focus Area:\n"${instructions}"\nEnsure the conversation specifically addresses and prioritizes this user request.` : '';
+
+      const userPrompt = `Notebook: "${notebook.title}"\n\nSource Knowledge Base:\n${sourceContext}${customReq}\n\nInstructions:\nCreate a captivating podcast episode that starts with a warm welcome and an intriguing real-life scenario or fact. Progressively increase the difficulty from foundational concepts to advanced technical nuances. Ensure a natural collaborative conversation between Alex and Jamie that covers key takeaways from the sources.\nLength Requirement: ${turnCountGuidance}`;
 
       const chatProvider = ChatProviderFactory.create();
       const response = await chatProvider.generateResponse(
@@ -256,12 +373,11 @@ export async function generatePodcastController(
           { role: ChatRole.SYSTEM, content: PODCAST_SYSTEM_PROMPT },
           { role: ChatRole.USER, content: userPrompt },
         ],
-        { task: 'chat', maxTokens: 3500 },
+        { task: 'chat', maxTokens: podcastLength === 'long' ? 5000 : 3500 },
       );
 
       const raw = response.message.content.trim();
-      const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      const podcastData = JSON.parse(cleaned);
+      const podcastData = parseLlmJsonResponse(raw);
 
       // Synthesize audio MP3 if cloud TTS provider is configured — wait for completion before READY
       const ttsProvider = (process.env.TTS_PROVIDER || 'web_speech').toLowerCase();
@@ -334,14 +450,16 @@ const LEARNING_PATH_SYSTEM_PROMPT = `You are an expert curriculum designer and e
 Your task is to generate a structured, progressive learning path based on the provided notebook sources.
 
 Rules:
-1. Order topics from foundational → advanced
-2. Each step must be actionable and specific — not vague
+1. Order topics from foundational → advanced.
+2. Each step must be actionable and specific — not vague.
 3. Attach the relevant source(s) to each step. For each source attached, include:
    - "title": exact source title matching one of the available sources
-   - "timestamp": time range (e.g. "05:12 - 14:30") or "Full Video" / "Full Document" if the whole source applies.
-4. Include realistic time estimates per step
-5. The path should have 4–8 steps total
-6. ONLY return valid JSON — no markdown fences, no extra text
+   - "sourceId": exact Source ID string matching the excerpt's Source ID
+   - "excerpt": 1-2 sentence verbatim passage directly copied from the source content that supports this step
+   - "timestamp": specific excerpt location, page number, section header, or timestamp range (e.g. "Page 4–8", "Section 2.1", "05:12–14:30", "Chapter 3"). NEVER output generic phrases like "Full Video" or "Full Document". Always cite specific page numbers, section headers, or timestamp ranges from the source excerpts.
+4. Calculate realistic, practical study hours per step based on actual material depth. For a multi-day timeframe (e.g. 3 days or 7 days), divide time practically across days (e.g. 1.5–3 focused study hours per day proportional to content complexity). Do NOT unrealistically assign 8+ hours a day to small or introductory concepts.
+5. The path should have 4–8 steps total.
+6. ONLY return valid JSON — no markdown fences, no extra text. Ensure all quotes inside JSON property values are properly escaped.
 
 Output format (strict JSON):
 {
@@ -357,7 +475,9 @@ Output format (strict JSON):
       "sources": [
         {
           "title": "Source title here",
-          "timestamp": "05:12 - 14:30"
+          "sourceId": "Source ID string",
+          "excerpt": "Verbatim quote snippet from source",
+          "timestamp": "Page 4–8"
         }
       ],
       "keyOutcomes": ["Outcome 1", "Outcome 2"]
@@ -375,8 +495,10 @@ export async function generateLearningPathController(
   const { notebookId } = request.params as { notebookId: string };
   if (!notebookId) throw new ValidationError('Notebook ID is required');
 
-  const body = (request.body as { force?: boolean }) || {};
+  const body = (request.body as { force?: boolean; timelineDays?: string; instructions?: string }) || {};
   const force = !!body.force;
+  const timelineDays = body.timelineDays || '7 days';
+  const instructions = body.instructions?.trim();
 
   // Non-Pro entitlement check for forced re-creation
   if (force) {
@@ -418,9 +540,12 @@ export async function generateLearningPathController(
   // Spawn background generation
   (async () => {
     try {
-      logger.info({ notebookId, userId }, '[Generate] Background learning path generation started');
-      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title);
-      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Sources:\n${sourceContext}\n\nGenerate a progressive learning path that guides someone from beginner to confident in the topics covered by these sources.`;
+      logger.info({ notebookId, userId, timelineDays, hasInstructions: !!instructions }, '[Generate] Background learning path generation started');
+      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+
+      const customReq = instructions ? `\n\nSpecific User Target Focus Area:\n"${instructions}"\nPrioritize topics matching this request.` : '';
+
+      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Sources:\n${sourceContext}${customReq}\n\nPreparation Timeframe Constraint:\nThe user has ${timelineDays} to prepare. Create a practical, realistic learning path formatted for a ${timelineDays} timeframe. Divide total learning hours realistically and proportionally across the available material scope (e.g. 1.5–3 focused study hours per day rather than arbitrary 8-hour blocks). Ensure every step links to specific page numbers, section headers, or timestamp ranges from the sources.`;
 
       const chatProvider = ChatProviderFactory.create();
       const response = await chatProvider.generateResponse(
@@ -432,8 +557,7 @@ export async function generateLearningPathController(
       );
 
       const raw = response.message.content.trim();
-      const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      const learningPathData = JSON.parse(cleaned);
+      const learningPathData = parseLlmJsonResponse(raw);
 
       const latestNotebook = await notebookService.getNotebook(notebookId, userId);
       const latestSettings = (latestNotebook.settings as Record<string, any>) || {};
@@ -483,12 +607,12 @@ const FLASHCARDS_SYSTEM_PROMPT = `You are a master educator specializing in effe
 Your task is to generate a set of high-quality study flashcards based strictly on the provided notebook sources.
 
 Rules:
-1. Generate clear, concise, and engaging flashcards covering key concepts, definitions, architecture, key trade-offs, and critical insights.
+1. Generate clear, concise, and engaging flashcards (keep 'front' prompts direct [1 sentence] and 'back' explanations clear and focused [1–3 sentences maximum]).
 2. Each flashcard must have a "front" (Question / Prompt / Concept) and a "back" (Clear, complete Answer / Explanation).
 3. Attach a category/tag to each card (e.g. "Concept", "Definition", "Architecture", "Best Practice").
 4. Provide an optional brief "hint" for cards where helpful.
 5. Generate the exact number of flashcards requested by the user prompt.
-6. ONLY return valid JSON — no markdown code fences, no extra text.
+6. ONLY return valid JSON — no markdown code fences, no extra text. Ensure all quotes within JSON string values are properly escaped.
 
 Output JSON Schema:
 {
@@ -515,9 +639,10 @@ export async function generateFlashcardsController(
   const { notebookId } = request.params as { notebookId: string };
   if (!notebookId) throw new ValidationError('Notebook ID is required');
 
-  const body = (request.body as { force?: boolean; count?: number }) || {};
+  const body = (request.body as { force?: boolean; count?: number; instructions?: string }) || {};
   const force = !!body.force;
   const count = body.count && body.count > 0 ? body.count : 15;
+  const instructions = body.instructions?.trim();
 
   // Non-Pro entitlement check for forced re-creation
   if (force) {
@@ -559,9 +684,12 @@ export async function generateFlashcardsController(
   // Spawn background generation
   (async () => {
     try {
-      logger.info({ notebookId, userId, count }, '[Generate] Background flashcards generation started');
-      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title);
-      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Knowledge Base Sources:\n${sourceContext}\n\nGenerate exactly ${count} interactive study flashcards covering key definitions, core concepts, edge cases, and insights from these sources.`;
+      logger.info({ notebookId, userId, count, hasInstructions: !!instructions }, '[Generate] Background flashcards generation started');
+      const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+
+      const customReq = instructions ? `\n\nSpecific User Target Focus Area:\n"${instructions}"\nEnsure generated flashcards prioritize and test knowledge around this request.` : '';
+
+      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Knowledge Base Sources:\n${sourceContext}${customReq}\n\nGenerate exactly ${count} interactive study flashcards covering key definitions, core concepts, edge cases, and insights from these sources. Keep 'back' answers concise (1-3 sentences maximum).`;
 
       const chatProvider = ChatProviderFactory.create();
       const response = await chatProvider.generateResponse(
@@ -569,12 +697,11 @@ export async function generateFlashcardsController(
           { role: ChatRole.SYSTEM, content: FLASHCARDS_SYSTEM_PROMPT },
           { role: ChatRole.USER, content: userPrompt },
         ],
-        { task: 'chat', maxTokens: 3500 },
+        { task: 'chat', maxTokens: count > 15 ? 7000 : 5000 },
       );
 
       const raw = response.message.content.trim();
-      const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      const flashcardData = JSON.parse(cleaned);
+      const flashcardData = parseLlmJsonResponse(raw);
 
       const latestNotebook = await notebookService.getNotebook(notebookId, userId);
       const latestSettings = (latestNotebook.settings as Record<string, any>) || {};

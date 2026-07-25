@@ -204,15 +204,17 @@ export function ChatContainer() {
         {/* Input Form Footer */}
         <div className="p-3 sm:p-3.5 border-t border-[#2B2B2B] bg-[#1A1A1A]/90 backdrop-blur-md">
           <div className="max-w-3xl mx-auto space-y-1.5">
-            <div className={`relative chat-input-box p-0.5 ${!hasReadySources ? 'opacity-60 cursor-not-allowed bg-[#141414]' : ''}`}>
+            <div className={`relative chat-input-box p-0.5 ${(isLoadingSources || isLoadingMessages || !hasReadySources) ? 'opacity-60 cursor-not-allowed bg-[#141414]' : ''}`}>
               <textarea
                 ref={textareaRef}
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={!hasReadySources || isStreaming}
+                disabled={isLoadingSources || isLoadingMessages || !hasReadySources || isStreaming}
                 placeholder={
-                  !hasSources
+                  isLoadingSources || isLoadingMessages
+                    ? 'Loading notebook knowledge sources...'
+                    : !hasSources
                     ? 'Upload at least one knowledge source to enable chat...'
                     : isIndexingSources
                     ? 'Processing sources... Chat will be enabled when indexing completes.'
@@ -225,16 +227,27 @@ export function ChatContainer() {
               <button
                 className="chat-send-btn absolute right-2.5 bottom-2 h-7 w-7 flex items-center justify-center disabled:opacity-40"
                 onClick={handleSend}
-                disabled={!inputQuery.trim() || isStreaming || !hasReadySources}
-                title={!hasReadySources ? 'Knowledge sources required' : 'Send Message'}
+                disabled={isLoadingSources || isLoadingMessages || !inputQuery.trim() || isStreaming || !hasReadySources}
+                title={isLoadingSources || isLoadingMessages ? 'Loading sources...' : !hasReadySources ? 'Knowledge sources required' : 'Send Message'}
               >
-                {!hasReadySources ? <Lock className="w-3 h-3" /> : <Send className="w-3.5 h-3.5" />}
+                {isLoadingSources || isLoadingMessages ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : !hasReadySources ? (
+                  <Lock className="w-3 h-3" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-[#A9A9A9] px-1">
               <span className="flex items-center gap-1.5">
-                {!hasReadySources ? (
+                {isLoadingSources || isLoadingMessages ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#F2A23A]" />
+                    <span>Loading workspace knowledge sources...</span>
+                  </>
+                ) : !hasReadySources ? (
                   <>
                     <Lock className="w-3.5 h-3.5 text-amber-500/70" />
                     <span>
@@ -250,7 +263,9 @@ export function ChatContainer() {
                   </>
                 )}
               </span>
-              {hasReadySources && <span className="hidden sm:inline">Press Enter to send, Shift+Enter for new line</span>}
+              {!isLoadingSources && !isLoadingMessages && hasReadySources && (
+                <span className="hidden sm:inline">Press Enter to send, Shift+Enter for new line</span>
+              )}
             </div>
           </div>
         </div>

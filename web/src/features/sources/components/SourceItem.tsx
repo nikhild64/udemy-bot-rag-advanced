@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { Source } from '@/shared/types';
 import { cn } from '@/lib/utils';
 import {
-  useSourceStatusQuery,
   useDeleteSourceMutation,
   useReindexSourceMutation,
   useRetrySourceMutation,
@@ -46,7 +45,6 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
   const [metadataDrawerOpen, setMetadataDrawerOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
-  const { data: liveStatus } = useSourceStatusQuery(source.id, source.status);
   const deleteMutation = useDeleteSourceMutation(notebookId);
   const reindexMutation = useReindexSourceMutation(notebookId);
   const retryMutation = useRetrySourceMutation(notebookId);
@@ -64,16 +62,16 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
   }, [reindexMutation.isPending, retryMutation.isPending, isForcedQueued]);
 
   useEffect(() => {
-    const s = liveStatus?.status;
+    const s = source.status;
     if (s && s !== 'Ready' && s !== 'Failed') {
       setIsForcedQueued(false);
     }
-  }, [liveStatus?.status]);
+  }, [source.status]);
 
   const isOptimisticQueued = isForcedQueued || reindexMutation.isPending || retryMutation.isPending;
-  const currentStatus = isOptimisticQueued ? 'Queued' : (liveStatus?.status || source.status);
-  const progress = isOptimisticQueued ? 0 : (liveStatus?.progress ?? (currentStatus === 'Ready' ? 100 : 0));
-  const currentStage = isOptimisticQueued ? 'Queued for processing' : (liveStatus?.currentStage || '');
+  const currentStatus = isOptimisticQueued ? 'Queued' : source.status;
+  const progress = isOptimisticQueued ? 0 : ((source as any).progress ?? (currentStatus === 'Ready' ? 100 : 0));
+  const currentStage = isOptimisticQueued ? 'Queued for processing' : ((source as any).currentStage || '');
 
   const isProcessing = ['Downloading', 'Extracting', 'Normalizing', 'Chunking', 'Embedding', 'Indexing'].includes(currentStatus);
   const isQueuedOrProcessing = isProcessing || currentStatus === 'Queued' || currentStatus === 'Uploading' || currentStatus === 'Uploaded';
@@ -100,9 +98,11 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
     const title = source.title.toLowerCase();
     const type = String(source.type || '').toUpperCase();
 
-    if (type === 'YOUTUBE' || isYouTube || mime.includes('video') || title.includes('youtube')) {
+    if (type === 'ZIP' || type === 'ARCHIVE' || mime.includes('zip') || mime.includes('compressed') || title.endsWith('.zip')) {
+      return <HardDrive className="w-4 h-4 text-amber-400 shrink-0" />;
+    } else if (type === 'YOUTUBE' || isYouTube || mime.includes('video') || title.includes('youtube')) {
       return <Video className="w-4 h-4 text-blue-400 shrink-0" />;
-    } else if (type === 'WEBSITE' || type === 'URL' || (source.metadata?.url && !isYouTube)) {
+    } else if (type === 'WEBSITE' || type === 'URL') {
       return <Globe className="w-4 h-4 text-cyan-400 shrink-0" />;
     } else if (type === 'PDF' || mime.includes('pdf') || title.endsWith('.pdf')) {
       return <FileText className="w-4 h-4 text-red-400 shrink-0" />;
@@ -144,7 +144,7 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
     <>
       <div 
         className={cn(
-          "p-3 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-2 group",
+          "p-2.5 bg-card/60 hover:bg-card border border-border/80 rounded-xl transition-all space-y-1.5 group",
           onOpenViewer && !isAnyMutationPending && "cursor-pointer hover:border-primary/50",
           (currentStatus === 'Deleting' || deleteMutation.isPending) && "opacity-60 pointer-events-none"
         )}
@@ -262,9 +262,9 @@ export function SourceItem({ source, notebookId, onOpenViewer }: SourceItemProps
           </div>
         )}
 
-        {liveStatus?.error && (
+        {((source as any).error || (source as any).errorMessage) && (
           <p className="text-[11px] text-destructive bg-destructive/10 p-1.5 rounded">
-            {liveStatus.error}
+            {(source as any).error || (source as any).errorMessage}
           </p>
         )}
       </div>

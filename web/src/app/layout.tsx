@@ -15,6 +15,11 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "ChaibookLM",
   description: "AI-powered notebook and knowledge assistant with grounded citations",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
