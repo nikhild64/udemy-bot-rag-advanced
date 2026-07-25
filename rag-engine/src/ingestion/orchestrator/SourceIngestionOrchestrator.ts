@@ -223,7 +223,16 @@ export class SourceIngestionOrchestrator {
       await this.updateProgress(sourceId, 'Chunking', 60, 'Processing', currentJobId, notebookId);
       await this.sourceRepository.updateStatus(sourceId, 'Chunking' as any);
 
-      const { pageTexts: _pageTexts, ...documentMetadata } = extractedDoc.metadata as Record<string, any>;
+      const {
+        pageTexts: _pageTexts,
+        rawText: _rawText,
+        fullText: _fullText,
+        content: _content,
+        body: _body,
+        buffer: _buffer,
+        info: _info,
+        ...documentMetadata
+      } = (extractedDoc.metadata as Record<string, any>) || {};
       const baseChunkMetadata = {
         title: finalTitle,
         displayName: finalTitle,
@@ -348,7 +357,19 @@ export class SourceIngestionOrchestrator {
 
       // Upsert fresh vectors
       const chunkModels = embeddingResult.embeddedChunks.map((ec) => {
-        const { courseId: _c, moduleId: _m, lessonId: _l, ...otherMeta } = ec.metadata;
+        const {
+          courseId: _c,
+          moduleId: _m,
+          lessonId: _l,
+          rawText: _rt,
+          fullText: _ft,
+          pageTexts: _pt,
+          content: _cnt,
+          body: _bd,
+          buffer: _bf,
+          info: _inf,
+          ...otherMeta
+        } = ec.metadata;
         return {
           id: ec.id,
           text: ec.text,

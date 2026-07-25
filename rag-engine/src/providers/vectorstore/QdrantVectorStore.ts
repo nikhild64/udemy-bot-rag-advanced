@@ -121,19 +121,35 @@ export class QdrantVectorStore implements VectorStore {
     const points = chunks.map((chunk, i) => {
       const vector = embeddings[i]!;
       const meta = (chunk.metadata ?? {}) as Record<string, any>;
+
+      // Explicit allowlist: store ONLY small chunk-specific scalar fields.
+      // Do NOT spread arbitrary unknown metadata keys that could contain full-document blobs.
       const payload: Record<string, unknown> = {
-        ...meta,
-        courseId: meta.courseId ?? (chunk as any).courseId ?? meta.notebookId ?? 'knowledge-base',
-        courseTitle: meta.courseTitle ?? meta.title ?? 'Knowledge Base',
-        moduleId: meta.moduleId ?? (chunk as any).moduleId ?? meta.courseId ?? 'module-1',
-        moduleTitle: meta.moduleTitle ?? meta.courseTitle ?? 'Knowledge Module',
-        lessonId: meta.lessonId ?? (chunk as any).lessonId ?? meta.sourceId ?? chunk.id,
-        lessonTitle: meta.lessonTitle ?? meta.displayName ?? meta.title ?? 'Source Document',
-        transcriptFile: meta.transcriptFile ?? meta.storagePath ?? meta.fileUrl ?? '',
-        startTime: meta.startTime ?? (chunk as any).startTime ?? 0,
-        endTime: meta.endTime ?? (chunk as any).endTime ?? 0,
-        text: chunk.text,
         chunkId: chunk.id,
+        text: chunk.text,
+        content: chunk.text,
+        notebookId: meta.notebookId ?? (chunk as any).notebookId ?? meta.courseId ?? 'knowledge-base',
+        sourceId: meta.sourceId ?? (chunk as any).sourceId ?? meta.lessonId ?? chunk.id,
+        chunkIndex: typeof meta.chunkIndex === 'number' ? meta.chunkIndex : (chunk as any).chunkIndex ?? i,
+
+        title: meta.title ?? meta.displayName ?? 'Source Document',
+        displayName: meta.displayName ?? meta.title ?? 'Source Document',
+        sourceType: meta.sourceType ?? 'document',
+
+        courseId: meta.courseId ?? meta.notebookId ?? 'knowledge-base',
+        courseTitle: meta.courseTitle ?? meta.title ?? 'Knowledge Base',
+        moduleId: meta.moduleId ?? meta.courseId ?? 'module-1',
+        moduleTitle: meta.moduleTitle ?? meta.courseTitle ?? 'Knowledge Module',
+        lessonId: meta.lessonId ?? meta.sourceId ?? chunk.id,
+        lessonTitle: meta.lessonTitle ?? meta.displayName ?? meta.title ?? 'Source Document',
+
+        transcriptFile: meta.transcriptFile ?? meta.storagePath ?? meta.fileUrl ?? '',
+        startTime: typeof meta.startTime === 'number' ? meta.startTime : typeof meta.startChar === 'number' ? meta.startChar : 0,
+        endTime: typeof meta.endTime === 'number' ? meta.endTime : typeof meta.endChar === 'number' ? meta.endChar : 0,
+        page: typeof meta.page === 'number' ? meta.page : typeof meta.pageNumber === 'number' ? meta.pageNumber : null,
+        timestamp: typeof meta.timestamp === 'number' ? meta.timestamp : null,
+        section: typeof meta.section === 'string' ? meta.section : null,
+        heading: typeof meta.heading === 'string' ? meta.heading : null,
       };
 
       return {
@@ -259,11 +275,16 @@ export class QdrantVectorStore implements VectorStore {
 
     const startTime = Date.now();
     const validIds = ids.map((id) => toValidQdrantId(id));
+    const BATCH_SIZE = 500;
+
     try {
-      await this.client.delete(name, {
-        wait: true,
-        points: validIds,
-      });
+      for (let i = 0; i < validIds.length; i += BATCH_SIZE) {
+        const batch = validIds.slice(i, i + BATCH_SIZE);
+        await this.client.delete(name, {
+          wait: true,
+          points: batch,
+        });
+      }
       const durationMs = Date.now() - startTime;
       logger.info({ collectionName: name, idsCount: ids.length, durationMs }, 'Delete vectors completed');
       return true;
