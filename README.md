@@ -175,24 +175,3 @@ pnpm dev
 | `pnpm ingest` / `index` | Runs complete end-to-end ingestion pipeline into Qdrant |
 | `pnpm search` | Runs test CLI vector retrieval queries against Qdrant |
 | `pnpm test` | Runs the Vitest automated unit and integration test suite |
-
----
-
-## 💯 Evaluation Alignment Matrix
-
-| Evaluation Parameter | Marks | ChaibookLM Implementation Details |
-| :--- | :---: | :--- |
-| **1. Notebook Management** | **10** | Multiple notebook CRUD, strict Qdrant `notebookId` isolation, clean Bento Grid UX. |
-| **2. Source Ingestion** | **10** | Full ingestion for PDF, Text, Web URL, YouTube, VTT. Status badges (`INDEXING`, `READY`), delete & re-index support. |
-| **3. RAG Pipeline** | **20** | Hierarchical chunking, high-dimensional vector embeddings, Qdrant search, Query transformations, CRAG gate, LLM Reranking. |
-| **4. AI Responses** | **15** | Grounded responses, Fastify SSE real-time streaming, structured prompt engineering, CRAG hallucination defense. |
-| **5. Citations & Attribution** | **15** | Interactive inline citation badges `[Citation ID]` linking directly to exact source chunks and timestamps. |
-| **6. Architecture & Quality** | **10** | Monorepo structure, strict TypeScript 5, Zod schema validation, Fastify v5, Next.js 16, Pino logger. |
-| **7. UI & UX** | **10** | Bento Grid layout, dark paper theme with orange accents, loading & empty states, smooth transitions. |
-| **8. Documentation** | **10** | Detailed `README.md` with system overview, setup guide, CLI tools, and architecture Mermaid diagrams. |
-| **9. Bonus Features** | **Bonus** | 🎙️ **AI Audio Podcast Generator** (2-speaker TTS studio) & 🛣️ **Personalized Concept Learning Roadmap**. |
-
----
-
-## 📄 License
-Distributed under the MIT License. See `LICENSE` for details.
