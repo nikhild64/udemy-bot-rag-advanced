@@ -1,3 +1,5 @@
+Demo Video - https://youtu.be/JzcnfSoynQY
+Project deployed at : https://chaibooklm.vercel.app/
 # 📚 ChaibookLM — AI-Powered Research & Knowledge Assistant
 
 An advanced, production-ready Retrieval-Augmented Generation (RAG) knowledge engine inspired by **Gemini Notebook / NotebookLM**. ChaibookLM allows users to create isolated notebook workspaces, ingest multi-format knowledge sources (PDF, Plain Text, Websites, YouTube videos, VTT transcripts), ask natural language questions with real-time streaming, receive grounded answers with precise inline citations, inspect sources in interactive viewers, and generate audio podcasts and personalized learning roadmaps.
