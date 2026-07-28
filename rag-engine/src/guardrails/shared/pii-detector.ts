@@ -36,10 +36,6 @@ export class PiiDetector {
       regex: /\b[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}\b/g,
     },
     {
-      type: 'URL',
-      regex: /https?:\/\/[^\s]+/gi,
-    },
-    {
       type: 'JWT',
       regex: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
     },

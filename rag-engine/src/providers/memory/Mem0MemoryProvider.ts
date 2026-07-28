@@ -88,10 +88,7 @@ export class Mem0MemoryProvider implements MemoryProvider {
         body: JSON.stringify({
           messages: options.messages,
           user_id: options.userId,
-          infer: true,
-          custom_prompt:
-            "Extract ONLY explicit user preferences, personal facts, skill level, tech stack choices, or direct instructions (e.g. 'I prefer Python', 'I work as a developer', 'Keep answers concise'). Do NOT extract general Q&A questions or one-off topic queries like 'What is Docker?'. If no user facts exist, return no memories.",
-        }),
+          infer: true}),
       });
 
       if (!response.ok) {

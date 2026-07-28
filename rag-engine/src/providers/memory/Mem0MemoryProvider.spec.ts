@@ -78,7 +78,7 @@ describe('Mem0MemoryProvider', () => {
           user_id: 'user_123',
           infer: true,
           custom_prompt:
-            "Extract ONLY explicit user preferences, personal facts, skill level, tech stack choices, or direct instructions (e.g. 'I prefer Python', 'I work as a developer', 'Keep answers concise'). Do NOT extract general Q&A questions or one-off topic queries like 'What is Docker?'. If no user facts exist, return no memories.",
+            "Extract ONLY explicit personal facts, tech stack, skill level, learning goals, or preferences ABOUT THE USER (e.g. 'User wants to master Angular', 'User prefers TypeScript', 'User works as a frontend engineer'). Absolutely DO NOT extract what the AI assistant suggested, recommended, or explained. Never store assistant advice or general Q&A summaries. Focus strictly on the USER's profile, stated goals, and preferences. If no user facts exist, return no memories.",
         }),
       })
     );
