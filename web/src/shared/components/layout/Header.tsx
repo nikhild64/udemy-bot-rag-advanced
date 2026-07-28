@@ -1,5 +1,4 @@
-"use client"
-
+import React, { useState } from 'react';
 import { useUIStore } from '@/shared/lib/store';
 import { useNotebookQuery, useDuplicateNotebookMutation, useArchiveNotebookMutation, useFavoriteNotebookMutation } from '@/features/notebooks/hooks/useNotebooks';
 import { useAdminStatusQuery } from '@/features/admin/hooks/useAdminLogs';
@@ -17,6 +16,7 @@ import {
   Star,
   Archive,
   Terminal,
+  Brain,
 } from 'lucide-react';
 
 import { useUserProfileQuery } from '@/shared/hooks/useUserProfile';
@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useRouter } from 'next/navigation';
+import { UserMemoryModal } from '@/features/memory/components/UserMemoryModal';
 
 interface HeaderProps {
   hideSidebarToggle?: boolean;
@@ -61,6 +62,7 @@ export function Header({
     router.push('/');
   };
 
+  const [memoryModalOpen, setMemoryModalOpen] = useState(false);
   const mobileSidebarOpen = useUIStore((s) => s.mobileSidebarOpen);
   const toggleMobileSidebar = useUIStore((s) => s.toggleMobileSidebar);
   const mobileSourcesPanelOpen = useUIStore((s) => s.mobileSourcesPanelOpen);
@@ -248,6 +250,16 @@ export function Header({
         <Button
           size="icon"
           variant="ghost"
+          className="h-8 w-8 text-muted-foreground hover:text-[#F2A23A]"
+          onClick={() => setMemoryModalOpen(true)}
+          title="AI Personal Memory"
+        >
+          <Brain className="w-4 h-4" />
+        </Button>
+
+        <Button
+          size="icon"
+          variant="ghost"
           className="h-8 w-8 text-muted-foreground hover:text-foreground"
           onClick={() => setSettingsModalOpen(true)}
           title="Settings"
@@ -303,6 +315,9 @@ export function Header({
           ) : null}
         </div>
       </div>
+
+      {/* User Personal Memory Engine Modal */}
+      <UserMemoryModal open={memoryModalOpen} onOpenChange={setMemoryModalOpen} />
     </header>
   );
 }

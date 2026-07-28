@@ -1,5 +1,6 @@
 import { RetrievedChunk } from '../../retrieval/RetrievalResult';
 import { Citation } from '../../retrieval/Citation';
+import { MemoryItem } from '../contracts/memory-provider.contract';
 
 /**
  * Represents an event emitted during chat streaming.
@@ -16,6 +17,7 @@ export type ChatStreamEvent =
  */
 export interface ChatRequest {
   readonly query: string;
+  readonly userId?: string;
   readonly topK?: number;
   readonly filters?: Record<string, unknown>;
   readonly metadata?: Record<string, unknown>;
@@ -28,6 +30,7 @@ export interface ChatPipelineResponse {
   readonly answer: string;
   readonly citations?: Citation[];
   readonly retrievedChunks?: RetrievedChunk[];
+  readonly memories?: MemoryItem[];
   readonly metadata?: Record<string, unknown>;
 }
 

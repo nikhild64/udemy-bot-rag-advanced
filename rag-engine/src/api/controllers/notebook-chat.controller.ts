@@ -3,8 +3,10 @@ import { Readable } from 'stream';
 import { NotebookChatOrchestrator } from '@/chat/notebook/NotebookChatOrchestrator';
 import { NotebookChatOptions } from '@/chat/notebook/types';
 import { MessageService } from '@/services/MessageService';
+import { NotebookService } from '@/services/NotebookService';
 import { notebookChatBodySchema } from '../schemas/notebook-chat.schema';
 import { UnauthorizedError, ValidationError } from '@/shared/errors';
+import { logger } from '@/shared/logger';
 
 export async function postNotebookChatController(
   request: FastifyRequest,
@@ -155,6 +157,23 @@ export async function deleteNotebookMessageController(
     request.server.messageService || new MessageService();
 
   const deletedCount = await messageService.deleteMessageAndSubsequent(messageId, targetNotebookId, userId);
+
+  // Clear cached suggested questions in notebook.settings so new questions are regenerated for updated chat state
+  try {
+    const notebookService = new NotebookService();
+    const notebook = await notebookService.getNotebook(targetNotebookId, userId);
+    const settings = (notebook.settings as Record<string, any>) || {};
+    if (settings.suggestedQuestions) {
+      await notebookService.updateNotebook(targetNotebookId, userId, {
+        settings: {
+          ...settings,
+          suggestedQuestions: null,
+        },
+      });
+    }
+  } catch (err: any) {
+    logger.warn({ err: err?.message, notebookId: targetNotebookId }, 'Failed to clear suggestedQuestions cache on message deletion');
+  }
 
   await reply.status(200).send({
     success: true,

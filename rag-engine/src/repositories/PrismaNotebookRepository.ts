@@ -57,20 +57,41 @@ export class PrismaNotebookRepository implements INotebookRepository {
       where.isFavorite = query.isFavorite;
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.notebook.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          _count: {
-            select: { sources: true, messages: true },
+    const fetchNotebooks = async () => {
+      const [data, total] = await Promise.all([
+        this.prisma.notebook.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            _count: {
+              select: { sources: true, messages: true },
+            },
           },
-        },
-      }),
-      this.prisma.notebook.count({ where }),
-    ]);
+        }),
+        this.prisma.notebook.count({ where }),
+      ]);
+      return { data, total };
+    };
+
+    let data: any[];
+    let total: number;
+
+    try {
+      const result = await fetchNotebooks();
+      data = result.data;
+      total = result.total;
+    } catch (err: any) {
+      if (err.code === 'P1001' || err.message?.includes("Can't reach database server")) {
+        await new Promise((res) => setTimeout(res, 1000));
+        const result = await fetchNotebooks();
+        data = result.data;
+        total = result.total;
+      } else {
+        throw err;
+      }
+    }
 
     const totalPages = Math.ceil(total / limit);
 

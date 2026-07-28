@@ -94,7 +94,7 @@ describe('ChatPipelineService', () => {
     expect(mockQueryTransformationStrategy.transform).toHaveBeenCalledWith('test query');
     expect(mockRetrievalService.search).toHaveBeenCalledWith(expect.objectContaining({ query: 'transformed query' }));
     expect(mockRerankerProvider.rerank).toHaveBeenCalledWith(expect.objectContaining({ query: 'transformed query', chunks: expect.any(Array) }));
-    expect(mockPromptBuilderService.buildPrompt).toHaveBeenCalledWith({ query: 'test query', chunks: expect.any(Array) });
+    expect(mockPromptBuilderService.buildPrompt).toHaveBeenCalledWith(expect.objectContaining({ query: 'test query', chunks: expect.any(Array) }));
     expect(mockChatProvider.generateResponse).toHaveBeenCalled();
     expect(mockOutputGuardService.validateAndSanitize).toHaveBeenCalled();
 

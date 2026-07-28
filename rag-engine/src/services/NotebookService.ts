@@ -29,7 +29,7 @@ export class NotebookService {
         isArchived: false,
         limit: 100,
       });
-      if (activeNotebooks.data.length >= 1) {
+      if ((activeNotebooks?.data?.length ?? 0) >= 1) {
         throw new ForbiddenError('Free account notebook limit reached (max 1 notebook). Contact admin to increase the limit.');
       }
     }

@@ -1,33 +1,44 @@
 import { Message, MessageRole } from '@prisma/client';
 import { ChatMessage } from '@/core/models';
+import { MemoryItem } from '@/core/contracts/memory-provider.contract';
 import { ChatRole } from '@/types';
+import { formatUserMemories } from '@/prompts/templates';
 
 export interface BuildNotebookPromptOptions {
   query: string;
   context: string;
   history?: Message[];
   notebookTitle?: string;
+  memories?: readonly MemoryItem[];
 }
 
 export class NotebookPromptBuilder {
-  public static readonly SYSTEM_PROMPT = `You are an intelligent AI Notebook Assistant. Your goal is to answer the user's questions based strictly on the retrieved Notebook context provided below.
+  public static readonly SYSTEM_PROMPT = `You are a helpful, intelligent AI Assistant. Answer the user's questions directly, naturally, and conversationally based on the provided Notebook knowledge context.
 
 Rules for response generation:
-1. Rely exclusively on the provided Notebook context to construct your answer. Do NOT hallucinate information or rely on external knowledge.
-2. Maintain a clear, factual, helpful, and concise tone.
-3. If the provided context does not contain the answer, simply state that the information is not available in the notebook sources. Do NOT invent an answer or list "missing context".
-4. Do NOT attempt to format or generate citation tags manually; citations are attached automatically by the retrieval engine based on source verification.
-5. Use plain markdown for formatting when appropriate.`;
+1. Speak naturally, warmly, and helpfully. Answer the question immediately without preamble.
+2. CRITICAL: Do NOT start your responses with robotic meta-disclaimers such as "Based on the provided notebook context...", "According to the retrieved context...", or "Based on the notebook sources...". Simply provide the factual answer directly.
+3. Rely strictly on the provided Notebook context for facts. Do NOT hallucinate information or rely on unverified external knowledge.
+4. If the provided context does not contain the answer, politely state that the information is not available in your notebook sources.
+5. Do NOT attempt to format or generate citation tags manually; citations are verified and attached automatically by the system.
+6. Use clean, plain markdown for formatting when appropriate.`;
 
   /**
    * Builds the formatted ChatMessage array to pass to the ChatProvider.
    */
   public buildPrompt(options: BuildNotebookPromptOptions): ChatMessage[] {
-    const { query, context, history = [], notebookTitle } = options;
+    const { query, context, history = [], notebookTitle, memories = [] } = options;
 
-    const systemPromptText = notebookTitle
+    let systemPromptText = notebookTitle
       ? `${NotebookPromptBuilder.SYSTEM_PROMPT}\n\nCurrent Notebook Context: "${notebookTitle}"`
       : NotebookPromptBuilder.SYSTEM_PROMPT;
+
+    if (memories && memories.length > 0) {
+      const formattedMemories = formatUserMemories(memories);
+      if (formattedMemories) {
+        systemPromptText += `\n\n${formattedMemories}`;
+      }
+    }
 
     const messages: ChatMessage[] = [
       {

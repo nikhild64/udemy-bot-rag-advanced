@@ -12,6 +12,7 @@ import { preferenceRoutes } from './preferences.routes';
 import { cleanupRoutes } from './cleanup.routes';
 import { youtubeRoutes } from './youtube.routes';
 import { adminRoutes } from './admin.routes';
+import { memoryRoutes } from './memory.routes';
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(healthRoutes);
@@ -27,5 +28,6 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(dashboardRoutes);
   await app.register(preferenceRoutes);
   await app.register(cleanupRoutes);
+  await app.register(memoryRoutes);
 }
 

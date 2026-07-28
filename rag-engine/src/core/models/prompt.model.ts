@@ -1,4 +1,5 @@
 import { RetrievedChunk } from '../../retrieval/RetrievalResult';
+import { MemoryItem } from '../contracts/memory-provider.contract';
 
 /**
  * Request to build a prompt using retrieved context.
@@ -6,6 +7,7 @@ import { RetrievedChunk } from '../../retrieval/RetrievalResult';
 export interface PromptBuildRequest {
   readonly query: string;
   readonly chunks: readonly RetrievedChunk[];
+  readonly memories?: readonly MemoryItem[];
 }
 
 /**

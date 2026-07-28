@@ -10,6 +10,9 @@ import { ChatProviderFactory } from '@/providers/chat/ChatProviderFactory';
 import { InputGuardService } from '@/guardrails/input/InputGuardService';
 import { OutputGuardService } from '@/guardrails/output/OutputGuardService';
 import { guardrailsConfig } from '@/config/guardrails';
+import { MemoryProvider, MemoryItem } from '@/core/contracts/memory-provider.contract';
+import { Mem0MemoryProvider } from '@/providers/memory/Mem0MemoryProvider';
+import { config } from '@/config';
 import { ChatRole } from '@/types';
 import { ValidationError, AppError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
@@ -28,6 +31,7 @@ export class NotebookChatOrchestrator {
   private readonly sourceService: SourceService;
   private readonly inputGuardService: InputGuardService;
   private readonly outputGuardService: OutputGuardService;
+  private readonly memoryProvider?: MemoryProvider;
 
   constructor(
     notebookService?: NotebookService,
@@ -38,6 +42,7 @@ export class NotebookChatOrchestrator {
     sourceService?: SourceService,
     inputGuardService?: InputGuardService,
     outputGuardService?: OutputGuardService,
+    memoryProvider?: MemoryProvider,
   ) {
     this.notebookService = notebookService ?? new NotebookService();
     this.messageService = messageService ?? new MessageService();
@@ -47,6 +52,7 @@ export class NotebookChatOrchestrator {
     this.sourceService = sourceService ?? new SourceService();
     this.inputGuardService = inputGuardService ?? new InputGuardService(guardrailsConfig);
     this.outputGuardService = outputGuardService ?? new OutputGuardService(guardrailsConfig);
+    this.memoryProvider = memoryProvider ?? new Mem0MemoryProvider(config.memory);
   }
 
   /**
@@ -86,16 +92,31 @@ export class NotebookChatOrchestrator {
     });
     const retrievalDurationMs = Math.round(performance.now() - startRetrieval);
 
-    // 4. Fetch Message History & Build Prompt
+    // 4. Fetch Message History & Personal Memories
     const history = await this.messageService.getNotebookMessages(notebookId, userId, 10);
     // Exclude the current user message from history array to prevent duplicate inclusion
     const conversationHistory = history.filter((msg) => msg.id !== userMessage.id);
+
+    let userMemories: MemoryItem[] = [];
+    if (this.memoryProvider && userId) {
+      userMemories = await this.memoryProvider
+        .search({
+          query,
+          userId,
+          topK: config.memory?.topK || 5,
+        })
+        .catch((err) => {
+          logger.warn({ err, userId }, 'User memory search failed in NotebookChatOrchestrator');
+          return [];
+        });
+    }
 
     const messages = this.promptBuilder.buildPrompt({
       query,
       context: retrievalResult.context,
       history: conversationHistory,
       notebookTitle: notebook.title,
+      memories: userMemories,
     });
 
     // 5. Invoke LLM Chat Provider
@@ -104,7 +125,7 @@ export class NotebookChatOrchestrator {
     try {
       const providerOptions: ChatProviderOptions = {
         task: 'chat',
-        maxTokens: options.maxTokens ?? 1500,
+        maxTokens: options.maxTokens ?? 4096,
         ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
       };
       aiResponse = await this.chatProvider.generateResponse(messages, providerOptions);
@@ -115,6 +136,21 @@ export class NotebookChatOrchestrator {
     const completionDurationMs = Math.round(performance.now() - startCompletion);
 
     const answerContent = aiResponse.message.content;
+
+    // Async Non-Blocking Memory Consolidation
+    if (this.memoryProvider && userId && answerContent) {
+      this.memoryProvider
+        .add({
+          userId,
+          messages: [
+            { role: 'user', content: query },
+            { role: 'assistant', content: answerContent },
+          ],
+        })
+        .catch((err) => {
+          logger.warn({ err, userId }, 'Background memory extraction failed in NotebookChatOrchestrator');
+        });
+    }
 
     logger.info(
       {
@@ -223,23 +259,38 @@ export class NotebookChatOrchestrator {
         yield { type: 'citation', data: citation };
       }
 
-      // 5. Fetch Message History & Build Prompt
+      // 5. Fetch Message History & Personal Memories
       const history = await this.messageService.getNotebookMessages(notebookId, userId, 10);
       const conversationHistory = history.filter((msg) => msg.id !== userMessage.id);
+
+      let userMemories: MemoryItem[] = [];
+      if (this.memoryProvider && userId) {
+        userMemories = await this.memoryProvider
+          .search({
+            query,
+            userId,
+            topK: config.memory?.topK || 5,
+          })
+          .catch((err) => {
+            logger.warn({ err, userId }, 'User memory search failed in NotebookChatOrchestrator stream');
+            return [];
+          });
+      }
 
       const messages = this.promptBuilder.buildPrompt({
         query,
         context: retrievalResult.context,
         history: conversationHistory,
         notebookTitle: notebook.title,
+        memories: userMemories,
       });
 
       // 6. Invoke LLM Chat Provider Stream
       const startCompletion = performance.now();
       const providerOptions: ChatProviderOptions = {
         task: 'chat',
+        maxTokens: options.maxTokens ?? 4096,
         ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-        ...(options.maxTokens !== undefined ? { maxTokens: options.maxTokens } : {}),
       };
 
       const streamIterator = this.chatProvider.streamResponse(messages, providerOptions);
@@ -252,6 +303,21 @@ export class NotebookChatOrchestrator {
         }
       }
       const completionDurationMs = Math.round(performance.now() - startCompletion);
+
+      // Async Non-Blocking Memory Consolidation
+      if (this.memoryProvider && userId && fullAnswerText) {
+        this.memoryProvider
+          .add({
+            userId,
+            messages: [
+              { role: 'user', content: query },
+              { role: 'assistant', content: fullAnswerText },
+            ],
+          })
+          .catch((err) => {
+            logger.warn({ err, userId }, 'Background memory extraction failed in NotebookChatOrchestrator stream');
+          });
+      }
 
       // 6b. Output Guardrails Check
       try {
@@ -330,13 +396,33 @@ export class NotebookChatOrchestrator {
         return cached.questions;
       }
 
-      // 2. Generate contextual suggested questions via LLM
+      // 2. Fetch User Personal Memories & Source Content Chunks
+      let userMemories: MemoryItem[] = [];
+      if (this.memoryProvider && userId) {
+        userMemories = await this.memoryProvider.getAll(userId).catch(() => []);
+      }
+      const memoryContext = userMemories.length > 0 ? formatUserMemories(userMemories) : '';
+
+      const lastUserQuery = history.length > 0
+        ? history.filter((m) => m.role === MessageRole.USER).pop()?.content || 'key concepts overview'
+        : 'key concepts overview main topics summary';
+
+      const retrievalResult = await this.retrievalOrchestrator
+        .retrieve({
+          notebookId,
+          userId,
+          query: lastUserQuery,
+          topK: 5,
+        })
+        .catch(() => ({ context: '' }));
+      const sourceContext = retrievalResult.context || '';
+
       let contextPrompt = '';
       if (history.length > 0) {
         const conversationText = history
           .map((msg) => `${msg.role.toUpperCase()}: ${msg.content.slice(0, 300)}`)
           .join('\n');
-        contextPrompt = `Notebook: ${notebook.title}\nRecent Conversation:\n${conversationText}\n\nBased on this conversation and notebook sources, generate 3 to 4 concise, high-value follow-up questions the user might ask next.`;
+        contextPrompt = `Notebook Title: "${notebook.title}"\n\nRecent Conversation:\n${conversationText}\n\nRetrieved Source Context:\n${sourceContext.slice(0, 1500)}${memoryContext ? `\n\n${memoryContext}` : ''}\n\nBased on this conversation, source material, and user preferences, generate 3 to 4 concise, high-value follow-up questions the user might ask next.`;
       } else {
         const sourcesResult = await this.sourceService.listSources(notebookId, userId, { limit: 5 });
         const sources = sourcesResult.data || [];
@@ -344,7 +430,8 @@ export class NotebookChatOrchestrator {
           .map((s: Source) => s.displayName || s.title || (s.metadata as any)?.originalName || s.type)
           .filter(Boolean)
           .join(', ');
-        contextPrompt = `Notebook Title: ${notebook.title}\nKnowledge Sources: ${sourceTitles || 'Uploaded documents'}\n\nBased on these knowledge sources, generate 3 to 4 concise, intriguing initial questions the user can ask about these topics.`;
+
+        contextPrompt = `Notebook Title: "${notebook.title}"\nKnowledge Sources: ${sourceTitles || 'Uploaded documents'}\n\nRetrieved Knowledge Base Excerpts:\n${sourceContext.slice(0, 1500)}${memoryContext ? `\n\n${memoryContext}` : ''}\n\nBased on these knowledge sources and user preferences, generate 3 to 4 concise, intriguing initial questions the user can ask about these topics.`;
       }
 
       const systemPrompt = `You are a helpful study assistant. Output ONLY a valid JSON array of 3 to 4 short question strings (max 12 words per question). Do not include markdown formatting, preambles, or explanations. Example output: ["What are the main concepts?", "How does this compare to traditional models?", "Can you summarize the key findings?"]`;

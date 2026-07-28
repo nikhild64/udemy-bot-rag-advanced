@@ -10,3 +10,4 @@ export * from './reranker-provider.contract';
 export * from './input-guard.contract';
 export * from './output-guard.contract';
 export * from './crag-evaluator.contract';
+export * from './memory-provider.contract';

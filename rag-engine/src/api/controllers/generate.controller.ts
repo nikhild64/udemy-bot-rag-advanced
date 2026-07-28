@@ -7,9 +7,24 @@ import { audioStorageService } from '@/services/audio-storage.service';
 import { TTSServiceFactory } from '@/services/tts.service';
 import { DenseNotebookRetriever } from '@/retrieval/notebook/DenseNotebookRetriever';
 import { PrismaUserRepository } from '@/repositories/PrismaUserRepository';
+import { Mem0MemoryProvider } from '@/providers/memory/Mem0MemoryProvider';
+import { formatUserMemories } from '@/prompts/templates';
+import { config } from '@/config';
 import { UnauthorizedError, ValidationError, ForbiddenError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
 import fs from 'fs';
+
+async function getUserMemoryContext(userId: string): Promise<string> {
+  try {
+    const memoryProvider = new Mem0MemoryProvider(config.memory);
+    const memories = await memoryProvider.getAll(userId);
+    if (!memories || memories.length === 0) return '';
+    return formatUserMemories(memories);
+  } catch (err) {
+    logger.warn({ err, userId }, '[Generate] Failed to fetch user memories for artifact generator');
+    return '';
+  }
+}
 
 // ─────────────────────────────────────────────
 // Shared helpers
@@ -390,6 +405,7 @@ export async function generatePodcastController(
       await updateArtifactProgress(notebookId, userId, 'podcast', 10, 'Analyzing knowledge sources...');
       
       const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+      const userMemoryText = await getUserMemoryContext(userId);
 
       await updateArtifactProgress(notebookId, userId, 'podcast', 40, 'Scripting the debate...');
 
@@ -401,8 +417,9 @@ export async function generatePodcastController(
       }
 
       const customReq = instructions ? `\n\nSpecific User Request / Target Focus Area:\n"${instructions}"\nEnsure the conversation specifically addresses and prioritizes this user request.` : '';
+      const memoryBlock = userMemoryText ? `\n\n${userMemoryText}` : '';
 
-      const userPrompt = `Notebook: "${notebook.title}"\n\nSource Knowledge Base:\n${sourceContext}${customReq}\n\nInstructions:\nCreate a captivating podcast episode that starts with a warm welcome and an intriguing real-life scenario or fact. Progressively increase the difficulty from foundational concepts to advanced technical nuances. Ensure a natural collaborative conversation between Alex and Jamie that covers key takeaways from the sources.\nLength Requirement: ${turnCountGuidance}`;
+      const userPrompt = `Notebook: "${notebook.title}"\n\nSource Knowledge Base:\n${sourceContext}${customReq}${memoryBlock}\n\nInstructions:\nCreate a captivating podcast episode that starts with a warm welcome and an intriguing real-life scenario or fact. Progressively increase the difficulty from foundational concepts to advanced technical nuances. Ensure a natural collaborative conversation between Alex and Jamie that covers key takeaways from the sources.\nLength Requirement: ${turnCountGuidance}`;
 
       const chatProvider = ChatProviderFactory.create();
       const response = await chatProvider.generateResponse(
@@ -586,12 +603,14 @@ export async function generateLearningPathController(
       logger.info({ notebookId, userId, timelineDays, hasInstructions: !!instructions }, '[Generate] Background learning path generation started');
       await updateArtifactProgress(notebookId, userId, 'learningPath', 10, 'Analyzing knowledge sources...');
       const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+      const userMemoryText = await getUserMemoryContext(userId);
 
       await updateArtifactProgress(notebookId, userId, 'learningPath', 50, 'Structuring the curriculum...');
 
       const customReq = instructions ? `\n\nSpecific User Target Focus Area:\n"${instructions}"\nPrioritize topics matching this request.` : '';
+      const memoryBlock = userMemoryText ? `\n\n${userMemoryText}` : '';
 
-      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Sources:\n${sourceContext}${customReq}\n\nPreparation Timeframe Constraint:\nThe user has ${timelineDays} to prepare. Create a practical, realistic learning path formatted for a ${timelineDays} timeframe. Divide total learning hours realistically and proportionally across the available material scope (e.g. 1.5–3 focused study hours per day rather than arbitrary 8-hour blocks). Ensure every step links to specific page numbers, section headers, or timestamp ranges from the sources.`;
+      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Sources:\n${sourceContext}${customReq}${memoryBlock}\n\nPreparation Timeframe Constraint:\nThe user has ${timelineDays} to prepare. Create a practical, realistic learning path formatted for a ${timelineDays} timeframe. Divide total learning hours realistically and proportionally across the available material scope (e.g. 1.5–3 focused study hours per day rather than arbitrary 8-hour blocks). Ensure every step links to specific page numbers, section headers, or timestamp ranges from the sources.`;
 
       const chatProvider = ChatProviderFactory.create();
       const response = await chatProvider.generateResponse(
@@ -736,12 +755,14 @@ export async function generateFlashcardsController(
       logger.info({ notebookId, userId, count, hasInstructions: !!instructions }, '[Generate] Background flashcards generation started');
       await updateArtifactProgress(notebookId, userId, 'flashcards', 10, 'Analyzing knowledge sources...');
       const sourceContext = await buildNotebookSourceContext(notebookId, userId, notebook.title, instructions);
+      const userMemoryText = await getUserMemoryContext(userId);
 
       await updateArtifactProgress(notebookId, userId, 'flashcards', 50, 'Extracting key concepts...');
 
       const customReq = instructions ? `\n\nSpecific User Target Focus Area:\n"${instructions}"\nEnsure generated flashcards prioritize and test knowledge around this request.` : '';
+      const memoryBlock = userMemoryText ? `\n\n${userMemoryText}` : '';
 
-      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Knowledge Base Sources:\n${sourceContext}${customReq}\n\nGenerate exactly ${count} interactive study flashcards covering key definitions, core concepts, edge cases, and insights from these sources. Keep 'back' answers concise (1-3 sentences maximum).`;
+      const userPrompt = `Notebook: "${notebook.title}"\n\nAvailable Knowledge Base Sources:\n${sourceContext}${customReq}${memoryBlock}\n\nGenerate exactly ${count} interactive study flashcards covering key definitions, core concepts, edge cases, and insights from these sources. Keep 'back' answers concise (1-3 sentences maximum).`;
 
       const chatProvider = ChatProviderFactory.create();
       const response = await chatProvider.generateResponse(

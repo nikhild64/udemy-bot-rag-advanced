@@ -1,12 +1,11 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Moon, Sun, Globe, Clock, Check } from 'lucide-react';
+import { X, Settings, Moon, Sun, Globe, Clock, Check, Brain } from 'lucide-react';
 import { useTranslation } from '@/shared/lib/i18n-context';
 import { SupportedLanguage } from '@/shared/lib/i18n';
 import { apiClient } from '@/shared/api/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { UserMemoryModal } from '@/features/memory/components/UserMemoryModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -17,6 +16,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { language, setLanguage, t } = useTranslation();
   const [timezone, setTimezone] = useState('UTC');
   const [loading, setLoading] = useState(false);
+  const [memoryModalOpen, setMemoryModalOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -103,6 +103,30 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
             </select>
           </div>
+
+          {/* AI Memory Engine (Mem0) section */}
+          <div className="pt-2">
+            <div className="p-3.5 rounded-xl border border-border bg-card/60 flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-lg bg-[#F2A23A]/10 text-[#F2A23A]">
+                  <Brain className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-semibold text-foreground">Personal AI Memory</h4>
+                  <p className="text-[11px] text-muted-foreground">Manage your personal preferences and learned context</p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMemoryModalOpen(true)}
+                className="text-xs border-[#F2A23A]/40 text-[#F2A23A] hover:bg-[#F2A23A]/10"
+              >
+                Manage Memories
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div className="pt-4 border-t border-border flex justify-end space-x-3">
@@ -123,6 +147,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </Button>
         </div>
       </div>
+
+      <UserMemoryModal open={memoryModalOpen} onOpenChange={setMemoryModalOpen} />
     </div>
   );
 }

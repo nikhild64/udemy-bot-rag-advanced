@@ -134,3 +134,70 @@ export async function streamChatQuery(
     reader.releaseLock()
   }
 }
+
+export interface MemoryItem {
+  id: string;
+  memory: string;
+  score?: number;
+  createdAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function fetchUserMemories(token?: string | null): Promise<MemoryItem[]> {
+  const authToken = await resolveAuthToken(token);
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const response = await fetch(`${API_URL}/memory`, { headers });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.memories || [];
+}
+
+export async function addUserMemory(memory: string, token?: string | null): Promise<MemoryItem[]> {
+  const authToken = await resolveAuthToken(token);
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const response = await fetch(`${API_URL}/memory`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ memory }),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || "Failed to add memory");
+  }
+  const data = await response.json();
+  return data.memories || [];
+}
+
+export async function deleteUserMemory(memoryId: string, token?: string | null): Promise<void> {
+  const authToken = await resolveAuthToken(token);
+  const headers: Record<string, string> = {};
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const response = await fetch(`${API_URL}/memory/${encodeURIComponent(memoryId)}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || "Failed to delete memory");
+  }
+}
+
+export async function deleteAllUserMemories(token?: string | null): Promise<void> {
+  const authToken = await resolveAuthToken(token);
+  const headers: Record<string, string> = {};
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const response = await fetch(`${API_URL}/memory`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || "Failed to clear all memories");
+  }
+}

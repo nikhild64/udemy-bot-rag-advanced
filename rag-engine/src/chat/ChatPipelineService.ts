@@ -20,6 +20,7 @@ import { OutputGuardService } from '../guardrails/output/OutputGuardService';
 import { RerankRequest, RerankResult } from '../core/models/rerank.model';
 import { RetrievedChunk } from '../retrieval/RetrievalResult';
 import { CRAGService } from '../crag/CRAGService';
+import { MemoryProvider, MemoryItem } from '../core/contracts/memory-provider.contract';
 import { config } from '../config';
 
 export class ChatPipelineService implements ChatPipeline {
@@ -31,11 +32,12 @@ export class ChatPipelineService implements ChatPipeline {
     private readonly promptBuilderService: PromptBuilderService,
     private readonly chatProvider: ChatProvider,
     private readonly outputGuardService: OutputGuardService,
-    private readonly cragService?: CRAGService
+    private readonly cragService?: CRAGService,
+    private readonly memoryProvider?: MemoryProvider
   ) {}
 
   public async chat(request: ChatRequest): Promise<ChatPipelineResponse> {
-    logger.info({ query: request.query }, 'Chat pipeline started');
+    logger.info({ query: request.query, userId: request.userId }, 'Chat pipeline started');
     const startTotal = performance.now();
 
     // Step 1: Input Guardrails
@@ -43,6 +45,18 @@ export class ChatPipelineService implements ChatPipeline {
     const guardRequest: GuardRequest = { query: request.query };
     const sanitizedRequest = await this.inputGuardService.validateAndSanitize(guardRequest);
     logger.debug({ durationMs: Math.round(performance.now() - startInputGuard) }, 'Input Guardrails completed');
+
+    // Step 1b: User Memory Retrieval
+    let userMemories: MemoryItem[] = [];
+    if (this.memoryProvider && request.userId) {
+      const startMemory = performance.now();
+      userMemories = await this.memoryProvider.search({
+        query: sanitizedRequest.query,
+        userId: request.userId,
+        topK: config.memory.topK,
+      });
+      logger.debug({ durationMs: Math.round(performance.now() - startMemory), count: userMemories.length }, 'User memories retrieved');
+    }
 
     // Step 2: Query Transformation
     const startTransformation = performance.now();
@@ -67,6 +81,7 @@ export class ChatPipelineService implements ChatPipeline {
             answer: "I couldn't find any relevant information to answer your query.",
             citations: [],
             retrievedChunks: [],
+            memories: userMemories,
             metadata: {
                 totalDurationMs: Math.round(performance.now() - startTotal)
             }
@@ -94,6 +109,7 @@ export class ChatPipelineService implements ChatPipeline {
           answer: 'I am unable to find sufficient relevant information in the knowledge base to answer your query confidently.',
           citations: [],
           retrievedChunks: [],
+          memories: userMemories,
           metadata: {
             totalDurationMs: Math.round(performance.now() - startTotal),
             transformationStrategy: transformationResult.strategy,
@@ -115,11 +131,12 @@ export class ChatPipelineService implements ChatPipeline {
     const rerankResult = await this.rerankerProvider.rerank(rerankRequest) as RerankResult<RetrievedChunk>;
     logger.debug({ durationMs: Math.round(performance.now() - startReranking) }, 'Reranking completed');
 
-    // Step 6: Prompt Construction
+    // Step 6: Prompt Construction (with User Memories)
     const startPrompt = performance.now();
     const promptBuildRequest = {
       query: sanitizedRequest.query,
       chunks: rerankResult.chunks,
+      memories: userMemories,
     };
     const promptResult = this.promptBuilderService.buildPrompt(promptBuildRequest);
     logger.debug({ durationMs: Math.round(performance.now() - startPrompt) }, 'Prompt built');
@@ -144,12 +161,24 @@ export class ChatPipelineService implements ChatPipeline {
     const sanitizedAiResponse = await this.outputGuardService.validateAndSanitize(aiResponse);
     logger.debug({ durationMs: Math.round(performance.now() - startOutputGuard) }, 'Output Guardrails completed');
 
+    // Step 8b: Background Memory Consolidation Hook
+    if (this.memoryProvider && request.userId) {
+      this.memoryProvider.add({
+        userId: request.userId,
+        messages: [
+          { role: 'user', content: sanitizedRequest.query },
+          { role: 'assistant', content: sanitizedAiResponse.message.content },
+        ],
+      }).catch((err) => logger.error({ err }, 'Background memory add failed'));
+    }
+
     // Step 9: Build Response
     const totalDurationMs = Math.round(performance.now() - startTotal);
     const pipelineResponse: ChatPipelineResponse = {
       answer: sanitizedAiResponse.message.content,
       citations: retrievalResult.citations,
       retrievedChunks: rerankResult.chunks as RetrievedChunk[],
+      memories: userMemories,
       metadata: {
         totalDurationMs,
         transformationStrategy: transformationResult.strategy,
@@ -162,13 +191,23 @@ export class ChatPipelineService implements ChatPipeline {
   }
 
   public async *stream(request: ChatRequest): AsyncIterable<ChatStreamEvent> {
-    logger.info({ query: request.query }, 'Chat streaming pipeline started');
+    logger.info({ query: request.query, userId: request.userId }, 'Chat streaming pipeline started');
     yield { type: 'start' };
 
     try {
       // Step 1: Input Guardrails
       const guardRequest: GuardRequest = { query: request.query };
       const sanitizedRequest = await this.inputGuardService.validateAndSanitize(guardRequest);
+
+      // Step 1b: User Memory Retrieval
+      let userMemories: MemoryItem[] = [];
+      if (this.memoryProvider && request.userId) {
+        userMemories = await this.memoryProvider.search({
+          query: sanitizedRequest.query,
+          userId: request.userId,
+          topK: config.memory.topK,
+        });
+      }
 
       // Step 2: Query Transformation
       const transformationResult = await this.queryTransformationStrategy.transform(sanitizedRequest.query);
@@ -231,10 +270,11 @@ export class ChatPipelineService implements ChatPipeline {
         }
       }
 
-      // Step 6: Prompt Construction
+      // Step 6: Prompt Construction (with User Memories)
       const promptBuildRequest = {
         query: sanitizedRequest.query,
         chunks: rerankResult.chunks,
+        memories: userMemories,
       };
       const promptResult = this.promptBuilderService.buildPrompt(promptBuildRequest);
 
@@ -265,6 +305,17 @@ export class ChatPipelineService implements ChatPipeline {
         logger.warn({ err }, 'Output guardrails rejected the streamed response');
         yield { type: 'error', data: { message: 'The generated response violated safety policies.' } };
         return;
+      }
+
+      // Step 8b: Background Memory Consolidation Hook
+      if (this.memoryProvider && request.userId && fullAnswer) {
+        this.memoryProvider.add({
+          userId: request.userId,
+          messages: [
+            { role: 'user', content: sanitizedRequest.query },
+            { role: 'assistant', content: fullAnswer },
+          ],
+        }).catch((err) => logger.error({ err }, 'Background memory add failed during stream'));
       }
 
       yield { type: 'done' };

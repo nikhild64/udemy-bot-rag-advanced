@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChaibookLM · Technical RAG Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Mermaid.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #121212;
+      --card-bg: #1A1A1A;
+      --card-border: #2B2B2B;
+      --accent: #F2A23A;
+      --text: #FFFFFF;
+      --muted: #A9A9A9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 1.5rem;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 900px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2.25rem;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+      display: flex;
+      justify-content: center;
+    }
+
+    .mermaid {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="mermaid">
+flowchart TD
+    %% Technical Node Styling Classes
+    classDef ingestStyle fill:#1E293B,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC;
+    classDef chunkStyle fill:#2E1065,stroke:#C084FC,stroke-width:2px,color:#F3E8FF;
+    classDef vectorStyle fill:#064E3B,stroke:#34D399,stroke-width:2px,color:#ECFDF5;
+    classDef queryStyle fill:#312E81,stroke:#818CF8,stroke-width:2px,color:#EEF2FF;
+    classDef cragStyle fill:#831843,stroke:#F472B6,stroke-width:2px,color:#FCE7F3;
+    classDef genStyle fill:#451A03,stroke:#F59E0B,stroke-width:2px,color:#FEF3C7;
+    classDef citeStyle fill:#14532D,stroke:#4ADE80,stroke-width:2px,color:#F0FDF4;
+
+    %% 1. Ingestion & Vector Indexing Phase
+    subgraph PHASE1["1. Data Ingestion & Vector Storage Pipeline"]
+        SRC["📥 <b>Raw Data Ingestion</b><br/>PDF Documents • Plain Text • Web Pages • YouTube Captions • VTT Files"]:::ingestStyle
+        PARSE["⚙️ <b>Document Parsers & Extractors</b><br/>PdfExtractor • HtmlExtractor • YouTubeLoader • VttExtractor"]:::ingestStyle
+        CHUNK["✂️ <b>Hierarchical & Semantic Chunker</b><br/>Text Splitting (500-1000 Tokens) + Header & Timestamp Metadata"]:::chunkStyle
+        EMBED["🧠 <b>Vector Embedding Generator</b><br/>Generates Dense High-Dimensional Vector Embeddings"]:::vectorStyle
+        STORE[("💾 <b>Qdrant Vector Database</b><br/>Cosine Similarity Indexing + Notebook ID Payload Isolation")]:::vectorStyle
+
+        SRC --> PARSE --> CHUNK --> EMBED --> STORE
+    end
+
+    %% 2. Query Transformation & Retrieval Phase
+    subgraph PHASE2["2. Query Transformation & Vector Search"]
+        QUERY["💬 <b>Natural Language User Query</b>"]:::queryStyle
+        INGUARD["🛡️ <b>Input Guardrails Service</b><br/>Query Sanitization • Max Length • Injection Defense"]:::queryStyle
+        QTRANS["🔄 <b>Query Transformation Strategies</b><br/>Rewrite • StepBack • SubQuestion Composite Expansion"]:::queryStyle
+        SEARCH["🔍 <b>Multi-Query Vector Retrieval</b><br/>Parallel Vector Search in Qdrant with Notebook Filters"]:::vectorStyle
+
+        QUERY --> INGUARD --> QTRANS --> SEARCH
+        STORE -.->|Vector Search| SEARCH
+    end
+
+    %% 3. CRAG Quality Gate & Reranking Phase
+    subgraph PHASE3["3. Corrective RAG Gate & Context Reranking"]
+        CRAG["🎯 <b>Corrective RAG (CRAG) Service</b><br/>Evaluates Context Relevance • Triggers Adaptive Query Retries / Fallback"]:::cragStyle
+        RERANK["⚖️ <b>LLM Context Reranker</b><br/>Re-scores Candidate Snippets & Orders Top Relevant Context"]:::cragStyle
+
+        SEARCH --> CRAG --> RERANK
+    end
+
+    %% 4. Prompt Engineering & Generation Phase
+    subgraph PHASE4["4. Response Generation & Citation Attribution"]
+        PROMPT["📄 <b>Prompt Construction Service</b><br/>Assembles System Directives, User Prompt & Cited Context Chunks"]:::genStyle
+        LLM["⚡ <b>LLM Generation Engine</b><br/>Server-Sent Events (SSE) Token Streaming Response"]:::genStyle
+        OUTGUARD["🛡️ <b>Output Guardrails Service</b><br/>Response Size Check • Citation Integrity Verification"]:::genStyle
+        OUT["📝 <b>Grounded Output with Citations</b><br/>Response containing metadata-linked Citation IDs"]:::citeStyle
+
+        RERANK --> PROMPT --> LLM --> OUTGUARD --> OUT
+    end
+
+    %% Subgraph Card Styles
+    style PHASE1 fill:#161616,stroke:#2B2B2B,stroke-width:1.5px,color:#A9A9A9;
+    style PHASE2 fill:#161616,stroke:#2B2B2B,stroke-width:1.5px,color:#A9A9A9;
+    style PHASE3 fill:#161616,stroke:#2B2B2B,stroke-width:1.5px,color:#A9A9A9;
+    style PHASE4 fill:#161616,stroke:#2B2B2B,stroke-width:1.5px,color:#A9A9A9;
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkColor: '#1A1A1A',
+        primaryColor: '#232323',
+        primaryBorderColor: '#F2A23A',
+        primaryTextColor: '#FFFFFF',
+        lineColor: '#F2A23A',
+        fontSize: '13px',
+        fontFamily: 'Inter, sans-serif'
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+  </script>
+</body>
+</html>

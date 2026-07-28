@@ -6,7 +6,9 @@ export async function postChat(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const chatRequest = request.body as ChatRequest;
+  const body = (request.body as ChatRequest) || {};
+  const userId = request.auth?.userId || (request as any).userId || (request.headers['x-test-user-id'] as string);
+  const chatRequest: ChatRequest = { ...body, userId };
   
   // Pipeline is injected on the Fastify instance via DI plugin
   const pipeline = request.server.chatPipelineService;
@@ -20,7 +22,9 @@ export async function postChatStream(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const chatRequest = request.body as ChatRequest;
+  const body = (request.body as ChatRequest) || {};
+  const userId = request.auth?.userId || (request as any).userId || (request.headers['x-test-user-id'] as string);
+  const chatRequest: ChatRequest = { ...body, userId };
   const pipeline = request.server.chatPipelineService;
 
   reply.header('Content-Type', 'text/event-stream');

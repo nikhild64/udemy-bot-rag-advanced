@@ -1,24 +1,30 @@
 import { RetrievedChunk } from '../retrieval/RetrievalResult';
+import { MemoryItem } from '../core/contracts/memory-provider.contract';
 
-export const SYSTEM_PROMPT_TEMPLATE = `You are a helpful AI assistant.
+export const SYSTEM_PROMPT_TEMPLATE = `You are a helpful, intelligent AI assistant.
 
-Answer ONLY using the supplied context.
+Answer the user's question directly, clearly, and conversationally using the supplied context.
 
-If the answer cannot be found in the supplied context, respond:
-
-"I couldn't find this information in the indexed knowledge base."
-
-Do not invent facts.
-
-Do not use prior knowledge.
-
-Always reference the supplied sources. When citing a source, include the module and lesson title along with the timestamp, using this exact format: (Source [Number], [Module Title] - [Lesson Title], Timestamp: [start] → [end]).`;
+Rules for response generation:
+1. Speak naturally, warmly, and helpfully. Answer the user's question immediately.
+2. CRITICAL: Do NOT start your responses with robotic meta-disclaimers such as "Based on the provided context...", "According to the supplied sources...", or "Based on the notebook context...". Provide direct, engaging, and factual answers.
+3. If the answer cannot be found in the supplied context, politely respond: "I couldn't find this information in your knowledge base."
+4. Do not invent facts or use unverified external knowledge.
+5. Always reference the supplied sources when citing. When citing a source, include the module and lesson title along with the timestamp, using this exact format: (Source [Number], [Module Title] - [Lesson Title], Timestamp: [start] → [end]).`;
 
 export function formatTime(secs: number | undefined): string {
   if (secs === undefined) return 'Unknown';
   const m = Math.floor(secs / 60).toString().padStart(2, '0');
   const s = Math.floor(secs % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
+}
+
+export function formatUserMemories(memories?: readonly MemoryItem[]): string {
+  if (!memories || memories.length === 0) {
+    return '';
+  }
+  const memoryLines = memories.map((m) => `- ${m.memory}`).join('\n');
+  return `\n\n[USER PERSONAL CONTEXT & MEMORIES]\nThe following remembered preferences and context apply to this user:\n${memoryLines}`;
 }
 
 export function formatContextChunks(chunks: readonly RetrievedChunk[]): string {

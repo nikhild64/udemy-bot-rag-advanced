@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChaibookLM · High-Level RAG Architecture Flowchart</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <!-- Mermaid.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #121212;
+      --card-bg: #1A1A1A;
+      --card-border: #2B2B2B;
+      --accent: #F2A23A;
+      --accent-hover: #e09229;
+      --text: #FFFFFF;
+      --muted: #A9A9A9;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1.5rem;
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+    }
+
+    /* App Theme Header */
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.9rem;
+      background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+      color: #FFFFFF;
+    }
+
+    p.subtitle {
+      font-size: 1rem;
+      color: var(--muted);
+      max-width: 620px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* Diagram Container Card */
+    .diagram-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.6);
+      margin-bottom: 2.5rem;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Stage Cards Grid */
+    .stages-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .stage-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      transition: border-color 220ms ease, transform 220ms ease;
+    }
+
+    .stage-card:hover {
+      border-color: color-mix(in srgb, var(--card-border) 50%, var(--accent));
+      transform: translateY(-2px);
+    }
+
+    .stage-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .stage-card__icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #232323;
+      border: 1px solid var(--card-border);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .stage-card__badge {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: #232323;
+      color: var(--accent);
+      border: 1px solid var(--card-border);
+    }
+
+    .stage-card__title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #FFFFFF;
+      margin-bottom: 0.35rem;
+    }
+
+    .stage-card__desc {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <header>
+      <div class="logo-badge">
+        <svg width="14" height="14" viewBox="0 0 2000 2000" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1507.79 760.427c-.65 63.101-207.62 111.366-468.81 108.688-261.194-2.678-465.548-45.025-464.901-108.125s206.05-123.061 467.241-120.383 467.11 56.719 466.47 119.82Z" fill="#F2A23A"/>
+        </svg>
+        ChaibookLM Architecture
+      </div>
+      <h1>High-Level RAG Pipeline Flowchart</h1>
+      <p class="subtitle">
+        Clean, theme-matched high-level architecture diagram detailing the 7 core components of our knowledge engine pipeline.
+      </p>
+    </header>
+
+    <!-- Theme-Aware High-Level Mermaid Flowchart -->
+    <div class="diagram-card">
+      <div class="mermaid">
+flowchart TB
+    %% Styling Configuration
+    accTitle: ChaibookLM RAG Pipeline
+    
+    classDef feStyle fill:#1A1A1A,stroke:#F2A23A,stroke-width:2px,color:#FFFFFF;
+    classDef apiStyle fill:#1A1A1A,stroke:#38BDF8,stroke-width:2px,color:#FFFFFF;
+    classDef ingestStyle fill:#1A1A1A,stroke:#A855F7,stroke-width:2px,color:#FFFFFF;
+    classDef chunkStyle fill:#1A1A1A,stroke:#F2A23A,stroke-width:2px,color:#FFFFFF;
+    classDef storeStyle fill:#1A1A1A,stroke:#34D399,stroke-width:2px,color:#FFFFFF;
+    classDef ragStyle fill:#1A1A1A,stroke:#F43F5E,stroke-width:2px,color:#FFFFFF;
+    classDef synthStyle fill:#1A1A1A,stroke:#F59E0B,stroke-width:2px,color:#FFFFFF;
+
+    %% High-Level 7 Nodes
+    N1["🌐 1. Web Frontend & Auth Client<br/><i>Next.js 16 • Clerk Authentication</i>"]:::feStyle
+    N2["🛡️ 2. API Gateway & Guardrails<br/><i>Fastify API • Input/Output Guardrails</i>"]:::apiStyle
+    N3["📥 3. Multimodal Ingestion Pipeline<br/><i>PDFs • Web URLs • YouTube Transcripts</i>"]:::ingestStyle
+    N4["✂️ 4. Semantic Chunker & Embedder<br/><i>500-1000 Token Chunks • Vector Embeddings</i>"]:::chunkStyle
+    N5["💾 5. Database & Vector Memory<br/><i>PostgreSQL (Metadata) • Qdrant Vector DB</i>"]:::storeStyle
+    N6["🔍 6. Hybrid Search & Reranker<br/><i>Dense + Keyword Search • CRAG Evaluator</i>"]:::ragStyle
+    N7["✨ 7. Grounded Answer & Citation Stream<br/><i>Grounded System Prompt • SSE Stream + Citations</i>"]:::synthStyle
+
+    %% Clean Flow Links
+    N1 -->|1. User Prompt / File Upload| N2
+    N2 -->|2. Validated Upload| N3
+    N3 -->|3. Clean Text| N4
+    N4 -->|4. Store Vectors & Metadata| N5
+    
+    N2 -->|5. Chat Question| N6
+    N6 -->|6. Query Context| N5
+    N5 -->|7. Top Excerpts| N6
+    N6 -->|8. Verified Context| N7
+    N7 -->|9. Stream Response + Citations| N1
+      </div>
+    </div>
+
+    <!-- High-Level Stage Cards -->
+    <div class="stages-grid">
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">🌐</div>
+          <span class="stage-card__badge">Client</span>
+        </div>
+        <h3 class="stage-card__title">1. Web Frontend & Auth</h3>
+        <p class="stage-card__desc">Next.js UI handles secure authentication, workspace state, file uploads, and streaming AI responses.</p>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">🛡️</div>
+          <span class="stage-card__badge">Security</span>
+        </div>
+        <h3 class="stage-card__title">2. Gateway & Guardrails</h3>
+        <p class="stage-card__desc">Fastify API validates requests with input/output guardrails (XSS, PII, prompt injection, and output size control).</p>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">📥</div>
+          <span class="stage-card__badge">Ingestion</span>
+        </div>
+        <h3 class="stage-card__title">3. Multimodal Ingestion</h3>
+        <p class="stage-card__desc">Parses PDFs, DOCX notes, web pages, and YouTube video/playlist transcripts into structured text nodes.</p>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">✂️</div>
+          <span class="stage-card__badge">Processing</span>
+        </div>
+        <h3 class="stage-card__title">4. Chunking & Embeddings</h3>
+        <p class="stage-card__desc">Divides text into 500-1000 token semantic chunks preserving section headers, and generates dense vector embeddings.</p>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">💾</div>
+          <span class="stage-card__badge">Storage</span>
+        </div>
+        <h3 class="stage-card__title">5. Database & Vector Memory</h3>
+        <p class="stage-card__desc">PostgreSQL manages user metadata and source records, while Qdrant stores high-speed vector embeddings.</p>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">🔍</div>
+          <span class="stage-card__badge">Retrieval</span>
+        </div>
+        <h3 class="stage-card__title">6. Hybrid Search & Reranker</h3>
+        <p class="stage-card__desc">Combines vector similarity and keyword search, re-ranking candidate excerpts via CRAG evaluation.</p>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-card__header">
+          <div class="stage-card__icon">✨</div>
+          <span class="stage-card__badge">Synthesis</span>
+        </div>
+        <h3 class="stage-card__title">7. Grounded Answer Stream</h3>
+        <p class="stage-card__desc">Assembles system prompts, streams LLM response tokens, and attaches footnote citations with exact source quotes.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      ChaibookLM Architecture Diagram · High-Level RAG System Overview
+    </footer>
+
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkColor: '#1A1A1A',
+        primaryColor: '#1A1A1A',
+        primaryBorderColor: '#F2A23A',
+        primaryTextColor: '#FFFFFF',
+        lineColor: '#F2A23A',
+        fontSize: '13px',
+        fontFamily: 'Inter, sans-serif'
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+  </script>
+</body>
+</html>

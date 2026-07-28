@@ -65,6 +65,7 @@ export function useChat(notebookId: string | null) {
               setStreamingContent('');
               setStreamingCitations([]);
               queryClient.invalidateQueries({ queryKey: ['messages', notebookId] });
+              queryClient.invalidateQueries({ queryKey: ['suggestedQuestions', notebookId] });
             },
             (err) => {
               setIsStreaming(false);
@@ -84,6 +85,7 @@ export function useChat(notebookId: string | null) {
           queryClient.setQueryData<Message[]>(['messages', notebookId], (old = []) => [...old, assistantMsg]);
           setIsStreaming(false);
           queryClient.invalidateQueries({ queryKey: ['messages', notebookId] });
+          queryClient.invalidateQueries({ queryKey: ['suggestedQuestions', notebookId] });
         }
       } catch (err: any) {
         setIsStreaming(false);

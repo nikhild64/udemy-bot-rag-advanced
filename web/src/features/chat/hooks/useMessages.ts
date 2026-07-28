@@ -23,6 +23,7 @@ export function useDeleteMessageMutation(notebookId: string | null) {
     onSuccess: (data) => {
       if (notebookId) {
         queryClient.invalidateQueries({ queryKey: ['messages', notebookId] });
+        queryClient.invalidateQueries({ queryKey: ['suggestedQuestions', notebookId] });
       }
       toast.success(
         data.deletedCount > 1

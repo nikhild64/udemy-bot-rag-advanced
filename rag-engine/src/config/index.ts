@@ -15,6 +15,8 @@ import { supabaseConfig, SupabaseConfig } from './supabase';
 import { redisConfig, RedisConfig } from './redis';
 import { uploadConfig, UploadConfig } from './upload';
 
+import { memoryConfig, MemoryConfig } from './memory';
+
 export interface ApplicationConfig {
   readonly app: AppConfig;
   readonly logger: LoggerConfig;
@@ -32,6 +34,7 @@ export interface ApplicationConfig {
   readonly supabase: SupabaseConfig;
   readonly redis: RedisConfig;
   readonly upload: UploadConfig;
+  readonly memory: MemoryConfig;
 }
 
 export const config: ApplicationConfig = {
@@ -51,6 +54,7 @@ export const config: ApplicationConfig = {
   supabase: supabaseConfig,
   redis: redisConfig,
   upload: uploadConfig,
+  memory: memoryConfig,
 };
 
 export * from './app';
@@ -69,3 +73,4 @@ export * from './database';
 export * from './supabase';
 export * from './redis';
 export * from './upload';
+export * from './memory';
