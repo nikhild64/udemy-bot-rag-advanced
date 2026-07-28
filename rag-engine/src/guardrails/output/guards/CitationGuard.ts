@@ -7,7 +7,9 @@ export class CitationGuard implements OutputGuard {
   }
 
   async evaluate(response: ChatResponse): Promise<GuardResult> {
-    const text = response.message.content;
+    const rawText = response.message.content;
+    // Strip fenced code blocks and inline code snippets so code array indexing (e.g. items[0]) isn't flagged as citation tags
+    const text = rawText.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '');
     
     // Detect empty brackets (Missing citation ID)
     if (/\[\s*\]/.test(text)) {

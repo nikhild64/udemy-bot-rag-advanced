@@ -32,6 +32,13 @@ describe('InputGuardService', () => {
     expect(result.query).toBe('What is RAG?');
   });
 
+  it('should allow user angular learning pathway query', async () => {
+    const service = new InputGuardService(baseConfig);
+    const query = 'i want to learn angular in dept, help me do that by provideing best pathway ??';
+    const result = await service.validateAndSanitize({ query });
+    expect(result.query).toBe(query);
+  });
+
   it('should modify queries that require normalization', async () => {
     const service = new InputGuardService(baseConfig);
     // \u212B is angstrom sign -> A with ring (\u00C5)
