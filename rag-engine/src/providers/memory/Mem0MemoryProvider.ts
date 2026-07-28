@@ -47,7 +47,7 @@ export class Mem0MemoryProvider implements MemoryProvider {
         return [];
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
       const rawMemories = Array.isArray(data) ? data : data.results || data.memories || [];
 
       return rawMemories.slice(0, topK).map((item: any) => ({
@@ -109,7 +109,7 @@ export class Mem0MemoryProvider implements MemoryProvider {
         return [];
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
       const rawMemories = Array.isArray(data) ? data : data.results || data.memories || [];
 
       logger.debug({ userId: options.userId, count: rawMemories.length }, 'Successfully processed memory add in Mem0');
@@ -150,7 +150,7 @@ export class Mem0MemoryProvider implements MemoryProvider {
         return [];
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
       const rawMemories = Array.isArray(data) ? data : data.results || data.memories || [];
 
       return rawMemories.map((item: any) => ({

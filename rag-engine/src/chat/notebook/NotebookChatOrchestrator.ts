@@ -16,6 +16,7 @@ import { config } from '@/config';
 import { ChatRole } from '@/types';
 import { ValidationError, AppError } from '@/shared/errors';
 import { logger } from '@/shared/logger';
+import { formatUserMemories } from '@/prompts/templates';
 import {
   NotebookChatOptions,
   NotebookChatResponse,
